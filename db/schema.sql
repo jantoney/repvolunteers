@@ -1,0 +1,26 @@
+CREATE TABLE IF NOT EXISTS shows (
+  id SERIAL PRIMARY KEY,
+  name TEXT NOT NULL,
+  date DATE NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS volunteers (
+  id SERIAL PRIMARY KEY,
+  name TEXT NOT NULL,
+  email TEXT,
+  phone TEXT
+);
+
+CREATE TABLE IF NOT EXISTS shifts (
+  id SERIAL PRIMARY KEY,
+  show_id INTEGER REFERENCES shows(id) ON DELETE CASCADE,
+  role TEXT NOT NULL,
+  start_time TIMESTAMP NOT NULL,
+  end_time TIMESTAMP NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS volunteer_shifts (
+  volunteer_id INTEGER REFERENCES volunteers(id) ON DELETE CASCADE,
+  shift_id INTEGER REFERENCES shifts(id) ON DELETE CASCADE,
+  PRIMARY KEY (volunteer_id, shift_id)
+);
