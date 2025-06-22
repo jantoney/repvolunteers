@@ -1,14 +1,31 @@
-import { Pool } from "https://deno.land/x/postgres@v0.17.0/mod.ts";
+import { Pool } from "postgres";
+import { Pool as PgPool } from "pg";
+import { createPool, createPgPool } from "../utils/db-utils.ts";
 
 let pool: Pool;
+let authPool: PgPool;
 
 export function getPool() {
   if (!pool) throw new Error("Database not initialized");
   return pool;
 }
 
+export function getAuthPool() {
+  if (!authPool) throw new Error("Database not initialized");
+  return authPool;
+}
+
 export async function initDb() {
-  const connectionString = Deno.env.get("DATABASE_URL");
-  if (!connectionString) throw new Error("DATABASE_URL not set");
-  pool = new Pool(connectionString, 10, true);
+  try {
+    // Create main application pool
+    pool = await createPool(10);
+    
+    // Create separate pg pool for authentication (Better Auth)
+    authPool = await createPgPool();
+    
+    console.log("Database pools initialized successfully");
+  } catch (error) {
+    console.error("Failed to initialize database:", error);
+    throw error;
+  }
 }

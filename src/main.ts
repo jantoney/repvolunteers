@@ -1,14 +1,17 @@
-import { Application } from "https://deno.land/x/oak@12.6.1/mod.ts";
-import { oakCors } from "https://deno.land/x/cors@v1.2.2/mod.ts";
-import { load } from "https://deno.land/std@0.203.0/dotenv/mod.ts";
+import { Application } from "oak";
+import { oakCors } from "cors";
+import { load } from "dotenv";
 
-import router from "./routes/index.ts";
 import { initDb } from "./models/db.ts";
 
-const env = await load({ export: true });
+const _env = await load({ export: true });
 const port = parseInt(Deno.env.get("PORT") ?? "8000");
 
+// Initialize database first
 await initDb();
+
+// Import routes after database is initialized
+const { default: router } = await import("./routes/index.ts");
 
 const app = new Application();
 app.use(oakCors());

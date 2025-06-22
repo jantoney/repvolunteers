@@ -1,0 +1,13 @@
+{
+    "editor.codeActionsOnSave": {
+      "source.fixAll": "always",
+      "source.fixAll.eslint": "always"
+    },
+    "editor.formatOnSave": true,
+    "gitblame.inlineMessageEnabled": true,
+    "terminal.integrated.defaultProfile.windows": "Ubuntu (WSL)",
+    "github.copilot.chat.codeGeneration.useInstructionFiles": true,
+    "github.copilot.chat.agent.runTasks": true,
+    "deno.enable": true
+  }
+  

@@ -1,4 +1,4 @@
-import { Context, Status } from "https://deno.land/x/oak@12.6.1/mod.ts";
+import { Context, Status } from "oak";
 
 export async function requireAuth(ctx: Context, next: () => Promise<unknown>) {
   const auth = ctx.request.headers.get("authorization");

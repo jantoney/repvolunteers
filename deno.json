@@ -1,0 +1,23 @@
+{  "imports": {
+    "@types/pg": "npm:@types/pg@^8.15.4",
+    "oak": "https://deno.land/x/oak@v17.1.4/mod.ts",
+    "cors": "https://deno.land/x/cors@v1.2.2/mod.ts",
+    "dotenv": "https://deno.land/std@0.203.0/dotenv/mod.ts",
+    "bcrypt": "https://deno.land/x/bcrypt@v0.4.1/mod.ts",
+    "mustache": "https://deno.land/x/mustache@v0.3.0/mod.ts",
+    "postgres": "https://deno.land/x/postgres@v0.17.0/mod.ts",
+    "pg": "npm:pg@^8.16.2",
+    "better-auth": "npm:better-auth@1.2.10",
+    "jspdf": "npm:jspdf@^2.5.2"
+  },"tasks": {
+    "start": "deno run -A src/main.ts",
+    "dev": "deno run --watch=src/,views/,scripts/ -A src/main.ts",
+    "create-admin": "deno run -A scripts/create-admin.ts",
+    "migrate": "deno run -A scripts/migrate.ts"
+  },
+  "nodeModulesDir": "auto",
+  "compilerOptions": {
+    "lib": ["deno.window"],
+    "strict": true
+  }
+}

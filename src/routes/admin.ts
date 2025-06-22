@@ -1,27 +1,74 @@
-import { Router } from "https://deno.land/x/oak@12.6.1/mod.ts";
+import { Router } from "oak";
 import * as adminController from "../controllers/admin.ts";
-import { requireAuth } from "../middlewares/auth.ts";
+import { requireAdminAuth } from "../middlewares/better-auth.ts";
 
 const router = new Router();
 
-router.post("/login", adminController.login);
-router.use(requireAuth);
-router.get("/shows", adminController.listShows);
-router.post("/shows", adminController.createShow);
-router.put("/shows/:id", adminController.updateShow);
-router.delete("/shows/:id", adminController.deleteShow);
+// Public routes
+router.get("/login", adminController.showLoginForm);
+router.get("/logout", adminController.logout);
 
-router.get("/volunteers", adminController.listVolunteers);
-router.post("/volunteers", adminController.createVolunteer);
-router.get("/volunteers/:id", adminController.getVolunteer);
-router.put("/volunteers/:id", adminController.updateVolunteer);
-router.delete("/volunteers/:id", adminController.deleteVolunteer);
+// Protected admin routes - apply middleware first
+router.use(requireAdminAuth);
+router.get("/dashboard", adminController.showDashboard);
 
-router.get("/shifts", adminController.listShifts);
-router.post("/shifts", adminController.createShift);
-router.put("/shifts/:id", adminController.updateShift);
-router.delete("/shifts/:id", adminController.deleteShift);
+// Shows management pages
+router.get("/shows", adminController.showShowsPage);
+router.get("/shows/new", adminController.showNewShowForm);
+router.get("/shows/:id/edit", adminController.showEditShowForm);
 
-router.get("/analytics/unfilled", adminController.unfilledShifts);
+// Shows API endpoints
+router.get("/api/shows", adminController.listShows);
+router.post("/api/shows", adminController.createShow);
+router.put("/api/shows/:id", adminController.updateShow);
+router.delete("/api/shows/:id", adminController.deleteShow);
+router.get("/api/shows/:showId/dates", adminController.listShowDates);
+
+// Show dates API endpoints
+router.post("/api/show-dates", adminController.createShowDate);
+router.put("/api/show-dates/:id", adminController.updateShowDate);
+router.delete("/api/show-dates/:id", adminController.deleteShowDate);
+
+// Volunteers management pages
+router.get("/volunteers", adminController.showVolunteersPage);
+router.get("/volunteers/new", adminController.showNewVolunteerForm);
+router.get("/volunteers/:id/edit", adminController.showEditVolunteerForm);
+
+// Volunteers API endpoints
+router.get("/api/volunteers", adminController.listVolunteers);
+router.post("/api/volunteers", adminController.createVolunteer);
+router.get("/api/volunteers/:id", adminController.getVolunteer);
+router.put("/api/volunteers/:id", adminController.updateVolunteer);
+router.delete("/api/volunteers/:id", adminController.deleteVolunteer);
+
+// Shifts management pages
+router.get("/shifts", adminController.showShiftsPage);
+router.get("/shifts/new", adminController.showNewShiftForm);
+router.get("/shifts/:id/edit", adminController.showEditShiftForm);
+
+// Shifts API endpoints
+router.get("/api/shifts", adminController.listShifts);
+router.get("/api/shifts/calendar-data", adminController.getShiftCalendarData);
+router.get("/api/shifts/calendar-shows", adminController.getShowsForCalendar);
+router.get("/api/shifts/default-roles", adminController.getDefaultRoles);
+router.post("/api/shifts", adminController.createShift);
+router.put("/api/shifts/:id", adminController.updateShift);
+router.delete("/api/shifts/:id", adminController.deleteShift);
+
+// Analytics pages
+router.get("/unfilled-shifts", adminController.showUnfilledShiftsPage);
+
+// Analytics API endpoints
+router.get("/api/analytics/unfilled", adminController.unfilledShifts);
+router.get("/api/unfilled-shifts/count", adminController.getUnfilledShiftsCount);
+router.get("/api/performances-without-shifts/count", adminController.getPerformancesWithoutShiftsCount);
+
+// Volunteer-Shift Assignment API endpoints
+router.get("/api/shifts/:shiftId/volunteers", adminController.getShiftVolunteers);
+router.get("/api/volunteers/:volunteerId/shifts", adminController.getVolunteerShifts);
+router.get("/api/shifts/:shiftId/available-volunteers", adminController.getAvailableVolunteersForShift);
+router.get("/api/volunteers/:volunteerId/available-shifts", adminController.getAvailableShiftsForVolunteer);
+router.post("/api/volunteer-shifts", adminController.assignVolunteerToShift);
+router.delete("/api/volunteers/:volunteerId/shifts/:shiftId", adminController.removeVolunteerFromShift);
 
 export default router;
