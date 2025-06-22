@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Volunteer Signup</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 1rem; }
+    .shift { margin-bottom: 0.5rem; }
+    button { padding: 0.5rem 1rem; }
+  </style>
+</head>
+<body>
+  <h1>Hello, {{name}}</h1>
+  <form id="signupForm">
+    <div id="shifts"></div>
+    <button type="submit">Submit</button>
+  </form>
+  <script>
+    const shifts = {{shifts}};
+    const container = document.getElementById('shifts');
+    shifts.forEach(s => {
+      const div = document.createElement('div');
+      div.className = 'shift';
+      div.innerHTML = `<label><input type='checkbox' value='${s.id}'> ${s.role} (${s.start_time})</label>`;
+      container.appendChild(div);
+    });
+    document.getElementById('signupForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const ids = Array.from(document.querySelectorAll('input[type=checkbox]:checked')).map(cb => cb.value);
+      await fetch(window.location.href, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({shiftIds: ids})
+      });
+      alert('Thank you for signing up!');
+    });
+  </script>
+</body>
+</html>
