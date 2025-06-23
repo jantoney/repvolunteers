@@ -1,6 +1,6 @@
 import type { RouterContext } from "oak";
 import { getPool } from "../models/db.ts";
-import { getCurrentTimeAdelaide, getCurrentDateAdelaide } from "../utils/timezone.ts";
+import { createAdelaideTimestamp } from "../utils/timezone.ts";
 import { getAuth } from "../auth.ts";
 
 // Import view functions from separated files
@@ -77,8 +77,8 @@ export async function listShows(ctx: RouterContext<string>) {
     const result = await client.queryObject<ShowRow>(`
       SELECT s.id, s.name, s.created_at,
              COUNT(sd.id) as show_date_count,
-             MIN(sd.date) as first_date,
-             MAX(sd.date) as last_date
+             MIN(sd.start_time) as first_date,
+             MAX(sd.start_time) as last_date
       FROM shows s
       LEFT JOIN show_dates sd ON sd.show_id = s.id
       GROUP BY s.id, s.name, s.created_at
@@ -105,9 +105,8 @@ export async function listShowDates(ctx: RouterContext<string>) {
     interface ShowDateRow {
       id: number;
       show_id: number;
-      date: string;
-      start_time: string;
-      end_time: string;
+      start_time: Date;
+      end_time: Date;
       show_name: string;
       total_shifts: bigint;
       filled_shifts: bigint;
@@ -122,8 +121,8 @@ export async function listShowDates(ctx: RouterContext<string>) {
       LEFT JOIN shifts sh ON sh.show_date_id = sd.id
       LEFT JOIN participant_shifts vs ON vs.shift_id = sh.id
       WHERE sd.show_id = $1
-      GROUP BY sd.id, sd.date, sd.start_time, sd.end_time, s.name
-      ORDER BY sd.date, sd.start_time
+      GROUP BY sd.id, sd.start_time, sd.end_time, s.name
+      ORDER BY sd.start_time
     `, [showId]);
     
     // Convert BigInt count values to numbers for JSON serialization
@@ -141,7 +140,7 @@ export async function listShowDates(ctx: RouterContext<string>) {
 
 export async function createShow(ctx: RouterContext<string>) {
   const value = await ctx.request.body.json();
-  const { name, dates, existingShowId } = value; // Expecting show name, array of dates, and optional existing show ID
+  const { name, performances, existingShowId } = value; // Expecting show name, array of performances, and optional existing show ID
   const pool = getPool();
   const client = await pool.connect();
   
@@ -174,38 +173,52 @@ export async function createShow(ctx: RouterContext<string>) {
     
     const results = [];
     
-    for (const dateInfo of dates) {
-      const { date, start_time, end_time } = dateInfo;
+    for (const performance of performances) {
+      const { start_time, end_time } = performance;
       
       try {
-        // Check if show date already exists
+        // Parse the incoming datetime strings as Adelaide timezone
+        // Format: "YYYY-MM-DDTHH:MM:SS" - treat as Adelaide time
+        
+        // Extract date and time components
+        const startDate = start_time.split('T')[0];
+        const startTimeOnly = start_time.split('T')[1].split(':').slice(0, 2).join(':'); // HH:MM
+        
+        const endDate = end_time.split('T')[0];
+        const endTimeOnly = end_time.split('T')[1].split(':').slice(0, 2).join(':'); // HH:MM
+        
+        // Create Adelaide timezone timestamps
+        const adelaideStartTime = createAdelaideTimestamp(startDate, startTimeOnly);
+        const adelaideEndTime = createAdelaideTimestamp(endDate, endTimeOnly);
+        
+        // Check if show date already exists (check for same start time)
         const existingDate = await client.queryObject(
-          "SELECT id FROM show_dates WHERE show_id = $1 AND date = $2",
-          [showId, date]
+          "SELECT id FROM show_dates WHERE show_id = $1 AND start_time = $2",
+          [showId, adelaideStartTime]
         );
         
         if (existingDate.rows.length > 0) {
           results.push({
-            date,
+            start_time,
             success: false,
-            reason: "Show date already exists"
+            reason: "Performance already exists"
           });
           continue;
         }
         
         const result = await client.queryObject<{ id: number }>(
-          "INSERT INTO show_dates (show_id, date, start_time, end_time) VALUES ($1, $2, $3, $4) RETURNING id",
-          [showId, date, start_time, end_time]
+          "INSERT INTO show_dates (show_id, start_time, end_time) VALUES ($1, $2, $3) RETURNING id",
+          [showId, adelaideStartTime, adelaideEndTime]
         );
         
         results.push({
-          date,
+          start_time,
           id: result.rows[0].id,
           success: true
         });
       } catch (_error) {
         results.push({
-          date,
+          start_time,
           success: false,
           reason: "Database error"
         });
@@ -256,13 +269,22 @@ export async function deleteShow(ctx: RouterContext<string>) {
 // API Functions for Show Dates
 export async function createShowDate(ctx: RouterContext<string>) {
   const value = await ctx.request.body.json();
-  const { show_id, date, start_time, end_time } = value;
+  const { show_id, start_time, end_time } = value;
   const pool = getPool();
   const client = await pool.connect();
   try {
+    // Parse the incoming datetime strings and create Adelaide timezone timestamps
+    const startDate = start_time.split('T')[0];
+    const startTimeOnly = start_time.split('T')[1];
+    const endDate = end_time.split('T')[0];
+    const endTimeOnly = end_time.split('T')[1];
+    
+    const adelaideStartTime = createAdelaideTimestamp(startDate, startTimeOnly);
+    const adelaideEndTime = createAdelaideTimestamp(endDate, endTimeOnly);
+    
     const result = await client.queryObject<{ id: number }>(
-      "INSERT INTO show_dates (show_id, date, start_time, end_time) VALUES ($1, $2, $3, $4) RETURNING id",
-      [show_id, date, start_time, end_time]
+      "INSERT INTO show_dates (show_id, start_time, end_time) VALUES ($1, $2, $3) RETURNING id",
+      [show_id, adelaideStartTime, adelaideEndTime]
     );
     ctx.response.status = 201;
     ctx.response.body = { id: result.rows[0].id };
@@ -278,9 +300,18 @@ export async function updateShowDate(ctx: RouterContext<string>) {
   const pool = getPool();
   const client = await pool.connect();
   try {
+    // Parse the incoming datetime strings and create Adelaide timezone timestamps
+    const startDate = start_time.split('T')[0];
+    const startTimeOnly = start_time.split('T')[1];
+    const endDate = end_time.split('T')[0];  
+    const endTimeOnly = end_time.split('T')[1];
+    
+    const adelaideStartTime = createAdelaideTimestamp(startDate, startTimeOnly);
+    const adelaideEndTime = createAdelaideTimestamp(endDate, endTimeOnly);
+    
     await client.queryObject(
       "UPDATE show_dates SET start_time = $1, end_time = $2 WHERE id = $3",
-      [start_time, end_time, id]
+      [adelaideStartTime, adelaideEndTime, id]
     );
     ctx.response.status = 200;
   } finally {
@@ -526,15 +557,13 @@ export async function listShifts(ctx: RouterContext<string>) {
 // Define default roles
 const DEFAULT_ROLES = [
   "FOH Manager",
-  "FOH 2IC", 
-  "Usher #1 (Remain FOH)",
-  "Usher #2 (Can watch show)",
-  "Usher #3 (Can watch show)",
-  "Usher #4 (Can watch show)",
-  "Usher #5 (Can watch show)",
-  "Tea & Coffee #1",
-  "Tea & Coffee #2",
-  "Raffle",
+  "FOH 2IC",
+  "Usher 1 (Can see show)",
+  "Usher 2 (Can see show)",
+  "Usher 3 (Can see show)",
+  "Tea and Coffee 1 (Can see show)",
+  "Tea and Coffee 2 (Can see show)",
+  "Raffle Ticket Selling",
   "Box Office"
 ];
 
@@ -554,12 +583,7 @@ export async function createShift(ctx: RouterContext<string>) {
     const results = [];
     
     for (const dateId of showDateIds) {
-      for (const role of roles) {
-        try {
-          // Parse times and handle day rollover
-          const arriveDateTime = new Date(`1970-01-01T${arriveTime}`);
-          const departDateTime = new Date(`1970-01-01T${departTime}`);
-          
+      for (const role of roles) {        try {
           // Get the show date
           const showDateResult = await client.queryObject<{ date: string }>(
             "SELECT date FROM show_dates WHERE id = $1",
@@ -576,19 +600,16 @@ export async function createShift(ctx: RouterContext<string>) {
             continue;
           }
           
-          const showDate = new Date(showDateResult.rows[0].date);
+          const showDate = showDateResult.rows[0].date;
           
-          // Create arrive timestamp
-          const arriveTimestamp = new Date(showDate);
-          arriveTimestamp.setHours(arriveDateTime.getHours(), arriveDateTime.getMinutes());
+          // Create arrive and depart timestamps in Adelaide timezone
+          const arriveTimestamp = createAdelaideTimestamp(showDate, arriveTime);
+          let departTimestamp = createAdelaideTimestamp(showDate, departTime);
           
-          // Create depart timestamp (handle next day if end time is before start time)
-          const departTimestamp = new Date(showDate);
-          departTimestamp.setHours(departDateTime.getHours(), departDateTime.getMinutes());
-          
+          // Handle next day if depart time is before arrive time
           if (departTimestamp <= arriveTimestamp) {
-            // Next day
-            departTimestamp.setDate(departTimestamp.getDate() + 1);
+            // Add one day to depart timestamp for next day
+            departTimestamp = new Date(departTimestamp.getTime() + 24 * 60 * 60 * 1000);
           }
           
           const result = await client.queryObject<{ id: number }>(
@@ -633,9 +654,20 @@ export async function updateShift(ctx: RouterContext<string>) {
   const pool = getPool();
   const client = await pool.connect();
   try {
+    // The inputs are in format YYYY-MM-DDTHH:MM and represent Adelaide time
+    // Parse them correctly as Adelaide timezone
+    
+    // Extract date and time components
+    const [arriveDate, arriveTime] = arrive_time.split('T');
+    const [departDate, departTime] = depart_time.split('T');
+    
+    // Create proper Adelaide timestamps
+    const arriveAdelaide = createAdelaideTimestamp(arriveDate, arriveTime);
+    const departAdelaide = createAdelaideTimestamp(departDate, departTime);
+    
     await client.queryObject(
       "UPDATE shifts SET role=$1, arrive_time=$2, depart_time=$3 WHERE id=$4",
-      [role, arrive_time, depart_time, id]
+      [role, arriveAdelaide.toISOString(), departAdelaide.toISOString(), id]
     );
     ctx.response.status = 200;
   } finally {

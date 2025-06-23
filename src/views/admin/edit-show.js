@@ -46,11 +46,11 @@ function showSuccess(message) {
 }
 
 async function updateShowDate(dateId) {
-  const startTime = document.getElementById(`start_${dateId}`).value;
-  const endTime = document.getElementById(`end_${dateId}`).value;
+  const startDateTime = document.getElementById(`start_${dateId}`).value;
+  const endDateTime = document.getElementById(`end_${dateId}`).value;
   
-  if (!startTime || !endTime) {
-    showError('Both start and end times are required');
+  if (!startDateTime || !endDateTime) {
+    showError('Both start and end date/times are required');
     return;
   }
   
@@ -58,14 +58,14 @@ async function updateShowDate(dateId) {
     const response = await fetch(`/admin/api/show-dates/${dateId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ start_time: startTime, end_time: endTime }),
+      body: JSON.stringify({ start_time: startDateTime, end_time: endDateTime }),
       credentials: 'include'
     });
     
     if (response.ok) {
-      showSuccess('Show date updated successfully');
+      showSuccess('Performance updated successfully');
     } else {
-      showError('Failed to update show date');
+      showError('Failed to update performance');
     }
   } catch (_error) {
     showError('Error updating show date');
@@ -95,12 +95,11 @@ async function deleteShowDate(dateId) {
 }
 
 async function addNewDate() {
-  const date = document.getElementById('newDate').value;
-  const startTime = document.getElementById('newStartTime').value;
-  const endTime = document.getElementById('newEndTime').value;
+  const startDateTime = document.getElementById('newStartDateTime').value;
+  const endDateTime = document.getElementById('newEndDateTime').value;
   
-  if (!date || !startTime || !endTime) {
-    showError('All fields are required for new date');
+  if (!startDateTime || !endDateTime) {
+    showError('Both start and end date/times are required');
     return;
   }
   
@@ -110,26 +109,24 @@ async function addNewDate() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ 
         show_id: showId, 
-        date: date, 
-        start_time: startTime, 
-        end_time: endTime 
+        start_time: startDateTime, 
+        end_time: endDateTime 
       }),
       credentials: 'include'
     });
     
     if (response.ok) {
-      showSuccess('New date added successfully');
+      showSuccess('New performance added successfully');
       // Clear form
-      document.getElementById('newDate').value = '';
-      document.getElementById('newStartTime').value = '';
-      document.getElementById('newEndTime').value = '';
-      // Reload page to show new date
+      document.getElementById('newStartDateTime').value = '';
+      document.getElementById('newEndDateTime').value = '';
+      // Reload page to show new performance
       setTimeout(() => globalThis.location.reload(), 1000);
     } else {
-      showError('Failed to add new date');
+      showError('Failed to add new performance');
     }
   } catch (_error) {
-    showError('Error adding new date');
+    showError('Error adding new performance');
   }
 }
 

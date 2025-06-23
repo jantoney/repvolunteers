@@ -5,7 +5,8 @@ class ModalSystem {
     this.setupGlobalStyles();
   }
 
-  setupGlobalStyles() {    // Add modal CSS if not already present
+  setupGlobalStyles() {
+    // Add modal CSS if not already present
     if (!document.getElementById('modal-system-styles')) {
       const style = document.createElement('style');
       style.id = 'modal-system-styles';
@@ -37,6 +38,11 @@ class ModalSystem {
           max-height: 80vh;
           overflow-y: auto;
           position: relative;
+        }
+
+        .modal-content.large {
+          max-width: 800px;
+          width: 95%;
         }
 
         .modal-header {
@@ -166,7 +172,8 @@ class ModalSystem {
       body = '',
       buttons = [],
       closable = true,
-      className = ''
+      className = '',
+      size = 'normal' // 'normal' or 'large'
     } = options;
 
     // Remove existing modal with same ID
@@ -176,8 +183,10 @@ class ModalSystem {
     overlay.className = `modal-overlay ${className}`;
     overlay.id = `modal-${id}`;
 
+    const contentClass = size === 'large' ? 'modal-content large' : 'modal-content';
+
     overlay.innerHTML = `
-      <div class="modal-content">
+      <div class="${contentClass}">
         <div class="modal-header">
           <h3 class="modal-title">${title}</h3>
           ${closable ? '<button class="modal-close" data-action="close">&times;</button>' : ''}
@@ -213,7 +222,7 @@ class ModalSystem {
         if (button.handler) {
           button.handler(e, this);
         }
-        if (action === 'close') {
+        if (action === 'close' || action === 'ok' || action === 'cancel' || action === 'confirm') {
           this.closeModal(id);
         }
       }
@@ -320,6 +329,38 @@ class ModalSystem {
     return this.showModal('success', {
       title: title || 'Success',
       body: `<p style="color: #28a745;">${message}</p>`,
+      buttons: [
+        {
+          text: 'OK',
+          className: 'modal-btn-primary',
+          action: 'ok',
+          handler: onOk || (() => {})
+        }
+      ]
+    });
+  }
+
+  info(title, message, onOk = null) {
+    return this.showModal('info', {
+      title: title || 'Information',
+      body: `<p>${message}</p>`,
+      buttons: [
+        {
+          text: 'OK',
+          className: 'modal-btn-primary',
+          action: 'ok',
+          handler: onOk || (() => {})
+        }
+      ]
+    });
+  }
+
+  // Method for displaying raw HTML content without wrapping in <p> tags
+  html(title, htmlContent, onOk = null, size = 'normal') {
+    return this.showModal('html', {
+      title: title || 'Information',
+      body: htmlContent,
+      size: size,
       buttons: [
         {
           text: 'OK',

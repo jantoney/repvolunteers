@@ -690,8 +690,8 @@
     const availableContainer = document.getElementById('availableShifts');
     const submitBtn = document.getElementById('submitBtn');
     
-    // Calendar state
-    let currentCalendarDate = new Date();
+    // Calendar state - initialize in Adelaide timezone
+    let currentCalendarDate = AdelaideTime.getNowAdelaide();
       function formatShiftTime(arriveTime, departTime) {
       return AdelaideTime.formatShiftTimeAdelaide(arriveTime, departTime);
     }    function generateCalendar() {
@@ -845,7 +845,18 @@
         dayDiv.className = 'calendar-day';
           const isCurrentMonth = currentDate.getMonth() === currentMonth;
         const isToday = AdelaideTime.isTodayAdelaide(currentDate);
-        const dateStr = AdelaideTime.dateToStringAdelaide(currentDate);
+        
+        // Create Adelaide timezone date string for comparison
+        // Important: Create the date as if it's in Adelaide timezone to match shift data
+        const year = currentDate.getFullYear();
+        const month = String(currentDate.getMonth() + 1).padStart(2, '0');
+        const day = String(currentDate.getDate()).padStart(2, '0');
+        const dateStr = `${year}-${month}-${day}`;
+        
+        // Debug: Log calendar date creation
+        if (dateStr === '2025-06-22' || dateStr === '2025-06-28') {
+          console.log(`Calendar: Creating day ${dateStr} from local date:`, currentDate.toISOString());
+        }
         
         // Apply styling classes
         if (!isCurrentMonth) {
@@ -894,7 +905,12 @@
     }
 
     function changeMonth(delta) {
-      currentCalendarDate.setMonth(currentCalendarDate.getMonth() + delta);
+      // Update calendar date maintaining Adelaide timezone alignment
+      const newMonth = currentCalendarDate.getMonth() + delta;
+      const newYear = currentCalendarDate.getFullYear() + Math.floor(newMonth / 12);
+      const adjustedMonth = ((newMonth % 12) + 12) % 12;
+      
+      currentCalendarDate = new Date(newYear, adjustedMonth, 1);
       generateCalendar();
     }    function populateAssignedShifts() {
       if (assignedShifts.length === 0) {

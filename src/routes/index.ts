@@ -362,8 +362,6 @@ router.get("/", (ctx) => {
             <div id="registerMessage"></div>
           </div>
           
-          <hr style="margin: 2rem 0;">
-          <p><em>Existing participants: Use the direct signup link provided by the organization</em></p>
         </div>
         
         <!-- Admin section moved to bottom -->

@@ -1,18 +1,24 @@
 document.addEventListener('DOMContentLoaded', function() {
   const defaultRoles = [
-    'FOH Manager', 'Bar Manager', 'Bartender', 'Usher', 'Box Office',
-    'Merchandise', 'Cleaning', 'Sound Operator', 'Lighting Operator'
+    'FOH Manager',
+    'FOH 2IC',
+    'Usher 1 (Can see show)',
+    'Usher 2 (Can see show)',
+    'Usher 3 (Can see show)',
+    'Tea and Coffee 1 (Can see show)',
+    'Tea and Coffee 2 (Can see show)',
+    'Raffle Ticket Selling',
+    'Box Office'
   ];
-    const customRoles = [];
+  const customRoles = [];
   const allRoles = [...defaultRoles];
-  
-  // Load default roles
+    // Load default roles
   function loadDefaultRoles() {
     const container = document.getElementById('defaultRolesList');
-    container.innerHTML = defaultRoles.map(role => `
+    container.innerHTML = defaultRoles.map((role, index) => `
       <div class="checkbox-item">
-        <input type="checkbox" id="role_${role}" value="${role}">
-        <label for="role_${role}">${role}</label>
+        <input type="checkbox" id="role_default_${index}" value="${role}">
+        <label for="role_default_${index}">${role}</label>
       </div>
     `).join('');
   }
@@ -39,7 +45,7 @@ document.addEventListener('DOMContentLoaded', function() {
           <div class="checkbox-item">
             <input type="checkbox" id="date_${date.id}" value="${date.id}" checked>
             <label for="date_${date.id}">
-              ${typeof AdelaideTime !== 'undefined' ? AdelaideTime.formatDateAdelaide(date.date) : new Date(date.date).toLocaleDateString()} - 
+              ${typeof AdelaideTime !== 'undefined' ? AdelaideTime.formatDateAdelaide(date.date) : AdelaideTime.formatDateAdelaide(date.date)} - 
               ${date.start_time} to ${date.end_time}
             </label>
           </div>
@@ -50,10 +56,22 @@ document.addEventListener('DOMContentLoaded', function() {
       console.error('Error loading show dates:', _error);
     }
   });
-  
-  // Time change handlers
+    // Time change handlers
   document.getElementById('arrive_time').addEventListener('change', checkNextDay);
   document.getElementById('depart_time').addEventListener('change', checkNextDay);
+  
+  // Show time picker on focus for better mobile experience
+  document.getElementById('arrive_time').addEventListener('focus', function() {
+    if (this.showPicker) {
+      this.showPicker();
+    }
+  });
+  
+  document.getElementById('depart_time').addEventListener('focus', function() {
+    if (this.showPicker) {
+      this.showPicker();
+    }
+  });
   
   function checkNextDay() {
     const arriveTime = document.getElementById('arrive_time').value;
@@ -66,8 +84,7 @@ document.addEventListener('DOMContentLoaded', function() {
       warning.style.display = 'none';
     }
   }
-  
-  // Add custom role
+    // Add custom role
   document.getElementById('addCustomRole').addEventListener('click', function() {
     const input = document.getElementById('customRole');
     const roleName = input.value.trim();
@@ -90,14 +107,25 @@ document.addEventListener('DOMContentLoaded', function() {
     const newRole = document.createElement('div');
     newRole.className = 'checkbox-item';
     newRole.innerHTML = `
-      <input type="checkbox" id="role_${roleName}" value="${roleName}" checked>
-      <label for="role_${roleName}">${roleName}</label>
+      <input type="checkbox" id="role_custom_${customRoles.length}" value="${roleName}" checked>
+      <label for="role_custom_${customRoles.length}">${roleName}</label>
     `;
     container.appendChild(newRole);
     
     input.value = '';
+    document.getElementById('customRoleWarning').style.display = 'none';
   });
   
+  // Show warning when custom role is typed but not added
+  document.getElementById('customRole').addEventListener('input', function() {
+    const warning = document.getElementById('customRoleWarning');
+    if (this.value.trim()) {
+      warning.style.display = 'block';
+    } else {
+      warning.style.display = 'none';
+    }
+  });
+
   // Allow Enter key to add custom role
   document.getElementById('customRole').addEventListener('keypress', function(e) {
     if (e.key === 'Enter') {
@@ -105,10 +133,25 @@ document.addEventListener('DOMContentLoaded', function() {
       document.getElementById('addCustomRole').click();
     }
   });
-  
-  // Form submission
+    // Form submission
   document.getElementById('shiftForm').addEventListener('submit', async function(e) {
     e.preventDefault();
+    
+    // Check if there's an unsaved custom role
+    const customRoleInput = document.getElementById('customRole');
+    if (customRoleInput.value.trim()) {
+      const confirmAdd = confirm('You have entered a custom role name but haven\'t added it yet. Would you like to add it now?');
+      if (confirmAdd) {
+        document.getElementById('addCustomRole').click();
+        // Don't proceed with form submission yet, let user review
+        return;
+      } else {
+        const confirmProceed = confirm('Are you sure you want to proceed without adding the custom role?');
+        if (!confirmProceed) {
+          return;
+        }
+      }
+    }
     
     const formData = new FormData(e.target);
     const showId = formData.get('show_id');
@@ -123,9 +166,8 @@ document.addEventListener('DOMContentLoaded', function() {
       showError('Please select at least one show date');
       return;
     }
-    
-    // Get selected roles
-    const selectedRoles = Array.from(document.querySelectorAll('.checkbox-group input:checked'))
+      // Get selected roles - use more specific selectors to avoid the '8' issue
+    const selectedRoles = Array.from(document.querySelectorAll('#defaultRolesList input:checked, #customRolesList input:checked'))
       .map(input => input.value);
     
     if (selectedRoles.length === 0) {
@@ -148,11 +190,13 @@ document.addEventListener('DOMContentLoaded', function() {
         body: JSON.stringify(data),
         credentials: 'include'
       });
-      
-      if (response.ok) {
+        if (response.ok) {
         const result = await response.json();
         const successCount = result.results.filter(r => r.success).length;
-        showSuccess(`Successfully created ${successCount} shifts`);
+        const totalDates = selectedDates.length;
+        const totalRoles = selectedRoles.length;
+        
+        showSuccess(`Successfully created ${successCount} shifts across ${totalDates} performance date${totalDates > 1 ? 's' : ''} and ${totalRoles} role${totalRoles > 1 ? 's' : ''}`);
         
         // Show next day warning if applicable
         const nextDayShifts = result.results.filter(r => r.nextDay && r.success);

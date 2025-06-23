@@ -1,4 +1,5 @@
 import { getAdminNavigation, getAdminStyles } from "../components/navigation.ts";
+import { formatDateAdelaide, toAdelaideDateTimeLocal } from "../../../utils/timezone.ts";
 
 export interface Show {
   id: number;
@@ -7,9 +8,8 @@ export interface Show {
 
 export interface ShowDate {
   id: number;
-  date: string;
-  start_time: string;
-  end_time: string;
+  start_time: Date;
+  end_time: Date;
 }
 
 export interface EditShowPageData {
@@ -88,17 +88,17 @@ export function renderEditShowTemplate(data: EditShowPageData): string {
               showDates.map(date => `
                 <div class="show-date-item" data-date-id="${date.id}">
                   <div class="show-date-header">
-                    <strong>${new Date(date.date).toLocaleDateString()}</strong>
+                    <strong>${formatDateAdelaide(date.start_time)}</strong>
                     <button type="button" class="btn btn-danger btn-sm" onclick="deleteShowDate(${date.id})">Delete</button>
                   </div>
                   <div class="time-group">
                     <div class="form-group">
-                      <label>Start Time:</label>
-                      <input type="time" id="start_${date.id}" value="${date.start_time}" onchange="updateShowDate(${date.id})">
+                      <label>Start Date & Time:</label>
+                      <input type="datetime-local" id="start_${date.id}" value="${toAdelaideDateTimeLocal(date.start_time)}" onchange="updateShowDate(${date.id})">
                     </div>
                     <div class="form-group">
-                      <label>End Time:</label>
-                      <input type="time" id="end_${date.id}" value="${date.end_time}" onchange="updateShowDate(${date.id})">
+                      <label>End Date & Time:</label>
+                      <input type="datetime-local" id="end_${date.id}" value="${toAdelaideDateTimeLocal(date.end_time)}" onchange="updateShowDate(${date.id})">
                     </div>
                   </div>
                 </div>
@@ -106,22 +106,18 @@ export function renderEditShowTemplate(data: EditShowPageData): string {
             }
 
             <div class="form-section">
-              <h3>Add New Date</h3>
+              <h3>Add New Performance</h3>
               <div class="time-group">
                 <div class="form-group">
-                  <label for="newDate">Date:</label>
-                  <input type="date" id="newDate">
+                  <label for="newStartDateTime">Start Date & Time:</label>
+                  <input type="datetime-local" id="newStartDateTime">
                 </div>
                 <div class="form-group">
-                  <label for="newStartTime">Start Time:</label>
-                  <input type="time" id="newStartTime">
-                </div>
-                <div class="form-group">
-                  <label for="newEndTime">End Time:</label>
-                  <input type="time" id="newEndTime">
+                  <label for="newEndDateTime">End Date & Time:</label>
+                  <input type="datetime-local" id="newEndDateTime">
                 </div>
               </div>
-              <button type="button" class="btn btn-primary" onclick="addNewDate()">Add Date</button>
+              <button type="button" class="btn btn-primary" onclick="addNewDate()">Add Performance</button>
             </div>
           </div>
         </div>

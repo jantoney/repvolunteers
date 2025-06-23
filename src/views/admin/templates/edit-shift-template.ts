@@ -1,4 +1,5 @@
 import { getAdminNavigation, getAdminStyles } from "../components/navigation.ts";
+import { toAdelaideDateTimeLocal, formatDateAdelaide, formatTimeAdelaide } from "../../../utils/timezone.ts";
 
 export interface ShowDate {
   id: number;
@@ -46,7 +47,7 @@ export function renderEditShiftTemplate(data: EditShiftPageData): string {
       <!-- Main Content -->
       <div class="main-content">
         <div class="page-header">
-          <h1 class="page-title">Edit Shift</h1>
+          <h1 class="page-title">Edit Shift #${shift.id}</h1>
         </div>
 
         <div class="form-container">
@@ -56,7 +57,7 @@ export function renderEditShiftTemplate(data: EditShiftPageData): string {
               <select id="show_date_id" name="show_date_id" required>
                 ${showDates.map(showDate => 
                   `<option value="${showDate.id}" ${showDate.id === shift.show_date_id ? 'selected' : ''}>
-                    ${showDate.show_name} - ${new Date(showDate.date).toLocaleDateString()} (${showDate.start_time} - ${showDate.end_time})
+                    ${showDate.show_name} - ${formatDateAdelaide(showDate.date)} (${formatTimeAdelaide(showDate.start_time)} - ${formatTimeAdelaide(showDate.end_time)})
                   </option>`
                 ).join('')}
               </select>
@@ -66,17 +67,16 @@ export function renderEditShiftTemplate(data: EditShiftPageData): string {
               <label for="role">Role:</label>
               <input type="text" id="role" name="role" value="${shift.role}" required>
             </div>
-            
-            <div class="form-group">
+              <div class="form-group">
               <label for="arrive_time">Arrive Time:</label>
               <input type="datetime-local" id="arrive_time" name="arrive_time" 
-                     value="${shift.arrive_time.toISOString().slice(0, 16)}" required>
+                     value="${toAdelaideDateTimeLocal(shift.arrive_time)}" required>
             </div>
             
             <div class="form-group">
               <label for="depart_time">Depart Time:</label>
               <input type="datetime-local" id="depart_time" name="depart_time" 
-                     value="${shift.depart_time.toISOString().slice(0, 16)}" required>
+                     value="${toAdelaideDateTimeLocal(shift.depart_time)}" required>
             </div>
             
             <div class="form-actions">

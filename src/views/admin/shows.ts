@@ -212,8 +212,8 @@ export function renderShowsTemplate(data: ShowsPageData): string {
                             
                             return \`
                               <tr>
-                                <td style="padding: 0.5rem; border: none;">\${AdelaideTime.formatDateAdelaide(date.date)}</td>
-                                <td style="padding: 0.5rem; border: none;">\${date.start_time || 'Not set'} - \${date.end_time || 'Not set'}</td>
+                                <td style="padding: 0.5rem; border: none;">\${AdelaideTime.formatDateAdelaide(date.start_time)}</td>
+                                <td style="padding: 0.5rem; border: none;">\${AdelaideTime.formatTimeAdelaide(date.start_time)} - \${AdelaideTime.formatTimeAdelaide(date.end_time)}</td>
                                 <td style="padding: 0.5rem; border: none;">
                                   <span class="traffic-light \${trafficColor}" style="width: 16px; height: 16px; margin-right: 6px;" 
                                         title="\${date.total_shifts > 0 ? date.filled_shifts + '/' + date.total_shifts + ' filled' : 'No shifts'}"></span>
@@ -221,7 +221,7 @@ export function renderShowsTemplate(data: ShowsPageData): string {
                                 </td>
                                 <td style="padding: 0.5rem; border: none;">
                                   \${date.total_shifts > 0 ? 
-                                    \`<a href="/admin/shifts?shows=\${showId}&date=\${date.date}" class="performance-link">View Shifts</a>\` : 
+                                    \`<a href="/admin/shifts?shows=\${showId}&date=\${AdelaideTime.dateToStringAdelaide(date.start_time)}" class="performance-link">View Shifts</a>\` : 
                                     '<span style="color: #6c757d;">No shifts</span>'
                                   }
                                 </td>

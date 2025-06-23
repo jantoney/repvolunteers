@@ -1,0 +1,18 @@
+{
+  "servers": {
+    "default": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-postgres",
+        "postgresql://repvolunteers:__PASSWORD__@db-postgresql-syd1-74021-do-user-17064276-0.l.db.ondigitalocean.com:25060/repvolunteers?sslmode=require"
+      ],
+      "env": {
+        "PGSSLMODE": "require",
+        "DEBUG": "true",
+        "NODE_TLS_REJECT_UNAUTHORIZED": "0"
+      }
+    }
+  }
+}
