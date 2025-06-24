@@ -1,7 +1,6 @@
 import type { RouterContext } from "oak";
 import { getPool } from "../models/db.ts";
 import { render } from "../utils/template.ts";
-import { formatDateTimeAdelaide, toAdelaideISOString } from "../utils/timezone.ts";
 
 interface VolunteerRecord {
   id: number;
@@ -327,63 +326,44 @@ export async function swapShift(ctx: RouterContext<string>) {
 
 export async function downloadPDF(ctx: RouterContext<string>) {
   const id = ctx.params.id;
-  const pool = getPool();
-  const client = await pool.connect();
   
   try {
-    const volunteerRes = await client.queryObject<VolunteerRecord>("SELECT * FROM participants WHERE id=$1", [id]);
-    if (volunteerRes.rows.length === 0) {
-      ctx.throw(404, "Volunteer not found");
-    }
+    const { generateVolunteerPDFData } = await import("../utils/pdf-generator.ts");
+    const { generateServerSidePDF } = await import("../utils/server-pdf-generator.ts");
+    
+    const pdfData = await generateVolunteerPDFData(Number(id));
+    const pdfBuffer = await generateServerSidePDF(pdfData);
 
-    type ShiftRow = {
-      id: number;
-      show_id: number;
-      show_name: string;
-      show_date_id: number;
-      role: string;
-      arrive_time: string;
-      depart_time: string;
-      show_date: string;
-      start_time: string;
-      end_time: string;
-    };
+    const filename = `theatre-shifts-${pdfData.volunteer.name.replace(/[^a-zA-Z0-9]/g, '-')}-${new Date().toISOString().split('T')[0]}.pdf`;
+    
+    ctx.response.headers.set("Content-Type", "application/pdf");
+    ctx.response.headers.set("Content-Disposition", `attachment; filename="${filename}"`);
+    ctx.response.body = pdfBuffer;
+  } catch (error) {
+    console.error("Error generating PDF:", error);
+    ctx.response.status = 500;
+    ctx.response.body = { error: "Failed to generate PDF" };
+  }
+}
 
-    // Get assigned shifts
-    const assignedShiftsRes = await client.queryObject<ShiftRow>(
-      `SELECT s.id, s.role, s.arrive_time, s.depart_time, s.show_date_id,
-              sh.name as show_name, sh.id as show_id, DATE(sd.start_time) as show_date, sd.start_time, sd.end_time
-       FROM shifts s
-       JOIN show_dates sd ON sd.id = s.show_date_id
-       JOIN shows sh ON sh.id = sd.show_id
-       JOIN participant_shifts vs ON vs.shift_id = s.id
-       WHERE vs.participant_id = $1
-       ORDER BY sh.name, DATE(sd.start_time), sd.start_time, s.arrive_time`,
-      [id]
-    );
-
-    // Get available shifts (not assigned to this volunteer)
-    const shiftsRes = await client.queryObject<ShiftRow>(
-      `SELECT s.id, s.role, s.arrive_time, s.depart_time, s.show_date_id,
-              sh.name as show_name, sh.id as show_id, DATE(sd.start_time) as show_date, sd.start_time, sd.end_time
-       FROM shifts s
-       JOIN show_dates sd ON sd.id = s.show_date_id
-       JOIN shows sh ON sh.id = sd.show_id
-       LEFT JOIN participant_shifts vs ON vs.shift_id = s.id AND vs.participant_id = $1
-       WHERE vs.participant_id IS NULL
-       ORDER BY sh.name, DATE(sd.start_time), sd.start_time, s.arrive_time`,
-      [id],
-    );    // Return PDF data for client-side generation
-    const pdfData = {
-      volunteer: volunteerRes.rows[0],
-      assignedShifts: assignedShiftsRes.rows,
-      availableShifts: shiftsRes.rows,
-      generatedAt: formatDateTimeAdelaide(new Date())
-    };
-
-    ctx.response.headers.set("Content-Type", "application/json");
-    ctx.response.body = pdfData;
-  } finally {
-    client.release();
+export async function downloadSchedulePDF(ctx: RouterContext<string>) {
+  const id = ctx.params.id;
+  
+  try {
+    const { generateVolunteerPDFData } = await import("../utils/pdf-generator.ts");
+    const { generateServerSidePDF } = await import("../utils/server-pdf-generator.ts");
+    
+    const pdfData = await generateVolunteerPDFData(Number(id));
+    const pdfBuffer = await generateServerSidePDF(pdfData);
+    
+    const filename = `theatre-shifts-${pdfData.volunteer.name.replace(/[^a-zA-Z0-9]/g, '-')}-${new Date().toISOString().split('T')[0]}.pdf`;
+    
+    ctx.response.headers.set("Content-Type", "application/pdf");
+    ctx.response.headers.set("Content-Disposition", `inline; filename="${filename}"`);
+    ctx.response.body = pdfBuffer;
+  } catch (error) {
+    console.error("Error generating volunteer schedule PDF:", error);
+    ctx.response.status = 500;
+    ctx.response.body = "Failed to generate PDF";
   }
 }

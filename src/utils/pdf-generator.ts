@@ -1,7 +1,10 @@
 /**
- * Simple PDF generation utility for Theatre Shifts
+ * PDF generation utility for Theatre Shifts
  * Uses basic text formatting to create downloadable reports
  */
+
+import { getPool } from "../models/db.ts";
+import { formatDateTimeAdelaide } from "./timezone.ts";
 
 export interface ShiftData {
   show_name: string;
@@ -13,6 +16,34 @@ export interface ShiftData {
 export interface VolunteerData {
   name: string;
   email: string | null;
+}
+
+interface VolunteerRecord {
+  id: number;
+  name: string;
+  email?: string;
+  phone?: string;
+  approved: boolean;
+}
+
+interface ShiftRow {
+  id: number;
+  show_id: number;
+  show_name: string;
+  show_date_id: number;
+  role: string;
+  arrive_time: string;
+  depart_time: string;
+  show_date: string;
+  start_time: string;
+  end_time: string;
+}
+
+export interface PDFData {
+  volunteer: VolunteerRecord;
+  assignedShifts: ShiftRow[];
+  availableShifts: ShiftRow[];
+  generatedAt: string;
 }
 
 export function generateShiftRemovalPDF(volunteer: VolunteerData, shifts: ShiftData[]): Uint8Array {
@@ -100,3 +131,295 @@ export function getFileExtension(): string {
 // In a production environment, you might want to use a proper PDF library
 // such as jsPDF for client-side generation or Puppeteer for server-side generation
 // For now, this provides a readable text-based report that can be easily downloaded
+
+/**
+ * Generates PDF data for a volunteer by participant ID
+ */
+export async function generateVolunteerPDFData(volunteerId: number): Promise<PDFData> {
+  const pool = getPool();
+  const client = await pool.connect();
+  
+  try {
+    // Get volunteer details
+    const volunteerRes = await client.queryObject<VolunteerRecord>(
+      "SELECT * FROM participants WHERE id=$1", [volunteerId]
+    );
+    
+    if (volunteerRes.rows.length === 0) {
+      throw new Error("Volunteer not found");
+    }
+
+    // Get assigned shifts
+    const assignedShiftsRes = await client.queryObject<ShiftRow>(
+      `SELECT s.id, s.role, s.arrive_time, s.depart_time, s.show_date_id,
+              sh.name as show_name, sh.id as show_id, DATE(sd.start_time) as show_date, sd.start_time, sd.end_time
+       FROM shifts s
+       JOIN show_dates sd ON sd.id = s.show_date_id
+       JOIN shows sh ON sh.id = sd.show_id
+       JOIN participant_shifts vs ON vs.shift_id = s.id
+       WHERE vs.participant_id = $1
+       ORDER BY sh.name, DATE(sd.start_time), sd.start_time, s.arrive_time`,
+      [volunteerId]
+    );
+
+    // Get available shifts (not assigned to this volunteer)
+    const shiftsRes = await client.queryObject<ShiftRow>(
+      `SELECT s.id, s.role, s.arrive_time, s.depart_time, s.show_date_id,
+              sh.name as show_name, sh.id as show_id, DATE(sd.start_time) as show_date, sd.start_time, sd.end_time
+       FROM shifts s
+       JOIN show_dates sd ON sd.id = s.show_date_id
+       JOIN shows sh ON sh.id = sd.show_id
+       LEFT JOIN participant_shifts vs ON vs.shift_id = s.id AND vs.participant_id = $1
+       WHERE vs.participant_id IS NULL
+       ORDER BY sh.name, DATE(sd.start_time), sd.start_time, s.arrive_time`,
+      [volunteerId]
+    );
+
+    return {
+      volunteer: volunteerRes.rows[0],
+      assignedShifts: assignedShiftsRes.rows,
+      availableShifts: shiftsRes.rows,
+      generatedAt: formatDateTimeAdelaide(new Date())
+    };
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Generates a comprehensive volunteer schedule PDF as HTML for browser rendering
+ */
+export function generateVolunteerSchedulePDF(data: PDFData): Uint8Array {
+  const content = generateVolunteerScheduleHTMLContent(data);
+  return new TextEncoder().encode(content);
+}
+
+function generateVolunteerScheduleHTMLContent(data: PDFData): string {
+  const { volunteer, assignedShifts, generatedAt } = data;
+  
+  // Filter to current month and future shifts only
+  const currentAndFutureShifts = filterCurrentAndFutureShifts(assignedShifts);
+  
+  return `<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Theatre Shifts Schedule - ${volunteer.name}</title>
+    <style>
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif; 
+            margin: 40px; 
+            line-height: 1.6; 
+            color: #333;
+        }
+        .header { 
+            text-align: center; 
+            border-bottom: 3px solid #007bff; 
+            padding-bottom: 20px; 
+            margin-bottom: 30px; 
+        }
+        .header h1 { 
+            color: #007bff; 
+            margin: 0; 
+            font-size: 28px; 
+        }
+        .header h2 { 
+            color: #666; 
+            margin: 5px 0; 
+            font-size: 18px; 
+            font-weight: normal; 
+        }
+        .volunteer-info { 
+            background: #f8f9fa; 
+            padding: 20px; 
+            border-radius: 8px; 
+            margin-bottom: 30px; 
+        }
+        .volunteer-info h3 { 
+            margin: 0 0 15px 0; 
+            color: #333; 
+        }
+        .volunteer-info p { 
+            margin: 5px 0; 
+        }
+        .shifts-section h3 { 
+            color: #333; 
+            border-bottom: 2px solid #007bff; 
+            padding-bottom: 10px; 
+        }
+        .shift { 
+            background: #fff; 
+            border: 1px solid #ddd; 
+            border-radius: 6px; 
+            padding: 15px; 
+            margin-bottom: 15px; 
+            break-inside: avoid;
+        }
+        .shift-header { 
+            font-weight: bold; 
+            color: #007bff; 
+            font-size: 16px; 
+            margin-bottom: 8px; 
+        }
+        .shift-details { 
+            color: #555; 
+        }
+        .shift-details div { 
+            margin: 3px 0; 
+        }
+        .no-shifts { 
+            background: #fff3cd; 
+            border: 1px solid #ffc107; 
+            border-radius: 6px; 
+            padding: 20px; 
+            text-align: center; 
+            color: #856404; 
+        }
+        .footer { 
+            margin-top: 40px; 
+            padding-top: 20px; 
+            border-top: 2px solid #eee; 
+            font-size: 12px; 
+            color: #666; 
+        }
+        .important { 
+            background: #e3f2fd; 
+            border: 1px solid #2196f3; 
+            border-radius: 6px; 
+            padding: 15px; 
+            margin-top: 30px; 
+        }
+        .important h4 { 
+            margin: 0 0 10px 0; 
+            color: #1976d2; 
+        }
+        .important ul { 
+            margin: 10px 0; 
+            padding-left: 20px; 
+        }
+        @media print {
+            body { margin: 20px; }
+            .header { page-break-after: avoid; }
+            .shift { page-break-inside: avoid; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🎭 Theatre Shifts</h1>
+        <h2>Volunteer Schedule</h2>
+    </div>
+    
+    <div class="volunteer-info">
+        <h3>Volunteer Information</h3>
+        <p><strong>Name:</strong> ${volunteer.name}</p>
+        ${volunteer.email ? `<p><strong>Email:</strong> ${volunteer.email}</p>` : ''}
+        ${volunteer.phone ? `<p><strong>Phone:</strong> ${volunteer.phone}</p>` : ''}
+        <p><strong>Generated:</strong> ${generatedAt}</p>
+        <p><strong>For updates visit:</strong> ${Deno.env.get('BASE_URL') || 'https://theatre-shifts.com'}/volunteer/signup/${volunteer.id}</p>
+    </div>
+
+    <div class="shifts-section">
+        <h3>Assigned Shifts (${currentAndFutureShifts.length} total)</h3>
+        ${currentAndFutureShifts.length > 0 ? 
+          currentAndFutureShifts.map((shift, index) => {
+            const date = formatDateForDisplay(shift.show_date);
+            const arriveTime = formatTimeForDisplay(shift.arrive_time);
+            const departTime = formatTimeForDisplay(shift.depart_time);
+            
+            return `
+        <div class="shift">
+            <div class="shift-header">${index + 1}. ${shift.show_name}</div>
+            <div class="shift-details">
+                <div><strong>Date:</strong> ${date}</div>
+                <div><strong>Call Time:</strong> ${arriveTime}</div>
+                <div><strong>End Time:</strong> ${departTime}</div>
+                <div><strong>Role:</strong> ${shift.role}</div>
+            </div>
+        </div>`;
+          }).join('') :
+          `
+        <div class="no-shifts">
+            <p><strong>No shifts assigned</strong></p>
+            <p>You don't have any shifts assigned for the current month and future dates.<br>
+            Please visit the online schedule to sign up for available shifts.</p>
+        </div>`
+        }
+    </div>
+    
+    <div class="important">
+        <h4>Important Information</h4>
+        <ul>
+            <li>Please arrive 15 minutes before your call time</li>
+            <li>Contact the theatre if you cannot make your shift</li>
+            <li>Check the online schedule regularly for updates</li>
+            <li>All times are in Adelaide, Australia timezone</li>
+        </ul>
+    </div>
+    
+    <div class="footer">
+        <p>For questions or changes, visit the online schedule or contact theatre administration.</p>
+        <p>This document was generated on ${generatedAt} from Theatre Shifts volunteer management system.</p>
+    </div>
+</body>
+</html>`;
+}
+
+/**
+ * Formats volunteer shift data for display in emails (date and time first)
+ */
+export function formatShiftForDisplay(shift: ShiftRow): string {
+  const date = formatDateForDisplay(shift.show_date);
+  const arriveTime = formatTimeForDisplay(shift.arrive_time);
+  
+  return `${date} ${arriveTime} - ${shift.show_name} (${shift.role})`;
+}
+
+/**
+ * Gets current and future shifts only, ordered by date (next shift first)
+ */
+export function filterCurrentAndFutureShifts(shifts: ShiftRow[]): ShiftRow[] {
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  
+  return shifts
+    .filter(shift => {
+      if (shift && shift.show_date) {
+        const shiftDate = new Date(shift.show_date);
+        return shiftDate >= today;
+      }
+      return false;
+    })
+    .sort((a, b) => {
+      const dateA = new Date(a.show_date);
+      const dateB = new Date(b.show_date);
+      return dateA.getTime() - dateB.getTime();
+    });
+}
+
+function formatDateForDisplay(dateString: string): string {
+  const date = new Date(dateString);
+  return date.toLocaleDateString('en-AU', {
+    weekday: 'short',
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric'
+  });
+}
+
+function formatTimeForDisplay(timeString: string): string {
+  const time = new Date(timeString);
+  return time.toLocaleTimeString('en-AU', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true
+  });
+}
+
+export function getVolunteerScheduleMimeType(): string {
+  return "text/html";
+}
+
+export function getVolunteerScheduleFileExtension(): string {
+  return "html";
+}

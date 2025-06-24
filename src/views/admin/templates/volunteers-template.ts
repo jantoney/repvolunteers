@@ -177,6 +177,7 @@ export function renderVolunteersTemplate(data: VolunteersPageData): string {
                     <div class="table-actions">
                       <a href="/admin/volunteers/${volunteer.id}/shifts" class="btn btn-sm btn-info">Shifts</a>
                       <a href="/admin/volunteers/${volunteer.id}/edit" class="btn btn-sm btn-secondary">Edit</a>
+                      <button onclick="sendSchedulePDF(${volunteer.id}, '${volunteer.name.replace(/'/g, "\\'")}', '${volunteer.email || ''}')" class="btn btn-sm btn-success" ${!volunteer.email ? 'disabled title="No email address"' : ''}>📧 Send PDF</button>
                       <button onclick="deleteVolunteer(${volunteer.id}, '${volunteer.name.replace(/'/g, "\\'")}'))" class="btn btn-sm btn-danger">Delete</button>
                     </div>
                   </td>
@@ -391,6 +392,67 @@ export function renderVolunteersTemplate(data: VolunteersPageData): string {
             // Continue anyway - the PDF is nice to have but not critical
           }
         }
+        
+        // Send schedule PDF via email
+        async function sendSchedulePDF(volunteerId, volunteerName, volunteerEmail) {
+          if (!volunteerEmail) {
+            if (typeof Modal !== 'undefined') {
+              Modal.error('Cannot Send PDF', 'This volunteer does not have an email address on file.');
+            } else {
+              alert('Cannot send PDF: No email address on file');
+            }
+            return;
+          }
+          
+          const confirmMessage = \`Send \${volunteerName}'s schedule PDF to \${volunteerEmail}?\`;
+          
+          const sendEmail = async () => {
+            try {
+              const response = await fetch(\`/admin/api/volunteers/\${volunteerId}/email-schedule-pdf\`, {
+                method: 'POST',
+                credentials: 'include'
+              });
+              
+              if (response.ok) {
+                const result = await response.json();
+                const message = result.hasShifts 
+                  ? \`Schedule PDF sent to \${volunteerEmail}! They have \${result.shiftsCount} upcoming shifts.\`
+                  : \`Schedule PDF sent to \${volunteerEmail}! They currently have no assigned shifts for future dates.\`;
+                  
+                if (typeof Modal !== 'undefined') {
+                  Modal.success('PDF Sent', message);
+                } else {
+                  alert(message);
+                }
+              } else {
+                const error = await response.json();
+                if (typeof Modal !== 'undefined') {
+                  Modal.error('Error', 'Failed to send PDF: ' + (error.error || 'Unknown error'));
+                } else {
+                  alert('Failed to send PDF: ' + (error.error || 'Unknown error'));
+                }
+              }
+            } catch (error) {
+              console.error('Error sending PDF:', error);
+              if (typeof Modal !== 'undefined') {
+                Modal.error('Error', 'Error sending schedule PDF');
+              } else {
+                alert('Error sending schedule PDF');
+              }
+            }
+          };
+          
+          if (typeof Modal !== 'undefined') {
+            Modal.confirm('Send Schedule PDF', confirmMessage, sendEmail);
+          } else {
+            if (confirm(confirmMessage)) {
+              await sendEmail();
+            }
+          }
+        }
+        
+        // Make function globally available
+        globalThis.sendSchedulePDF = sendSchedulePDF;
       </script>
     </body>
     </html>

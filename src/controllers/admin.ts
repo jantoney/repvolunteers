@@ -1269,3 +1269,92 @@ export async function getAvailableRolesForShift(ctx: RouterContext<string>) {
     client.release();
   }
 }
+
+/**
+ * Downloads a volunteer's schedule as PDF - can be called by volunteer or admin
+ */
+export async function downloadVolunteerSchedulePDF(ctx: RouterContext<string>) {
+  const volunteerId = ctx.params.id;
+  
+  try {
+    const { generateVolunteerPDFData, generateVolunteerSchedulePDF, getVolunteerScheduleMimeType, getVolunteerScheduleFileExtension } = await import("../utils/pdf-generator.ts");
+    
+    const pdfData = await generateVolunteerPDFData(Number(volunteerId));
+    const pdfBuffer = generateVolunteerSchedulePDF(pdfData);
+    
+    const filename = `theatre-shifts-${pdfData.volunteer.name.replace(/[^a-zA-Z0-9]/g, '-')}-${new Date().toISOString().split('T')[0]}.${getVolunteerScheduleFileExtension()}`;
+    
+    ctx.response.headers.set("Content-Type", getVolunteerScheduleMimeType());
+    ctx.response.headers.set("Content-Disposition", `attachment; filename="${filename}"`);
+    ctx.response.body = pdfBuffer;
+  } catch (error) {
+    console.error("Error generating volunteer schedule PDF:", error);
+    ctx.response.status = 500;
+    ctx.response.body = { error: "Failed to generate PDF" };
+  }
+}
+
+/**
+ * Sends a volunteer's schedule PDF via email - admin only
+ */
+export async function emailVolunteerSchedulePDF(ctx: RouterContext<string>) {
+  const volunteerId = ctx.params.id;
+  
+  try {
+    const { generateVolunteerPDFData, generateVolunteerSchedulePDF, filterCurrentAndFutureShifts, formatShiftForDisplay } = await import("../utils/pdf-generator.ts");
+    const { sendVolunteerScheduleEmail, createVolunteerLoginUrl } = await import("../utils/email.ts");
+    
+    // Generate PDF data
+    const pdfData = await generateVolunteerPDFData(Number(volunteerId));
+    
+    // Check if volunteer has email
+    if (!pdfData.volunteer.email) {
+      ctx.response.status = 400;
+      ctx.response.body = { error: "Volunteer does not have an email address" };
+      return;
+    }
+    
+    // Generate PDF buffer
+    const pdfBuffer = generateVolunteerSchedulePDF(pdfData);
+    const filename = `theatre-shifts-${pdfData.volunteer.name.replace(/[^a-zA-Z0-9]/g, '-')}-${new Date().toISOString().split('T')[0]}.html`;
+    
+    // Prepare email data
+    const currentAndFutureShifts = filterCurrentAndFutureShifts(pdfData.assignedShifts);
+    const hasShifts = currentAndFutureShifts.length > 0;
+    const shifts = currentAndFutureShifts.slice(0, 5).map(formatShiftForDisplay); // Show max 5 in email
+    
+    const baseUrl = `${ctx.request.url.protocol}//${ctx.request.url.host}`;
+    const loginUrl = createVolunteerLoginUrl(baseUrl, pdfData.volunteer.id);
+    
+    const emailData = {
+      volunteerName: pdfData.volunteer.name,
+      volunteerEmail: pdfData.volunteer.email,
+      loginUrl,
+      hasShifts,
+      shifts
+    };
+    
+    // Send email with PDF attachment
+    const emailSent = await sendVolunteerScheduleEmail(emailData, {
+      content: pdfBuffer,
+      filename
+    });
+    
+    if (emailSent) {
+      ctx.response.status = 200;
+      ctx.response.body = { 
+        success: true, 
+        message: `Schedule PDF sent to ${pdfData.volunteer.email}`,
+        hasShifts,
+        shiftsCount: currentAndFutureShifts.length
+      };
+    } else {
+      ctx.response.status = 500;
+      ctx.response.body = { error: "Failed to send email" };
+    }
+  } catch (error) {
+    console.error("Error sending volunteer schedule PDF:", error);
+    ctx.response.status = 500;
+    ctx.response.body = { error: "Failed to send schedule PDF" };
+  }
+}

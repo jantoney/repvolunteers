@@ -42,6 +42,8 @@ router.get("/api/volunteers/:id", adminController.getVolunteer);
 router.put("/api/volunteers/:id", adminController.updateVolunteer);
 router.put("/api/volunteers/:id/approval", adminController.toggleVolunteerApproval);
 router.post("/api/volunteers/:id/shifts/removal-pdf", adminController.generateShiftRemovalPDF);
+router.get("/api/volunteers/:id/schedule-pdf", adminController.downloadVolunteerSchedulePDF);
+router.post("/api/volunteers/:id/email-schedule-pdf", adminController.emailVolunteerSchedulePDF);
 router.delete("/api/volunteers/:id", adminController.deleteVolunteer);
 
 // Shifts management pages
