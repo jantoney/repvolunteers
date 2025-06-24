@@ -1301,7 +1301,8 @@ export async function emailVolunteerSchedulePDF(ctx: RouterContext<string>) {
   const volunteerId = ctx.params.id;
   
   try {
-    const { generateVolunteerPDFData, generateVolunteerSchedulePDF, filterCurrentAndFutureShifts, formatShiftForDisplay } = await import("../utils/pdf-generator.ts");
+    const { generateVolunteerPDFData, filterCurrentAndFutureShifts } = await import("../utils/pdf-generator.ts");
+    const { generateServerSidePDF } = await import("../utils/server-pdf-generator.ts");
     const { sendVolunteerScheduleEmail, createVolunteerLoginUrl } = await import("../utils/email.ts");
     
     // Generate PDF data
@@ -1314,14 +1315,24 @@ export async function emailVolunteerSchedulePDF(ctx: RouterContext<string>) {
       return;
     }
     
-    // Generate PDF buffer
-    const pdfBuffer = generateVolunteerSchedulePDF(pdfData);
-    const filename = `theatre-shifts-${pdfData.volunteer.name.replace(/[^a-zA-Z0-9]/g, '-')}-${new Date().toISOString().split('T')[0]}.html`;
+    // Generate PDF buffer (real PDF)
+    const pdfBuffer = await generateServerSidePDF(pdfData);
+    const filename = `theatre-shifts-${pdfData.volunteer.name.replace(/[^a-zA-Z0-9]/g, '-')}-${new Date().toISOString().split('T')[0]}.pdf`;
     
     // Prepare email data
     const currentAndFutureShifts = filterCurrentAndFutureShifts(pdfData.assignedShifts);
     const hasShifts = currentAndFutureShifts.length > 0;
-    const shifts = currentAndFutureShifts.slice(0, 5).map(formatShiftForDisplay); // Show max 5 in email
+    // Improved shift preview formatting: date/time on first line, show/role on second, indented
+    const shifts = currentAndFutureShifts.slice(0, 5).map(shift => {
+      const date = new Date(shift.show_date).toLocaleDateString('en-AU', {
+        weekday: 'short', day: '2-digit', month: 'short', year: 'numeric'
+      });
+      const arriveTime = new Date(shift.arrive_time).toLocaleTimeString('en-AU', {
+        hour: '2-digit', minute: '2-digit', hour12: true
+      });
+      // Second line indented
+      return `${date} ${arriveTime}<br><span style="margin-left:1.5em;display:inline-block;">${shift.show_name} (${shift.role})</span>`;
+    });
     
     const baseUrl = `${ctx.request.url.protocol}//${ctx.request.url.host}`;
     const loginUrl = createVolunteerLoginUrl(baseUrl, pdfData.volunteer.id);

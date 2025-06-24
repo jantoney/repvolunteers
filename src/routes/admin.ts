@@ -7,6 +7,13 @@ const router = new Router();
 // Public routes
 router.get("/login", adminController.showLoginForm);
 router.get("/logout", adminController.logout);
+// Serve the admin password reset page (public)
+router.get("/reset-password", async (ctx) => {
+  await ctx.send({
+    root: `${Deno.cwd()}/src/views/admin`,
+    path: "reset-password.html",
+  });
+});
 
 // Protected admin routes - apply middleware first
 router.use(requireAdminAuth);

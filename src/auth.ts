@@ -1,5 +1,6 @@
 import { betterAuth } from "better-auth";
 import { getAuthPool } from "./models/db.ts";
+import { sendAdminPasswordResetEmail } from "./utils/admin-email.ts";
 
 let _auth: ReturnType<typeof betterAuth>;
 
@@ -9,6 +10,16 @@ function createAuth() {
       database: getAuthPool(),
       emailAndPassword: {
         enabled: true,
+        async sendResetPassword({ user, url, token }) {
+          // Build custom UI URL for password reset
+          const baseUrl = Deno.env.get("PUBLIC_BASE_URL") || "http://localhost:8044";
+          const resetUrl = `${baseUrl}/admin/reset-password?token=${encodeURIComponent(token)}&email=${encodeURIComponent(user.email)}`;
+          await sendAdminPasswordResetEmail({
+            adminName: user.name || user.email,
+            adminEmail: user.email,
+            resetUrl,
+          });
+        },
       },
       user: {
         modelName: "user",

@@ -78,7 +78,8 @@ CREATE TABLE IF NOT EXISTS account (
   scope TEXT,
   password TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (user_id, provider_id)
 );
 
 CREATE TABLE IF NOT EXISTS verification (

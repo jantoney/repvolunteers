@@ -48,7 +48,7 @@
                         <tr>
                           <td style="text-align:center;">
                             <h2 style="color:#fff;margin:0;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;font-size:24px;font-weight:bold;">
-                              🎭 Theatre Shifts
+                              🎭 The Rep Theatre Shifts
                             </h2>
                           </td>
                         </tr>
@@ -82,7 +82,32 @@
                               </h3>
                               <ul style="color:#555;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;font-size:14px;line-height:20px;margin:0;padding-left:20px;">
                                 {{#each shifts}}
-                                <li style="margin-bottom:5px;">{{this}}</li>
+                                <li style="margin-bottom:10px;">
+                                    {{!-- Expect shift string as "DATE/TIME — SHOW NAME (ROLE)" --}}
+                                    {{#if (contains this "—")}}
+                                    {{~@root.splitParts = (split this "—")~}}
+                                    {{~@root.showAndRole = (trim @root.splitParts.[1])~}}
+                                    {{!-- Extract show name and role --}}
+                                    {{#if (contains @root.showAndRole "(")}}
+                                      {{~@root.showName = (trim (substring @root.showAndRole 0 (lastIndexOf @root.showAndRole "(")))~}}
+                                      {{~@root.role = (trim (substring @root.showAndRole (add (lastIndexOf @root.showAndRole "(") 1) (sub (length @root.showAndRole) 1)))~}}
+                                      <span>{{@root.splitParts.[0]}}</span><br />
+                                      <span style="display:inline-block;margin-left:1.5em;color:#333;">
+                                        {{@root.showName}}
+                                      </span><br />
+                                      <span style="display:inline-block;margin-left:3em;color:#555;">
+                                        {{@root.role}}
+                                      </span>
+                                    {{else}}
+                                      <span>{{@root.splitParts.[0]}}</span><br />
+                                      <span style="display:inline-block;margin-left:1.5em;color:#333;">
+                                      {{@root.showAndRole}}
+                                      </span>
+                                    {{/if}}
+                                  {{else}}
+                                    {{this}}
+                                  {{/if}}
+                                </li>
                                 {{/each}}
                               </ul>
                             </div>

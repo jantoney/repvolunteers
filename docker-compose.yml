@@ -1,0 +1,7 @@
+services:
+  app:
+    image: registry.digitalocean.com/djshopdevregistry/theatre-app:latest
+    env_file: .env
+    ports:
+      - "8044:8044"
+    restart: unless-stopped

@@ -1,0 +1,47 @@
+name: Build and Deploy
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Log in to DigitalOcean Container Registry
+      run: echo "${{ secrets.DO_TOKEN }}" | docker login registry.digitalocean.com -u doctl --password-stdin
+
+    - name: Build Docker image
+      run: |
+        docker build -t registry.digitalocean.com/djshopdevregistry/theatre-app:latest .
+
+    - name: Push Docker image
+      run: |
+        docker push registry.digitalocean.com/djshopdevregistry/theatre-app:latest
+
+    - name: Create .env file
+      run: |
+        cat > .env <<EOF
+        PORT=8044
+        DATABASE_URL=${{ secrets.DATABASE_URL }}
+        SESSION_SECRET=${{ secrets.SESSION_SECRET }}
+        RESEND_API_KEY=${{ secrets.RESEND_API_KEY }}
+        BASE_URL=${{ secrets.BASE_URL }}
+        FROM_EMAIL=${{ secrets.FROM_EMAIL }}
+        FROM_NAME=${{ secrets.FROM_NAME }}
+        ADMIN_USER=${{ secrets.ADMIN_USER }}
+        ADMIN_PASS=${{ secrets.ADMIN_PASS }}
+        BETTER_AUTH_SECRET=${{ secrets.BETTER_AUTH_SECRET }}
+        BETTER_AUTH_URL=${{ secrets.BETTER_AUTH_URL }}
+        DENO_ENV=production
+        EOF
+
+    - name: Restart app with Docker Compose
+      run: |
+        docker compose down
+        docker compose pull
+        docker compose up -d

@@ -368,10 +368,10 @@ function generateVolunteerScheduleHTMLContent(data: PDFData): string {
 /**
  * Formats volunteer shift data for display in emails (date and time first)
  */
+// Updated: formatting now handled inline in admin controller for email preview (see admin.ts)
 export function formatShiftForDisplay(shift: ShiftRow): string {
   const date = formatDateForDisplay(shift.show_date);
   const arriveTime = formatTimeForDisplay(shift.arrive_time);
-  
   return `${date} ${arriveTime} - ${shift.show_name} (${shift.role})`;
 }
 

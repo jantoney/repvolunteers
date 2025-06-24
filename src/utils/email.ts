@@ -250,7 +250,8 @@ export function renderVolunteerScheduleEmail(data: VolunteerScheduleEmailData): 
   // Generate shifts section based on whether they have shifts
   let shiftsSection = '';
   if (data.hasShifts && data.shifts.length > 0) {
-    const shiftsList = data.shifts.map(shift => `<li style="margin-bottom:5px;">${escapeHtml(shift)}</li>`).join('');
+    // Do not escape HTML, as shift preview now contains <br> and <span> for formatting
+    const shiftsList = data.shifts.map(shift => `<li style="margin-bottom:5px;">${shift}</li>`).join('');
     shiftsSection = `
             <div style="background:#f8f9fa;border-radius:6px;padding:20px;margin:25px 0;">
               <h3 style="color:#333;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;font-size:16px;font-weight:bold;margin:0 0 10px 0;">

@@ -1,3 +1,7 @@
+
+// --- ADMIN PASSWORD RESET SUBMIT ENDPOINT ---
+// Place this after router is declared
+
 import { Router } from "oak";
 import { auth } from "../auth.ts";
 
@@ -275,3 +279,74 @@ router.post("/register", async (ctx) => {
 });
 
 export default router;
+
+// --- ADMIN PASSWORD RESET SUBMIT ENDPOINT ---
+router.post("/admin/reset-password", async (ctx) => {
+  try {
+    const { token, password } = await ctx.request.body.json();
+    if (!token || !password) {
+      ctx.response.status = 400;
+      ctx.response.body = { error: "Missing token or password." };
+      return;
+    }
+
+    // Use Better Auth API directly with correct parameters
+    const result = await auth.api.resetPassword({
+      body: {
+        newPassword: password,
+        token: token,
+      },
+    });
+
+    if (!result.status) {
+      ctx.response.status = 400;
+      ctx.response.body = { error: "Failed to reset password." };
+      return;
+    }
+
+    ctx.response.status = 200;
+    ctx.response.body = { message: "Password reset successful. You may now log in with your new password." };
+  } catch (error) {
+    console.error("Error in admin password reset submit:", error);
+    ctx.response.status = 500;
+    ctx.response.body = { error: "Failed to reset password." };
+  }
+});
+
+// --- ADMIN PASSWORD RESET ENDPOINT ---
+// Use Better Auth's built-in API for password reset requests
+router.post("/admin/password-reset", async (ctx) => {
+  try {
+    const { email } = await ctx.request.body.json();
+    if (!email) {
+      ctx.response.status = 400;
+      ctx.response.body = { error: "Email is required" };
+      return;
+    }
+
+    // Forward to Better Auth's request-password-reset endpoint
+    const req = new Request(
+      new URL("/api/auth/request-password-reset", ctx.request.url),
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      }
+    );
+    const response = await auth.handler(req);
+    const result = await response.json();
+
+    if (!response.ok || result.error) {
+      ctx.response.status = 400;
+      ctx.response.body = { error: result?.error || "Failed to send password reset email." };
+      return;
+    }
+
+    ctx.response.status = 200;
+    ctx.response.body = { message: result?.message || `Password reset email sent to ${email}` };
+  } catch (error) {
+    console.error("Error in admin password reset:", error);
+    ctx.response.status = 500;
+    ctx.response.body = { error: "Failed to process password reset request" };
+  }
+});

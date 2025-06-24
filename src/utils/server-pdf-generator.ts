@@ -322,22 +322,47 @@ export async function generateServerSidePDF(data: PDFData): Promise<Uint8Array> 
             const x = calendarMargin + (col * cellWidth);
             const y = yPos + (row * cellHeight);
 
-            // Draw cell border
-            doc.rect(x, y, cellWidth, cellHeight);
+            // Determine if this cell is a valid date
+            const isDateCell = !(row === 0 && col < adjustedFirstDay) && (dayCount <= daysInMonth);
+            let hasShifts = false;
+            let dateStr = '';
+            if (isDateCell) {
+              dateStr = `${year}-${String(month).padStart(2, '0')}-${String(dayCount).padStart(2, '0')}`;
+              hasShifts = !!shiftsByDate[dateStr];
+            }
 
-            if (row === 0 && col < adjustedFirstDay) {
-              // Empty cell before month starts
-            } else if (dayCount <= daysInMonth) {
+            // Grey out cells that are not valid dates
+            if (!isDateCell) {
+              doc.setFillColor(220, 220, 220); // light grey
+              doc.rect(x, y, cellWidth, cellHeight, 'F');
+              doc.setDrawColor(180, 180, 180); // slightly darker border
+              doc.rect(x, y, cellWidth, cellHeight);
+              doc.setDrawColor(0, 0, 0); // reset to black
+            } else {
+              // Draw normal or thick border for date cells
+              if (hasShifts) {
+                doc.setLineWidth(0.8); // Thicker border for days with shifts
+                doc.setDrawColor(0, 0, 0); // Ensure border is black
+                doc.rect(x, y, cellWidth, cellHeight);
+                doc.setLineWidth(0.2); // Reset to default
+              } else {
+                doc.rect(x, y, cellWidth, cellHeight);
+              }
+            }
+
+            if (isDateCell) {
               // Day number
               doc.setFontSize(10);
-              doc.setFont("helvetica", 'bold');
+              if (hasShifts) {
+                doc.setFont("helvetica", 'bold');
+              } else {
+                doc.setFont("helvetica", 'normal');
+              }
               doc.text(dayCount.toString(), x + 2, y + 4);
               doc.setFont("helvetica", 'normal');
 
-              // Check if this day has shifts
-              const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(dayCount).padStart(2, '0')}`;
-              if (shiftsByDate[dateStr]) {
-                // Instead of indicator, print each shift's arrive and depart time
+              // If this day has shifts, print each shift's arrive and depart time
+              if (hasShifts) {
                 let shiftY = y + 9;
                 doc.setFontSize(8);
                 shiftsByDate[dateStr].forEach(shift => {
