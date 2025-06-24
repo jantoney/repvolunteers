@@ -134,13 +134,13 @@ export function renderNewShowTemplate(data: NewShowPageData): string {
             
             <div class="time-group">
               <div class="form-group">
-                <label for="startDateTime">Start Date & Time:</label>
-                <input type="datetime-local" id="startDateTime" name="startDateTime" required>
+                <label for="startTime">Start Time:</label>
+                <input type="time" id="startTime" name="startTime" required>
               </div>
               
               <div class="form-group">
-                <label for="endDateTime">End Date & Time:</label>
-                <input type="datetime-local" id="endDateTime" name="endDateTime" required>
+                <label for="endTime">End Time:</label>
+                <input type="time" id="endTime" name="endTime" required>
               </div>
             </div>
             
@@ -286,8 +286,8 @@ export function renderNewShowTemplate(data: NewShowPageData): string {
         
         function clearForm() {
           document.getElementById('name').value = '';
-          document.getElementById('startDateTime').value = '';
-          document.getElementById('endDateTime').value = '';
+          document.getElementById('startTime').value = '';
+          document.getElementById('endTime').value = '';
           document.getElementById('existingShow').value = '';
           selectedDates = [];
           
@@ -341,15 +341,15 @@ export function renderNewShowTemplate(data: NewShowPageData): string {
           hideMessages();
           
           const showType = document.querySelector('input[name="showType"]:checked').value;
-          const startDateTime = document.getElementById('startDateTime').value;
-          const endDateTime = document.getElementById('endDateTime').value;
+          const startTime = document.getElementById('startTime').value;
+          const endTime = document.getElementById('endTime').value;
           
           if (selectedDates.length === 0) {
             showError('Please select at least one date.');
             return;
           }
           
-          if (!startDateTime || !endDateTime) {
+          if (!startTime || !endTime) {
             showError('Please fill in all fields.');
             return;
           }
@@ -375,13 +375,9 @@ export function renderNewShowTemplate(data: NewShowPageData): string {
           
           // For each selected date, combine with the start and end times
           const performances = selectedDates.map(date => {
-            // Extract time parts from the datetime-local inputs
-            const startTime = startDateTime.split('T')[1]; // Get HH:MM part
-            const endTime = endDateTime.split('T')[1]; // Get HH:MM part
-            
+            // Use the time values directly from the time inputs
             // Create timestamps for this date with the specified times
-            // The datetime-local inputs contain the local time, but we want to treat
-            // these as Adelaide time, so we'll send the raw datetime and let the server handle it
+            // The time inputs contain just HH:MM, so we combine with the selected date
             const startTimestamp = \`\${date}T\${startTime}:00\`;
             const endTimestamp = \`\${date}T\${endTime}:00\`;
             
@@ -427,8 +423,8 @@ export function renderNewShowTemplate(data: NewShowPageData): string {
               document.getElementById('existingShow').value = lastCreatedShowId;
               
               // Clear only the dates and times, keep the show selected
-              document.getElementById('startDateTime').value = '';
-              document.getElementById('endDateTime').value = '';
+              document.getElementById('startTime').value = '';
+              document.getElementById('endTime').value = '';
               selectedDates = [];
               renderCalendar();
               updateSelectedDatesDisplay();

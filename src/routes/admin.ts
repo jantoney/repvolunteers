@@ -31,6 +31,7 @@ router.delete("/api/show-dates/:id", adminController.deleteShowDate);
 
 // Volunteers management pages
 router.get("/volunteers", adminController.showVolunteersPage);
+router.get("/volunteers/:id/shifts", adminController.showVolunteerShiftsPage);
 router.get("/volunteers/new", adminController.showNewVolunteerForm);
 router.get("/volunteers/:id/edit", adminController.showEditVolunteerForm);
 
@@ -39,6 +40,8 @@ router.get("/api/volunteers", adminController.listVolunteers);
 router.post("/api/volunteers", adminController.createVolunteer);
 router.get("/api/volunteers/:id", adminController.getVolunteer);
 router.put("/api/volunteers/:id", adminController.updateVolunteer);
+router.put("/api/volunteers/:id/approval", adminController.toggleVolunteerApproval);
+router.post("/api/volunteers/:id/shifts/removal-pdf", adminController.generateShiftRemovalPDF);
 router.delete("/api/volunteers/:id", adminController.deleteVolunteer);
 
 // Shifts management pages
@@ -65,7 +68,9 @@ router.get("/api/performances-without-shifts/count", adminController.getPerforma
 
 // Volunteer-Shift Assignment API endpoints
 router.get("/api/shifts/:shiftId/volunteers", adminController.getShiftVolunteers);
+router.get("/api/shifts/:shiftId/available-roles", adminController.getAvailableRolesForShift);
 router.get("/api/volunteers/:volunteerId/shifts", adminController.getVolunteerShifts);
+router.get("/api/volunteers/:volunteerId/shifts/simple", adminController.getVolunteerShiftsSimple);
 router.get("/api/shifts/:shiftId/available-volunteers", adminController.getAvailableVolunteersForShift);
 router.get("/api/volunteers/:volunteerId/available-shifts", adminController.getAvailableShiftsForVolunteer);
 router.post("/api/volunteer-shifts", adminController.assignVolunteerToShift);

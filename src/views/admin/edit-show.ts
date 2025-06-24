@@ -17,7 +17,7 @@ export async function showEditShowForm(ctx: RouterContext<string>) {
     
     // Get show dates for this show
     const datesResult = await client.queryObject<ShowDate>(
-      "SELECT id, date, start_time, end_time FROM show_dates WHERE show_id = $1 ORDER BY date",
+      "SELECT id, start_time, end_time FROM show_dates WHERE show_id = $1 ORDER BY start_time",
       [id]
     );
     

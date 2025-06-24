@@ -170,7 +170,7 @@ export function toAdelaideDateTimeLocal(date: Date | string): string {
 /**
  * Create a timestamp in Adelaide timezone from a date and time
  * @param date - The date (YYYY-MM-DD string or Date object)  
- * @param time - The time (HH:MM string)
+ * @param time - The time (HH:MM or HH:MM:SS string)
  * @returns Date object representing the time in Adelaide timezone stored as UTC
  */
 export function createAdelaideTimestamp(date: Date | string, time: string): Date {
@@ -178,13 +178,16 @@ export function createAdelaideTimestamp(date: Date | string, time: string): Date
   
   // Parse the components
   const [year, month, day] = dateStr.split('-').map(Number);
-  const [hours, minutes] = time.split(':').map(Number);
+  
+  // Parse the components - handle both HH:MM and HH:MM:SS formats
+  const timeParts = time.split(':').map(Number);
+  const [hours, minutes, seconds = 0] = timeParts; // Default seconds to 0 if not provided
   
   // Use a more direct approach: create a date with the desired Adelaide time,
   // then find the UTC equivalent using binary search
   
   // Start with an approximation
-  let utcTime = Date.UTC(year, month - 1, day, hours, minutes);
+  let utcTime = Date.UTC(year, month - 1, day, hours, minutes, seconds);
   
   // Adjust for approximate Adelaide offset (UTC+9.5 to UTC+10.5 depending on DST)
   utcTime -= 9.5 * 60 * 60 * 1000; // Start with UTC+9.5
@@ -211,7 +214,7 @@ export function createAdelaideTimestamp(date: Date | string, time: string): Date
     const [aYear, aMonth, aDay] = adelaideDatePart.split('-').map(Number);
     const [aHours, aMinutes] = adelaideTimePart.split(':').map(Number);
     
-    // Compare with our target
+    // Compare with our target (ignoring seconds since Adelaide formatting only gives minute precision)
     const targetTime = year * 10000000000 + month * 100000000 + day * 1000000 + hours * 10000 + minutes * 100;
     const actualTime = aYear * 10000000000 + aMonth * 100000000 + aDay * 1000000 + aHours * 10000 + aMinutes * 100;
     

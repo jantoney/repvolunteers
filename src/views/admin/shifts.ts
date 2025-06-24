@@ -27,7 +27,7 @@ export async function showShiftsPage(ctx: RouterContext<string>) {
     
     // Build the shifts query with optional show filter
     let shiftsQuery = `
-      SELECT s.id, s.show_date_id, sh.id as show_id, sh.name as show_name, sd.date, 
+      SELECT s.id, s.show_date_id, sh.id as show_id, sh.name as show_name, DATE(sd.start_time) as date, 
              sd.start_time as show_start, sd.end_time as show_end,
              s.role, s.arrive_time, s.depart_time,
              COUNT(vs.participant_id) as volunteer_count
@@ -47,7 +47,7 @@ export async function showShiftsPage(ctx: RouterContext<string>) {
     }
     
     if (selectedDate) {
-      whereConditions.push(`sd.date = $${queryParams.length + 1}`);
+      whereConditions.push(`DATE(sd.start_time) = $${queryParams.length + 1}`);
       queryParams.push(selectedDate);
     }
     
@@ -56,8 +56,8 @@ export async function showShiftsPage(ctx: RouterContext<string>) {
     }
     
     shiftsQuery += `
-      GROUP BY s.id, sh.id, sh.name, sd.date, sd.start_time, sd.end_time
-      ORDER BY sd.date, s.arrive_time
+      GROUP BY s.id, sh.id, sh.name, DATE(sd.start_time), sd.start_time, sd.end_time
+      ORDER BY DATE(sd.start_time), s.arrive_time
     `;
     
     const shiftsResult = await client.queryObject<{

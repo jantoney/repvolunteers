@@ -284,8 +284,9 @@
       background: #f8f9fa;
     }
     .calendar-day.other-month {
-      background: #f8f9fa;
-      color: #999;
+      background: #f0f0f0;
+      color: #ccc;
+      cursor: default;
     }
     .calendar-day.today {
       background: #fff3cd;
@@ -524,7 +525,7 @@
     
     <!-- Assigned Shifts Section -->
     <div class="shifts-section">
-      <h2>Your Assigned Shifts</h2>
+      <h2>Future Shifts</h2>
       <div id="assignedShifts"></div>
     </div>
     
@@ -705,6 +706,13 @@
       if (monthSpan) {
         monthSpan.textContent = AdelaideTime.getMonthYearAdelaide(currentCalendarDate);
       }
+      
+      // Show/hide previous button based on whether we're viewing current month
+      const prevButton = document.querySelector('.calendar-nav button');
+      if (prevButton) {
+        const isCurrentMonth = currentYear === now.getFullYear() && currentMonth === now.getMonth();
+        prevButton.style.display = isCurrentMonth ? 'none' : 'inline-block';
+      }
         // Create calendar grid
       const firstDay = new Date(currentYear, currentMonth, 1);
       const lastDay = new Date(currentYear, currentMonth + 1, 0);
@@ -739,13 +747,17 @@
       }      // Build assigned shift dates - handle multiple possible data structures
       if (assignedShifts && Array.isArray(assignedShifts)) {
         const now = AdelaideTime.getNowAdelaide();
+        const currentYear = now.getFullYear();
+        const currentMonth = now.getMonth(); // 0-11
+        const currentMonthStart = new Date(currentYear, currentMonth, 1); // First day of current month
+        
         assignedShifts.forEach((show, index) => {
           console.log(`Processing assigned show ${index}:`, show);
           
           // Handle case where shifts are directly in the show object (flattened structure)
           if (show.show_date && show.depart_time) {
-            const shiftEndTime = new Date(show.depart_time);
-            if (shiftEndTime > now) {
+            const showDate = new Date(show.show_date);
+            if (showDate >= currentMonthStart) {
               const dateOnly = dateToString(show.show_date);
               if (dateOnly) {
                 assignedShiftDates.add(dateOnly);
@@ -755,8 +767,8 @@
           }
           // Handle legacy flattened structure with 'date' field
           else if (show.date && show.depart_time) {
-            const shiftEndTime = new Date(show.depart_time);
-            if (shiftEndTime > now) {
+            const showDate = new Date(show.date);
+            if (showDate >= currentMonthStart) {
               const dateOnly = dateToString(show.date);
               if (dateOnly) {
                 assignedShiftDates.add(dateOnly);
@@ -769,16 +781,16 @@
             show.performances.forEach((perf, perfIndex) => {
               console.log(`Processing assigned performance ${perfIndex}:`, perf);
               if (perf.date && perf.shifts) {
-                perf.shifts.forEach(shift => {
-                  const shiftEndTime = new Date(shift.depart_time);
-                  if (shiftEndTime > now) {
+                const performanceDate = new Date(perf.date);
+                if (performanceDate >= currentMonthStart) {
+                  perf.shifts.forEach(shift => {
                     const dateOnly = dateToString(perf.date);
                     if (dateOnly) {
                       assignedShiftDates.add(dateOnly);
                       console.log(`Added assigned date from performance: ${perf.date} -> ${dateOnly}`);
                     }
-                  }
-                });
+                  });
+                }
               }
             });
           }
@@ -866,37 +878,41 @@
           dayDiv.classList.add('today');
         }
         
-        // Add day number
+        // Add day number (only for current month)
         const dayNumber = document.createElement('div');
         dayNumber.className = 'calendar-day-number';
-        dayNumber.textContent = currentDate.getDate();
-        dayDiv.appendChild(dayNumber);        // Add shift indicators
-        const hasAssignedShift = assignedShiftDates.has(dateStr);
-        const hasAvailableShift = availableShiftDates.has(dateStr);
-        
-        // Debug: Log some key dates to help troubleshoot
-        if (dateStr === '2025-06-22' || dateStr === '2025-06-28') {
-          console.log(`Date ${dateStr}: assigned=${hasAssignedShift}, available=${hasAvailableShift}`);
+        if (isCurrentMonth) {
+          dayNumber.textContent = currentDate.getDate();
         }
-        
-        if (hasAssignedShift || hasAvailableShift) {
-          const indicatorsContainer = document.createElement('div');
-          indicatorsContainer.className = 'shift-indicators';
-            if (hasAssignedShift) {
-            const assignedIcon = document.createElement('div');
-            assignedIcon.className = 'shift-icon assigned';
-            assignedIcon.title = 'You have assigned shifts on this day';
-            indicatorsContainer.appendChild(assignedIcon);
+        dayDiv.appendChild(dayNumber);        // Add shift indicators (only for current month days)
+        if (isCurrentMonth) {
+          const hasAssignedShift = assignedShiftDates.has(dateStr);
+          const hasAvailableShift = availableShiftDates.has(dateStr);
+          
+          // Debug: Log some key dates to help troubleshoot
+          if (dateStr === '2025-06-22' || dateStr === '2025-06-28') {
+            console.log(`Date ${dateStr}: assigned=${hasAssignedShift}, available=${hasAvailableShift}`);
           }
           
-          if (hasAvailableShift) {
-            const availableIcon = document.createElement('div');
-            availableIcon.className = 'shift-icon available';
-            availableIcon.title = 'Available shifts on this day';
-            indicatorsContainer.appendChild(availableIcon);
+          if (hasAssignedShift || hasAvailableShift) {
+            const indicatorsContainer = document.createElement('div');
+            indicatorsContainer.className = 'shift-indicators';
+              if (hasAssignedShift) {
+              const assignedIcon = document.createElement('div');
+              assignedIcon.className = 'shift-icon assigned';
+              assignedIcon.title = 'You have assigned shifts on this day';
+              indicatorsContainer.appendChild(assignedIcon);
+            }
+            
+            if (hasAvailableShift) {
+              const availableIcon = document.createElement('div');
+              availableIcon.className = 'shift-icon available';
+              availableIcon.title = 'Available shifts on this day';
+              indicatorsContainer.appendChild(availableIcon);
+            }
+            
+            dayDiv.appendChild(indicatorsContainer);
           }
-          
-          dayDiv.appendChild(indicatorsContainer);
         }
         
         calendar.appendChild(dayDiv);
@@ -910,21 +926,31 @@
       const newYear = currentCalendarDate.getFullYear() + Math.floor(newMonth / 12);
       const adjustedMonth = ((newMonth % 12) + 12) % 12;
       
-      currentCalendarDate = new Date(newYear, adjustedMonth, 1);
-      generateCalendar();
+      // Don't allow going to months before current month
+      const now = AdelaideTime.getNowAdelaide();
+      const targetDate = new Date(newYear, adjustedMonth, 1);
+      const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+      
+      if (targetDate >= currentMonthStart) {
+        currentCalendarDate = targetDate;
+        generateCalendar();
+      }
     }    function populateAssignedShifts() {
       if (assignedShifts.length === 0) {
         assignedContainer.innerHTML = '<div class="no-shifts">You are not currently assigned to any shifts.</div>';
       } else {
         const now = AdelaideTime.getNowAdelaide();
+        const today = new Date(now);
+        today.setHours(0, 0, 0, 0); // Start of today for date comparison
         
-        // Flatten all shifts and sort by date
+        // Flatten all shifts and filter to today onwards only
         const allShifts = [];
         assignedShifts.forEach(show => {
           // Handle flattened structure (shifts directly in show)
           if (show.show_date && show.arrive_time) {
-            const shiftEndTime = new Date(show.depart_time);
-            if (shiftEndTime > now) {
+            // Check if the show date is today or in the future
+            const showDate = new Date(show.show_date);
+            if (showDate >= today) {
               allShifts.push({
                 id: show.id,
                 role: show.role,
@@ -942,9 +968,9 @@
             show.performances.forEach(performance => {
               if (performance.shifts && Array.isArray(performance.shifts)) {
                 performance.shifts.forEach(shift => {
-                  // Check if shift end time has passed
-                  const shiftEndTime = new Date(shift.depart_time);
-                  if (shiftEndTime > now) {
+                  // Check if the performance date is today or in the future
+                  const performanceDate = new Date(performance.date);
+                  if (performanceDate >= today) {
                     allShifts.push({
                       ...shift,
                       show_name: show.show_name,
@@ -959,16 +985,24 @@
           }
         });
         
-        // Sort by date, then by arrive time
+        // Sort by date (closest first), then by arrive time
         allShifts.sort((a, b) => {
           const dateCompare = new Date(a.date) - new Date(b.date);
           if (dateCompare !== 0) return dateCompare;
           return new Date(a.arrive_time) - new Date(b.arrive_time);
         });
         if (allShifts.length === 0) {
-          assignedContainer.innerHTML = '<div class="no-shifts">You are not currently assigned to any upcoming shifts.</div>';
+          assignedContainer.innerHTML = '<div class="no-shifts">You are not currently assigned to any future shifts.</div>';
         } else {
-          assignedContainer.innerHTML = allShifts.map(shift => `            <div class="shift assigned-shift">
+          assignedContainer.innerHTML = allShifts.map(shift => {
+            // Check if shift is less than 48 hours away
+            const shiftDate = new Date(shift.arrive_time);
+            const now = AdelaideTime.getNowAdelaide();
+            const hoursUntilShift = (shiftDate - now) / (1000 * 60 * 60); // Convert to hours
+            const canRemove = hoursUntilShift >= 48;
+            
+            return `
+            <div class="shift assigned-shift">
               <div class="shift-row">
                 <div class="shift-details">
                   <div class="show-name">${shift.show_name}</div>
@@ -976,10 +1010,14 @@
                   <div class="shift-role">${shift.role}</div>
                   <div class="shift-time">${formatShiftTime(shift.arrive_time, shift.depart_time)}</div>
                 </div>
-                <button class="btn btn-danger" onclick="removeShift(${shift.id})">Remove</button>
+                ${canRemove 
+                  ? `<button class="btn btn-danger" onclick="removeShift(${shift.id})">Remove</button>`
+                  : `<button class="btn btn-danger" disabled onclick="showCannotRemoveMessage()" title="Cannot remove shifts less than 48 hours away">Remove</button>`
+                }
               </div>
             </div>
-          `).join('');
+          `;
+          }).join('');
         }
       }
     }    function populateAvailableShifts() {
@@ -1019,7 +1057,7 @@
       });
       
       if (futureShifts.length === 0) {
-        availableContainer.innerHTML = '<div class="no-shifts">No upcoming shifts are currently available for signup.</div>';
+        availableContainer.innerHTML = '<div class="no-shifts">No shifts are currently available for signup (all shifts have ended).</div>';
         submitBtn.disabled = true;
       } else {
         availableContainer.innerHTML = futureShifts.map(show => {
@@ -1176,6 +1214,13 @@
       );
     }
 
+    function showCannotRemoveMessage() {
+      Modal.alert(
+        'Cannot Remove Shift',
+        'You cannot remove yourself from shifts that are less than 48 hours away. Please contact the FOH Manager if you need to make changes to this shift.'
+      );
+    }
+
     function logout() {
       // Simple redirect to the main route
       window.location.href = '/';
@@ -1228,11 +1273,28 @@
         const pageHeight = 297;
         const margin = 10;
         const contentWidth = pageWidth - (2 * margin);
-        const maxY = pageHeight - margin;
+        const maxY = pageHeight - margin - 15; // Leave space for footer
         
         // Check if AdelaideTime utilities are available
         if (!window.AdelaideTime) {
           throw new Error('AdelaideTime utilities not loaded');
+        }
+        
+        // Function to add footer to current page
+        function addPageFooter() {
+          const currentY = doc.getCurrentPageInfo().pageNumber;
+          
+          // Website info at bottom left
+          doc.setFontSize(9);
+          const websiteUrl = window.location.origin;
+          const infoText = `Login for the most up-to-date roster: ${websiteUrl}`;
+          doc.text(infoText, margin, pageHeight - margin);
+          
+          // Generated date/time at bottom right (in adelaide timezone)
+          doc.setFontSize(9);
+          const generatedText = `Printed: ${AdelaideTime.getCurrentDateAdelaide()} ${AdelaideTime.getCurrentTimeAdelaide()}`;
+          const textWidth = doc.getTextWidth(generatedText);
+          doc.text(generatedText, pageWidth - margin - textWidth, pageHeight - margin);
         }
         
         let yPos = margin + 10;
@@ -1247,16 +1309,27 @@
         doc.setFontSize(10);
         const generatedDateStr = AdelaideTime.getCurrentDateAdelaide();
         const generatedTimeStr = AdelaideTime.getCurrentTimeAdelaide();
-        doc.text(`Generated: ${generatedDateStr} ${generatedTimeStr}`, margin, yPos);
-        yPos += 6;
           // Note about updating
         doc.setFontSize(10);
-        doc.text('Note: Login to the website for the most up-to-date information at:', margin, yPos);
-        yPos += 5;
-        doc.text(window.location.origin, margin, yPos);
-        yPos += 15;        // Group shifts by date - add validation
+        
+        // Add footer to first page
+        addPageFooter();        // Filter shifts to current month and future only
+        const now = AdelaideTime.getNowAdelaide();
+        const currentYear = now.getFullYear();
+        const currentMonth = now.getMonth(); // 0-11
+        const currentMonthStart = new Date(currentYear, currentMonth, 1); // First day of current month
+        
+        // Group shifts by date - add validation and filter for current month and future
         const shiftsByDate = {};
-        const assignedShifts = data.assignedShifts || [];
+        const assignedShifts = (data.assignedShifts || []).filter(shift => {
+          if (shift && shift.show_date) {
+            const shiftDate = new Date(shift.show_date);
+            // Include only shifts from current month onwards
+            return shiftDate >= currentMonthStart;
+          }
+          return false;
+        });
+        
         assignedShifts.forEach(shift => {
           if (shift && shift.show_date) {
             // Extract date from show_date (which includes time)
@@ -1270,12 +1343,12 @@
         
         // Assigned Shifts Details table (on first page)
         doc.setFontSize(16);
-        doc.text('Assigned Shifts Details', margin, yPos);
+        doc.text('Assigned Shifts (Current Month On-wards)', margin, yPos);
         yPos += 10;
         
         if (assignedShifts.length === 0) {
           doc.setFontSize(10);
-          doc.text('No shifts assigned.', margin, yPos);
+          doc.text('No shifts assigned for current month and future.', margin, yPos);
           yPos += 10;
         } else {
           // Table headers
@@ -1320,6 +1393,9 @@
               doc.addPage();
               yPos = margin + 10;
               
+              // Add footer to new page
+              addPageFooter();
+              
               // Redraw headers on new page
               doc.setFont(undefined, 'bold');
               xPos = margin;
@@ -1354,6 +1430,9 @@
         doc.addPage();
         yPos = margin;
         
+        // Add footer to calendar page
+        addPageFooter();
+        
         // Calendar section
 /*         doc.setFontSize(16);
         doc.text('Shift Calendar Summary', margin, yPos);
@@ -1385,6 +1464,9 @@
               doc.addPage();
               yPos = margin;
               calendarsOnPage = 0;
+              
+              // Add footer to new calendar page
+              addPageFooter();
             }
             
             // Draw calendar for this month
@@ -1478,21 +1560,6 @@
             calendarsOnPage++;
           });        }
         
-        // Add final note at bottom
-        yPos = margin - 3;
-        doc.setFontSize(9);
-        const websiteUrl = window.location.origin;
-        const infoText = `Login to the website for the most up-to-date information: ${websiteUrl}`;
-        const infoTextWidth = doc.getTextWidth(infoText);
-        doc.text(infoText, 210 - 10 - infoTextWidth, yPos); // Right aligned at 10mm from right edge
-
-        //Generated date/time (in adelaide timezone)
-        yPos = margin;
-        doc.setFontSize(9);
-        const generatedText = `Generated: ${AdelaideTime.getCurrentDateAdelaide()} ${AdelaideTime.getCurrentTimeAdelaide()}`;
-        const textWidth = doc.getTextWidth(generatedText);
-        doc.text(generatedText, 210 - 10 - textWidth, yPos); // 210 = A4 width, 10 = right margin
-
         // Save the PDF
         const pdfVolunteerName = data.volunteer?.name || 'volunteer';
         const safeFileName = pdfVolunteerName.replace(/[^a-zA-Z0-9\s]/g, '').replace(/\s+/g, '_');

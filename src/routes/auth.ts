@@ -185,17 +185,27 @@ router.post("/send-link", async (ctx) => {
 
       const volunteer = result.rows[0] as { id: number; name: string; email: string };
       
-      // In a real implementation, you would send an email here
-      // For now, we'll just log the link that would be sent
-      const signupLink = `${ctx.request.url.origin}/volunteer/signup/${volunteer.id}`;
+      // Import and use the email utility
+      const { sendVolunteerLoginEmail, createVolunteerLoginUrl } = await import("../utils/email.ts");
       
-      console.log(`Would send email to ${email} with link: ${signupLink}`);
+      const loginUrl = createVolunteerLoginUrl(ctx.request.url.origin, volunteer.id);
       
-      // TODO: Implement actual email sending
-      // await sendEmail(email, 'Your Theatre Shifts Link', `Access your shifts: ${signupLink}`);
+      // Send the email using our template
+      const emailSent = await sendVolunteerLoginEmail({
+        volunteerName: volunteer.name,
+        volunteerEmail: volunteer.email,
+        loginUrl: loginUrl
+      });
       
-      ctx.response.status = 200;
-      ctx.response.body = { message: "Link sent successfully" };
+      if (emailSent) {
+        console.log(`Email sent to ${email} with login link: ${loginUrl}`);
+        ctx.response.status = 200;
+        ctx.response.body = { message: "Link sent successfully" };
+      } else {
+        console.error(`Failed to send email to ${email}`);
+        ctx.response.status = 500;
+        ctx.response.body = { error: "Failed to send email" };
+      }
     } finally {
       client.release();
     }

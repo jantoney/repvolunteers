@@ -145,7 +145,7 @@ async function migrateShowStructure() {
         const showDateResult = await client.queryObject<{ id: number }>(
           `SELECT sd.id FROM show_dates sd 
            JOIN shows s ON s.id = sd.show_id 
-           WHERE s.name = $1 AND sd.date = $2`,
+           WHERE s.name = $1 AND DATE(sd.start_time) = $2`,
           [show.name, show.date]
         );
         

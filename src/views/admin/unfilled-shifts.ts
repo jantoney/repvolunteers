@@ -17,16 +17,16 @@ export async function showUnfilledShiftsPage(ctx: RouterContext<string>) {
       arrive_time: Date;
       depart_time: Date;
     }>(
-      `SELECT s.id, s.show_date_id, sh.name as show_name, sd.date,
+      `SELECT s.id, s.show_date_id, sh.name as show_name, DATE(sd.start_time) as date,
               sd.start_time as show_start, sd.end_time as show_end,
               s.role, s.arrive_time, s.depart_time
        FROM shifts s
        JOIN show_dates sd ON sd.id = s.show_date_id
        JOIN shows sh ON sh.id = sd.show_id
        LEFT JOIN participant_shifts vs ON vs.shift_id = s.id
-       GROUP BY s.id, sh.name, sd.date, sd.start_time, sd.end_time, s.role, s.arrive_time, s.depart_time
+       GROUP BY s.id, sh.name, DATE(sd.start_time), sd.start_time, sd.end_time, s.role, s.arrive_time, s.depart_time
        HAVING COUNT(vs.participant_id) = 0
-       ORDER BY sd.date, s.arrive_time`
+       ORDER BY DATE(sd.start_time), s.arrive_time`
     );
     
     const data: UnfilledShiftsPageData = {

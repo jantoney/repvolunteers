@@ -8,7 +8,8 @@
     "postgres": "https://deno.land/x/postgres@v0.17.0/mod.ts",
     "pg": "npm:pg@^8.16.2",
     "better-auth": "npm:better-auth@1.2.10",
-    "jspdf": "npm:jspdf@^2.5.2"
+    "jspdf": "npm:jspdf@^2.5.2",
+    "resend": "npm:resend@^4.0.1"
   },"tasks": {
     "start": "deno run -A src/main.ts",
     "dev": "deno run --watch=src/,views/,scripts/ -A src/main.ts",

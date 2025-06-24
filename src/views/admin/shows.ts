@@ -277,8 +277,8 @@ export async function showShowsPage(ctx: RouterContext<string>) {
     const result = await client.queryObject<Show>(`
       SELECT s.id, s.name, s.created_at,
              COUNT(DISTINCT sd.id) as show_date_count,
-             MIN(sd.date) as first_date,
-             MAX(sd.date) as last_date,
+             MIN(DATE(sd.start_time)) as first_date,
+             MAX(DATE(sd.start_time)) as last_date,
              COUNT(DISTINCT sh.id) as total_shifts,
              COUNT(DISTINCT CASE WHEN vs.participant_id IS NOT NULL THEN sh.id END) as filled_shifts
       FROM shows s

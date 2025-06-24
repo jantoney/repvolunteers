@@ -36,26 +36,26 @@ export async function viewSignup(ctx: RouterContext<string>) {
     // Get assigned shifts
     const assignedShiftsRes = await client.queryObject<ShiftRow>(
       `SELECT s.id, s.role, s.arrive_time, s.depart_time, s.show_date_id,
-              sh.name as show_name, sh.id as show_id, sd.date as show_date, sd.start_time, sd.end_time
+              sh.name as show_name, sh.id as show_id, DATE(sd.start_time) as show_date, sd.start_time, sd.end_time
        FROM shifts s
        JOIN show_dates sd ON sd.id = s.show_date_id
        JOIN shows sh ON sh.id = sd.show_id
        JOIN participant_shifts vs ON vs.shift_id = s.id
        WHERE vs.participant_id = $1
-       ORDER BY sh.name, sd.date, sd.start_time, s.arrive_time`,
+       ORDER BY sh.name, DATE(sd.start_time), sd.start_time, s.arrive_time`,
       [id]
     );
 
     // Get available shifts (not assigned to this volunteer)
     const shiftsRes = await client.queryObject<ShiftRow>(
       `SELECT s.id, s.role, s.arrive_time, s.depart_time, s.show_date_id,
-              sh.name as show_name, sh.id as show_id, sd.date as show_date, sd.start_time, sd.end_time
+              sh.name as show_name, sh.id as show_id, DATE(sd.start_time) as show_date, sd.start_time, sd.end_time
        FROM shifts s
        JOIN show_dates sd ON sd.id = s.show_date_id
        JOIN shows sh ON sh.id = sd.show_id
        LEFT JOIN participant_shifts vs ON vs.shift_id = s.id AND vs.participant_id = $1
        WHERE vs.participant_id IS NULL
-       ORDER BY sh.name, sd.date, sd.start_time, s.arrive_time`,
+       ORDER BY sh.name, DATE(sd.start_time), sd.start_time, s.arrive_time`,
       [id],
     );
 
@@ -206,7 +206,7 @@ export async function submitSignup(ctx: RouterContext<string>) {
           end_time: string;
           show_name: string;
         }>(
-          `SELECT sd.date, sd.start_time, sd.end_time, sh.name as show_name
+          `SELECT DATE(sd.start_time) as date, sd.start_time, sd.end_time, sh.name as show_name
            FROM show_dates sd
            JOIN shows sh ON sh.id = sd.show_id
            WHERE sd.id = $1`,
@@ -352,26 +352,26 @@ export async function downloadPDF(ctx: RouterContext<string>) {
     // Get assigned shifts
     const assignedShiftsRes = await client.queryObject<ShiftRow>(
       `SELECT s.id, s.role, s.arrive_time, s.depart_time, s.show_date_id,
-              sh.name as show_name, sh.id as show_id, sd.date as show_date, sd.start_time, sd.end_time
+              sh.name as show_name, sh.id as show_id, DATE(sd.start_time) as show_date, sd.start_time, sd.end_time
        FROM shifts s
        JOIN show_dates sd ON sd.id = s.show_date_id
        JOIN shows sh ON sh.id = sd.show_id
        JOIN participant_shifts vs ON vs.shift_id = s.id
        WHERE vs.participant_id = $1
-       ORDER BY sh.name, sd.date, sd.start_time, s.arrive_time`,
+       ORDER BY sh.name, DATE(sd.start_time), sd.start_time, s.arrive_time`,
       [id]
     );
 
     // Get available shifts (not assigned to this volunteer)
     const shiftsRes = await client.queryObject<ShiftRow>(
       `SELECT s.id, s.role, s.arrive_time, s.depart_time, s.show_date_id,
-              sh.name as show_name, sh.id as show_id, sd.date as show_date, sd.start_time, sd.end_time
+              sh.name as show_name, sh.id as show_id, DATE(sd.start_time) as show_date, sd.start_time, sd.end_time
        FROM shifts s
        JOIN show_dates sd ON sd.id = s.show_date_id
        JOIN shows sh ON sh.id = sd.show_id
        LEFT JOIN participant_shifts vs ON vs.shift_id = s.id AND vs.participant_id = $1
        WHERE vs.participant_id IS NULL
-       ORDER BY sh.name, sd.date, sd.start_time, s.arrive_time`,
+       ORDER BY sh.name, DATE(sd.start_time), sd.start_time, s.arrive_time`,
       [id],
     );    // Return PDF data for client-side generation
     const pdfData = {

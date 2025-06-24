@@ -2,6 +2,7 @@ import type { RouterContext } from "oak";
 import { getPool } from "../models/db.ts";
 import { createAdelaideTimestamp } from "../utils/timezone.ts";
 import { getAuth } from "../auth.ts";
+import { generateShiftRemovalPDF as generatePDF, getMimeType, getFileExtension, type ShiftData, type VolunteerData } from "../utils/pdf-generator.ts";
 
 // Import view functions from separated files
 export {
@@ -11,6 +12,7 @@ export {
   showNewShowForm,
   showEditShowForm,
   showVolunteersPage,
+  showVolunteerShiftsPage,
   showNewVolunteerForm,
   showEditVolunteerForm,
   showShiftsPage,
@@ -125,11 +127,12 @@ export async function listShowDates(ctx: RouterContext<string>) {
       ORDER BY sd.start_time
     `, [showId]);
     
-    // Convert BigInt count values to numbers for JSON serialization
+    // Convert BigInt count values to numbers for JSON serialization and add formatted date field
     const showDates = result.rows.map(date => ({
       ...date,
       total_shifts: Number(date.total_shifts),
-      filled_shifts: Number(date.filled_shifts)
+      filled_shifts: Number(date.filled_shifts),
+      date: date.start_time // Add the date field that the frontend expects
     }));
     
     ctx.response.body = showDates;
@@ -141,19 +144,30 @@ export async function listShowDates(ctx: RouterContext<string>) {
 export async function createShow(ctx: RouterContext<string>) {
   const value = await ctx.request.body.json();
   const { name, performances, existingShowId } = value; // Expecting show name, array of performances, and optional existing show ID
+  
+  console.log("🎭 CREATE SHOW DEBUG - Request received:");
+  console.log("  Name:", name);
+  console.log("  Existing Show ID:", existingShowId);
+  console.log("  Performances count:", performances?.length);
+  console.log("  Performances:", JSON.stringify(performances, null, 2));
+  
   const pool = getPool();
   const client = await pool.connect();
   
   try {
+    console.log("🔗 Database connection established");
     await client.queryObject("BEGIN");
+    console.log("📝 Transaction begun");
     
     let showId: number;
     
     if (existingShowId) {
       // Use existing show
+      console.log("🔄 Using existing show ID:", existingShowId);
       showId = existingShowId;
     } else {
       // Check if show already exists or create new one
+      console.log("🔍 Checking if show exists:", name);
       const existingShow = await client.queryObject(
         "SELECT id FROM shows WHERE name = $1",
         [name]
@@ -161,20 +175,29 @@ export async function createShow(ctx: RouterContext<string>) {
       
       if (existingShow.rows.length > 0) {
         showId = (existingShow.rows[0] as { id: number }).id;
+        console.log("✅ Found existing show with ID:", showId);
       } else {
         // Create new show
+        console.log("➕ Creating new show:", name);
         const result = await client.queryObject<{ id: number }>(
           "INSERT INTO shows (name) VALUES ($1) RETURNING id",
           [name]
         );
         showId = result.rows[0].id;
+        console.log("✅ Created new show with ID:", showId);
       }
     }
     
     const results = [];
     
+    console.log("🎯 Processing", performances.length, "performances for show ID:", showId);
+    
     for (const performance of performances) {
       const { start_time, end_time } = performance;
+      
+      console.log("📅 Processing performance:");
+      console.log("  Start time (raw):", start_time);
+      console.log("  End time (raw):", end_time);
       
       try {
         // Parse the incoming datetime strings as Adelaide timezone
@@ -182,22 +205,31 @@ export async function createShow(ctx: RouterContext<string>) {
         
         // Extract date and time components
         const startDate = start_time.split('T')[0];
-        const startTimeOnly = start_time.split('T')[1].split(':').slice(0, 2).join(':'); // HH:MM
+        const startTimeOnly = start_time.split('T')[1]; // Keep full time format HH:MM:SS
         
         const endDate = end_time.split('T')[0];
-        const endTimeOnly = end_time.split('T')[1].split(':').slice(0, 2).join(':'); // HH:MM
+        const endTimeOnly = end_time.split('T')[1]; // Keep full time format HH:MM:SS
+        
+        console.log("  Parsed start date:", startDate, "time:", startTimeOnly);
+        console.log("  Parsed end date:", endDate, "time:", endTimeOnly);
         
         // Create Adelaide timezone timestamps
+        console.log("🌏 Creating Adelaide timestamps...");
         const adelaideStartTime = createAdelaideTimestamp(startDate, startTimeOnly);
         const adelaideEndTime = createAdelaideTimestamp(endDate, endTimeOnly);
         
+        console.log("  Adelaide start timestamp:", adelaideStartTime);
+        console.log("  Adelaide end timestamp:", adelaideEndTime);
+        
         // Check if show date already exists (check for same start time)
+        console.log("🔍 Checking for existing performance...");
         const existingDate = await client.queryObject(
           "SELECT id FROM show_dates WHERE show_id = $1 AND start_time = $2",
-          [showId, adelaideStartTime]
+          [showId, adelaideStartTime] // Pass Date object, not ISO string
         );
         
         if (existingDate.rows.length > 0) {
+          console.log("⚠️ Performance already exists");
           results.push({
             start_time,
             success: false,
@@ -206,17 +238,25 @@ export async function createShow(ctx: RouterContext<string>) {
           continue;
         }
         
+        console.log("💾 Inserting new show date...");
         const result = await client.queryObject<{ id: number }>(
           "INSERT INTO show_dates (show_id, start_time, end_time) VALUES ($1, $2, $3) RETURNING id",
-          [showId, adelaideStartTime, adelaideEndTime]
+          [showId, adelaideStartTime, adelaideEndTime] // Pass Date objects, not ISO strings
         );
         
+        console.log("✅ Successfully created show date with ID:", result.rows[0].id);
         results.push({
           start_time,
           id: result.rows[0].id,
           success: true
         });
-      } catch (_error) {
+      } catch (error) {
+        console.error("❌ Error processing performance:", error);
+        console.error("  Error details:", {
+          message: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
+          name: error instanceof Error ? error.name : 'Unknown'
+        });
         results.push({
           start_time,
           success: false,
@@ -225,14 +265,22 @@ export async function createShow(ctx: RouterContext<string>) {
       }
     }
     
+    console.log("✅ Committing transaction...");
     await client.queryObject("COMMIT");
+    
+    console.log("🎉 CREATE SHOW COMPLETE - Results:");
+    console.log("  Show ID:", showId);
+    console.log("  Results:", JSON.stringify(results, null, 2));
     
     ctx.response.status = 201;
     ctx.response.body = { showId, results };
   } catch (error) {
+    console.error("💥 TRANSACTION ERROR:", error);
     await client.queryObject("ROLLBACK");
+    console.log("⏪ Transaction rolled back");
     throw error;
   } finally {
+    console.log("🔚 Releasing database connection");
     client.release();
   }
 }
@@ -284,7 +332,7 @@ export async function createShowDate(ctx: RouterContext<string>) {
     
     const result = await client.queryObject<{ id: number }>(
       "INSERT INTO show_dates (show_id, start_time, end_time) VALUES ($1, $2, $3) RETURNING id",
-      [show_id, adelaideStartTime, adelaideEndTime]
+      [show_id, adelaideStartTime, adelaideEndTime] // Pass Date objects, not ISO strings
     );
     ctx.response.status = 201;
     ctx.response.body = { id: result.rows[0].id };
@@ -311,7 +359,7 @@ export async function updateShowDate(ctx: RouterContext<string>) {
     
     await client.queryObject(
       "UPDATE show_dates SET start_time = $1, end_time = $2 WHERE id = $3",
-      [adelaideStartTime, adelaideEndTime, id]
+      [adelaideStartTime, adelaideEndTime, id] // Pass Date objects, not ISO strings
     );
     ctx.response.status = 200;
   } finally {
@@ -432,7 +480,7 @@ export async function getShiftCalendarData(ctx: RouterContext<string>) {
       show_names: string;
     }>(`
       SELECT 
-        sd.date::text as date,
+        DATE(sd.start_time)::text as date,
         COALESCE(COUNT(s.id), 0)::int as total_shifts,
         COALESCE(COUNT(CASE WHEN shift_volunteers.volunteer_count > 0 THEN 1 END), 0)::int as filled_shifts,
         COALESCE(STRING_AGG(DISTINCT sh.name, ', '), '') as show_names
@@ -444,12 +492,12 @@ export async function getShiftCalendarData(ctx: RouterContext<string>) {
         FROM participant_shifts
         GROUP BY shift_id
       ) shift_volunteers ON shift_volunteers.shift_id = s.id
-      WHERE sd.date >= CURRENT_DATE - INTERVAL '30 days'
-        AND sd.date <= CURRENT_DATE + INTERVAL '90 days'
+      WHERE DATE(sd.start_time) >= CURRENT_DATE - INTERVAL '30 days'
+        AND DATE(sd.start_time) <= CURRENT_DATE + INTERVAL '90 days'
         ${showFilter}
-      GROUP BY sd.date
+      GROUP BY DATE(sd.start_time)
       HAVING COUNT(s.id) > 0
-      ORDER BY sd.date
+      ORDER BY DATE(sd.start_time)
     `, queryParams);
     
     ctx.response.body = result.rows;
@@ -500,12 +548,12 @@ export async function listShifts(ctx: RouterContext<string>) {
       show_end: string;
     };
     const result = await client.queryObject<ShiftRow>(
-      `SELECT s.*, sd.date, sd.start_time as show_start, sd.end_time as show_end, 
+      `SELECT s.*, DATE(sd.start_time) as date, sd.start_time as show_start, sd.end_time as show_end, 
               sh.name as show_name, sh.id as show_id
        FROM shifts s
        JOIN show_dates sd ON sd.id = s.show_date_id
        JOIN shows sh ON sh.id = sd.show_id
-       ORDER BY sh.name, sd.date, sd.start_time, s.arrive_time`
+       ORDER BY sh.name, DATE(sd.start_time), sd.start_time, s.arrive_time`
     );
     // Group by show, then by performance (date/start_time)
     const grouped: {
@@ -584,9 +632,9 @@ export async function createShift(ctx: RouterContext<string>) {
     
     for (const dateId of showDateIds) {
       for (const role of roles) {        try {
-          // Get the show date
+          // Get the show date (extract date from start_time)
           const showDateResult = await client.queryObject<{ date: string }>(
-            "SELECT date FROM show_dates WHERE id = $1",
+            "SELECT DATE(start_time)::text as date FROM show_dates WHERE id = $1",
             [dateId]
           );
           
@@ -602,19 +650,30 @@ export async function createShift(ctx: RouterContext<string>) {
           
           const showDate = showDateResult.rows[0].date;
           
+          console.log("🔍 Creating shift debug:");
+          console.log("  Date ID:", dateId);
+          console.log("  Role:", role);
+          console.log("  Show Date:", showDate);
+          console.log("  Arrive Time:", arriveTime);
+          console.log("  Depart Time:", departTime);
+          
           // Create arrive and depart timestamps in Adelaide timezone
           const arriveTimestamp = createAdelaideTimestamp(showDate, arriveTime);
           let departTimestamp = createAdelaideTimestamp(showDate, departTime);
+          
+          console.log("  Arrive Timestamp:", arriveTimestamp);
+          console.log("  Initial Depart Timestamp:", departTimestamp);
           
           // Handle next day if depart time is before arrive time
           if (departTimestamp <= arriveTimestamp) {
             // Add one day to depart timestamp for next day
             departTimestamp = new Date(departTimestamp.getTime() + 24 * 60 * 60 * 1000);
+            console.log("  Adjusted Depart Timestamp (next day):", departTimestamp);
           }
           
           const result = await client.queryObject<{ id: number }>(
             "INSERT INTO shifts (show_date_id, role, arrive_time, depart_time) VALUES ($1, $2, $3, $4) RETURNING id",
-            [dateId, role, arriveTimestamp.toISOString(), departTimestamp.toISOString()]
+            [dateId, role, arriveTimestamp, departTimestamp] // Pass Date objects, not ISO strings
           );
           
           results.push({
@@ -624,7 +683,16 @@ export async function createShift(ctx: RouterContext<string>) {
             success: true,
             nextDay: departTimestamp.getDate() !== arriveTimestamp.getDate()
           });
-        } catch (_error) {
+        } catch (error) {
+          console.error("❌ Error creating shift:", error);
+          console.error("  Error details:", {
+            message: error instanceof Error ? error.message : String(error),
+            stack: error instanceof Error ? error.stack : undefined,
+            dateId,
+            role,
+            arriveTime,
+            departTime
+          });
           results.push({
             dateId,
             role,
@@ -667,7 +735,7 @@ export async function updateShift(ctx: RouterContext<string>) {
     
     await client.queryObject(
       "UPDATE shifts SET role=$1, arrive_time=$2, depart_time=$3 WHERE id=$4",
-      [role, arriveAdelaide.toISOString(), departAdelaide.toISOString(), id]
+      [role, arriveAdelaide, departAdelaide, id] // Pass Date objects, not ISO strings
     );
     ctx.response.status = 200;
   } finally {
@@ -704,15 +772,15 @@ export async function unfilledShifts(ctx: RouterContext<string>) {
       show_end: string;
     };
     const result = await client.queryObject<ShiftRow>(
-      `SELECT s.*, sd.date, sd.start_time as show_start, sd.end_time as show_end,
+      `SELECT s.*, DATE(sd.start_time) as date, sd.start_time as show_start, sd.end_time as show_end,
               sh.name as show_name, sh.id as show_id
        FROM shifts s
        JOIN show_dates sd ON sd.id = s.show_date_id
        JOIN shows sh ON sh.id = sd.show_id
        LEFT JOIN participant_shifts vs ON vs.shift_id = s.id
-       GROUP BY s.id, sd.date, sd.start_time, sd.end_time, sh.name, sh.id
+       GROUP BY s.id, DATE(sd.start_time), sd.start_time, sd.end_time, sh.name, sh.id
        HAVING COUNT(vs.participant_id) = 0
-       ORDER BY sh.name, sd.date, sd.start_time, s.arrive_time`
+       ORDER BY sh.name, DATE(sd.start_time), sd.start_time, s.arrive_time`
     );
     // Group by show, then by performance (date/start_time)
     const grouped: {
@@ -799,14 +867,14 @@ export async function getVolunteerShifts(ctx: RouterContext<string>) {
     };
     const result = await client.queryObject<ShiftRow>(
       `SELECT s.id, s.role, s.arrive_time, s.depart_time, s.show_date_id,
-              sd.date, sd.start_time as show_start, sd.end_time as show_end,
+              DATE(sd.start_time) as date, sd.start_time as show_start, sd.end_time as show_end,
               sh.name as show_name, sh.id as show_id
        FROM shifts s
        JOIN participant_shifts vs ON vs.shift_id = s.id
        JOIN show_dates sd ON sd.id = s.show_date_id
        JOIN shows sh ON sh.id = sd.show_id
        WHERE vs.participant_id = $1
-       ORDER BY sh.name, sd.date, sd.start_time, s.arrive_time`,
+       ORDER BY sh.name, DATE(sd.start_time), sd.start_time, s.arrive_time`,
       [volunteerId]
     );
     // Group by show, then by performance (date/start_time)
@@ -851,6 +919,64 @@ export async function getVolunteerShifts(ctx: RouterContext<string>) {
       performances: Object.values(show.performances)
     }));
     ctx.response.body = resultArr;
+  } finally {
+    client.release();
+  }
+}
+
+export async function getVolunteerShiftsSimple(ctx: RouterContext<string>) {
+  const volunteerId = ctx.params.volunteerId;
+  const pool = getPool();
+  const client = await pool.connect();
+  try {
+    type SimpleShiftRow = {
+      id: number;
+      show_name: string;
+      role: string;
+      date: string;
+      arrive_time: string;
+      depart_time: string;
+      show_date: string;
+    };
+    
+    // Only get future shifts (where depart_time is in the future)
+    const result = await client.queryObject<SimpleShiftRow>(
+      `SELECT s.id, sh.name as show_name, s.role, 
+              DATE(sd.start_time)::text as show_date,
+              TO_CHAR(s.arrive_time, 'HH24:MI') as arrive_time,
+              TO_CHAR(s.depart_time, 'HH24:MI') as depart_time,
+              DATE(sd.start_time)::text as date
+       FROM shifts s
+       JOIN participant_shifts vs ON vs.shift_id = s.id
+       JOIN show_dates sd ON sd.id = s.show_date_id
+       JOIN shows sh ON sh.id = sd.show_id
+       WHERE vs.participant_id = $1 
+         AND s.depart_time > NOW()
+       ORDER BY DATE(sd.start_time), s.arrive_time`,
+      [volunteerId]
+    );
+    
+    // Format the data for easy display in modal
+    const shifts = result.rows.map(row => {
+      const arriveTime = row.arrive_time;
+      const departTime = row.depart_time;
+      
+      // Check if depart time is next day (arrive time > depart time)
+      const isNextDay = arriveTime > departTime;
+      const timeDisplay = isNextDay ? 
+        `${arriveTime} - ${departTime} (+1 day)` : 
+        `${arriveTime} - ${departTime}`;
+      
+      return {
+        id: row.id,
+        show_name: row.show_name,
+        role: row.role,
+        date: row.date,
+        time: timeDisplay
+      };
+    });
+    
+    ctx.response.body = shifts;
   } finally {
     client.release();
   }
@@ -942,7 +1068,7 @@ export async function getAvailableShiftsForVolunteer(ctx: RouterContext<string>)
     // Get shifts not already assigned to this volunteer
     const result = await client.queryObject<ShiftRow>(
       `SELECT s.id, s.role, s.arrive_time, s.depart_time, s.show_date_id,
-              sd.date, sd.start_time as show_start, sd.end_time as show_end,
+              DATE(sd.start_time) as date, sd.start_time as show_start, sd.end_time as show_end,
               sh.name as show_name, sh.id as show_id
        FROM shifts s
        JOIN show_dates sd ON sd.id = s.show_date_id
@@ -952,7 +1078,7 @@ export async function getAvailableShiftsForVolunteer(ctx: RouterContext<string>)
          FROM participant_shifts vs 
          WHERE vs.participant_id = $1
        )
-       ORDER BY sh.name, sd.date, sd.start_time, s.arrive_time`,
+       ORDER BY sh.name, DATE(sd.start_time), sd.start_time, s.arrive_time`,
       [volunteerId]
     );
     // Group by show, then by performance (date/start_time)
@@ -1033,6 +1159,112 @@ export async function getPerformancesWithoutShiftsCount(ctx: RouterContext<strin
     
     const count = parseInt(result.rows[0]?.count || '0');
     ctx.response.body = { count };
+  } finally {
+    client.release();
+  }
+}
+
+// API Functions for Volunteer Approval
+export async function toggleVolunteerApproval(ctx: RouterContext<string>) {
+  const id = ctx.params.id;
+  const { approved } = await ctx.request.body.json();
+  const pool = getPool();
+  const client = await pool.connect();
+  
+  try {
+    await client.queryObject("BEGIN");
+    
+    // Update approval status
+    await client.queryObject(
+      "UPDATE participants SET approved = $1 WHERE id = $2",
+      [approved, id]
+    );
+    
+    // If disabling, remove from all shifts
+    if (!approved) {
+      await client.queryObject(
+        "DELETE FROM participant_shifts WHERE participant_id = $1",
+        [id]
+      );
+    }
+    
+    await client.queryObject("COMMIT");
+    ctx.response.body = { success: true };
+  } catch (error) {
+    await client.queryObject("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+export async function generateShiftRemovalPDF(ctx: RouterContext<string>) {
+  const id = ctx.params.id;
+  const { shifts } = await ctx.request.body.json();
+  
+  // Get volunteer details
+  const pool = getPool();
+  const client = await pool.connect();
+  
+  try {
+    const volunteerResult = await client.queryObject(
+      "SELECT name, email FROM participants WHERE id = $1",
+      [id]
+    );
+    
+    if (volunteerResult.rows.length === 0) {
+      ctx.throw(404, "Volunteer not found");
+    }
+    
+    const volunteer = volunteerResult.rows[0] as VolunteerData;
+    const shiftData: ShiftData[] = shifts;
+    
+    // Generate PDF content using the utility
+    const pdfBuffer = generatePDF(volunteer, shiftData);
+    
+    // Set response headers for download
+    const filename = `shift-removal-${volunteer.name.replace(/[^a-zA-Z0-9]/g, '-')}-${new Date().toISOString().split('T')[0]}.${getFileExtension()}`;
+    
+    ctx.response.headers.set("Content-Type", getMimeType());
+    ctx.response.headers.set("Content-Disposition", `attachment; filename="${filename}"`);
+    ctx.response.body = pdfBuffer;
+  } finally {
+    client.release();
+  }
+}
+
+export async function getAvailableRolesForShift(ctx: RouterContext<string>) {
+  const shiftId = ctx.params.shiftId;
+  const pool = getPool();
+  const client = await pool.connect();
+  
+  try {
+    // Get the show_date_id for this shift
+    const shiftResult = await client.queryObject(
+      "SELECT show_date_id FROM shifts WHERE id = $1",
+      [shiftId]
+    );
+    
+    if (shiftResult.rows.length === 0) {
+      ctx.throw(404, "Shift not found");
+    }
+    
+    const showDateId = (shiftResult.rows[0] as { show_date_id: number }).show_date_id;
+    
+    // Get all available roles for the same performance (show_date_id) that are not assigned
+    const availableRolesResult = await client.queryObject(`
+      SELECT 
+        s.id,
+        s.role
+      FROM shifts s
+      LEFT JOIN participant_shifts ps ON ps.shift_id = s.id
+      WHERE s.show_date_id = $1 
+        AND ps.participant_id IS NULL
+        AND s.id != $2
+      ORDER BY s.role
+    `, [showDateId, shiftId]);
+    
+    ctx.response.body = availableRolesResult.rows;
   } finally {
     client.release();
   }

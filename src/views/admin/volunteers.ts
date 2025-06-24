@@ -6,8 +6,8 @@ export async function showVolunteersPage(ctx: RouterContext<string>) {
   const pool = getPool();
   const client = await pool.connect();
   try {
-    const result = await client.queryObject<{ id: number; name: string; email: string; phone: string }>(
-      "SELECT id, name, email, phone FROM participants ORDER BY name"
+    const result = await client.queryObject<{ id: number; name: string; email: string; phone: string; approved: boolean }>(
+      "SELECT id, name, email, phone, approved FROM participants ORDER BY name"
     );
     
     const data: VolunteersPageData = {

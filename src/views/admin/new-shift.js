@@ -45,8 +45,8 @@ document.addEventListener('DOMContentLoaded', function() {
           <div class="checkbox-item">
             <input type="checkbox" id="date_${date.id}" value="${date.id}" checked>
             <label for="date_${date.id}">
-              ${typeof AdelaideTime !== 'undefined' ? AdelaideTime.formatDateAdelaide(date.date) : AdelaideTime.formatDateAdelaide(date.date)} - 
-              ${date.start_time} to ${date.end_time}
+              ${AdelaideTime.formatDateAdelaide(date.date)} - 
+              ${AdelaideTime.formatTimeAdelaide(date.start_time)} to ${AdelaideTime.formatTimeAdelaide(date.end_time)}
             </label>
           </div>
         `).join('');
