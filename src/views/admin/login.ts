@@ -188,8 +188,25 @@ export function renderLoginTemplate(): string {
                 errorMessage.style.display = 'block';
               }
             } else {
-              const error = await response.text();
-              errorMessage.textContent = error || 'Invalid email or password';
+              // Try to parse JSON error response first
+              let errorText = 'Invalid email or password';
+              try {
+                const errorData = await response.json();
+                if (errorData.message) {
+                  errorText = errorData.message;
+                } else if (errorData.error) {
+                  errorText = errorData.error;
+                }
+              } catch {
+                // If JSON parsing fails, fall back to text
+                try {
+                  errorText = await response.text() || 'Invalid email or password';
+                } catch {
+                  // If all parsing fails, use default message
+                  errorText = 'Invalid email or password';
+                }
+              }
+              errorMessage.textContent = errorText;
               errorMessage.style.display = 'block';
             }
           } catch (error) {
