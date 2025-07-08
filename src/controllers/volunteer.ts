@@ -2,8 +2,9 @@ import type { RouterContext } from "oak";
 import { getPool } from "../models/db.ts";
 import { render } from "../utils/template.ts";
 
+// ...existing code...
 interface VolunteerRecord {
-  id: number;
+  id: string; // UUID
   name: string;
   email?: string;
   phone?: string;
@@ -19,11 +20,12 @@ export async function viewSignup(ctx: RouterContext<string>) {
       ctx.throw(404, "Volunteer not found");
     }
 
+    // ...existing code...
     type ShiftRow = {
-      id: number;
-      show_id: number;
+      id: string; // UUID
+      show_id: string; // UUID
       show_name: string;
-      show_date_id: number;
+      show_date_id: string; // UUID
       role: string;
       arrive_time: string;
       depart_time: string;
@@ -59,9 +61,10 @@ export async function viewSignup(ctx: RouterContext<string>) {
     );
 
     // Group assigned shifts by show, then by performance
+    // ...existing code...
     const groupedAssigned: {
       [showId: string]: {
-        show_id: number;
+        show_id: string; // UUID
         show_name: string;
         performances: {
           [perfKey: string]: {
@@ -95,9 +98,10 @@ export async function viewSignup(ctx: RouterContext<string>) {
     }
 
     // Group available shifts by show, then by performance
+    // ...existing code...
     const groupedAvailable: {
       [showId: string]: {
-        show_id: number;
+        show_id: string; // UUID
         show_name: string;
         performances: {
           [perfKey: string]: {
@@ -143,14 +147,25 @@ export async function viewSignup(ctx: RouterContext<string>) {
       performances: Object.values(show.performances)
     }));
 
+    // Thoroughly sanitize JSON to prevent syntax errors
+    // Convert objects to strings with built-in JSON.stringify which handles escaping correctly
+    const assignedJSON = JSON.stringify(assignedShiftsGrouped);
+    const availableJSON = JSON.stringify(availableShiftsGrouped);
+
+    // Just use the JSON strings directly, no need for additional escaping
+    // JSON.stringify already properly escapes special characters for JSON context
+    const safeAssignedJSON = assignedJSON;
+    const safeAvailableJSON = availableJSON;
+
     const html = await render(
-      "views/signup.html",      {
-        name: volunteerRes.rows[0].name,
-        volunteerId: id,
-        assignedShiftsJson: JSON.stringify(assignedShiftsGrouped),
-        shiftsJson: JSON.stringify(availableShiftsGrouped),
-      },
+      "views/signup.html", {
+      name: volunteerRes.rows[0].name,
+      volunteerId: id,
+      assignedShiftsJson: safeAssignedJSON,
+      shiftsJson: safeAvailableJSON,
+    },
     );
+
     ctx.response.headers.set("Content-Type", "text/html; charset=utf-8");
     ctx.response.body = html;
   } finally {
@@ -166,7 +181,7 @@ export async function submitSignup(ctx: RouterContext<string>) {
   const client = await pool.connect();
   try {
     await client.queryObject("BEGIN");
-    
+
     // Check for conflicts before inserting any shifts
     for (const shiftId of shiftIds) {
       // Get the show_date_id for the shift being added
@@ -174,20 +189,20 @@ export async function submitSignup(ctx: RouterContext<string>) {
         "SELECT show_date_id FROM shifts WHERE id = $1",
         [shiftId]
       );
-      
+
       if (shiftResult.rows.length === 0) {
         await client.queryObject("ROLLBACK");
         ctx.response.status = 400;
-        ctx.response.body = { 
-          error: "Invalid shift ID", 
+        ctx.response.body = {
+          error: "Invalid shift ID",
           conflictType: "invalid_shift",
-          shiftId 
+          shiftId
         };
         return;
       }
-      
+
       const showDateId = shiftResult.rows[0].show_date_id;
-      
+
       // Check if volunteer already has a shift for this show_date_id
       const existingShift = await client.queryObject<{ shift_id: number; role: string }>(
         `SELECT s.id as shift_id, s.role 
@@ -196,7 +211,7 @@ export async function submitSignup(ctx: RouterContext<string>) {
          WHERE vs.participant_id = $1 AND s.show_date_id = $2`,
         [id, showDateId]
       );
-      
+
       if (existingShift.rows.length > 0) {
         // Get performance details for the error response
         const performanceResult = await client.queryObject<{
@@ -211,10 +226,10 @@ export async function submitSignup(ctx: RouterContext<string>) {
            WHERE sd.id = $1`,
           [showDateId]
         );
-        
+
         await client.queryObject("ROLLBACK");
         ctx.response.status = 409;
-        ctx.response.body = { 
+        ctx.response.body = {
           error: "Already assigned to a shift for this performance",
           conflictType: "performance_conflict",
           existingShift: {
@@ -227,7 +242,7 @@ export async function submitSignup(ctx: RouterContext<string>) {
         return;
       }
     }
-    
+
     // If no conflicts, insert all shifts
     for (const shiftId of shiftIds) {
       await client.queryObject(
@@ -235,7 +250,7 @@ export async function submitSignup(ctx: RouterContext<string>) {
         [id, shiftId],
       );
     }
-    
+
     await client.queryObject("COMMIT");
     ctx.response.status = 201;
     ctx.response.body = { success: true, message: `Successfully signed up for ${shiftIds.length} shift(s)` };
@@ -273,11 +288,11 @@ export async function swapShift(ctx: RouterContext<string>) {
   const client = await pool.connect();
   try {
     await client.queryObject("BEGIN");
-    
+
     // Verify both shifts exist and are for the same performance
-    const shiftsResult = await client.queryObject<{ 
-      shift_id: number; 
-      show_date_id: number; 
+    const shiftsResult = await client.queryObject<{
+      shift_id: number;
+      show_date_id: number;
       role: string;
     }>(
       `SELECT id as shift_id, show_date_id, role 
@@ -285,14 +300,14 @@ export async function swapShift(ctx: RouterContext<string>) {
        WHERE id IN ($1, $2)`,
       [oldShiftId, newShiftId]
     );
-    
+
     if (shiftsResult.rows.length !== 2) {
       await client.queryObject("ROLLBACK");
       ctx.response.status = 400;
       ctx.response.body = { error: "Invalid shift IDs" };
       return;
     }
-    
+
     const [shift1, shift2] = shiftsResult.rows;
     if (shift1.show_date_id !== shift2.show_date_id) {
       await client.queryObject("ROLLBACK");
@@ -300,19 +315,19 @@ export async function swapShift(ctx: RouterContext<string>) {
       ctx.response.body = { error: "Shifts must be for the same performance" };
       return;
     }
-    
+
     // Remove old assignment
     await client.queryObject(
       "DELETE FROM participant_shifts WHERE participant_id = $1 AND shift_id = $2",
       [volunteerId, oldShiftId]
     );
-    
+
     // Add new assignment
     await client.queryObject(
       "INSERT INTO participant_shifts (participant_id, shift_id) VALUES ($1, $2)",
       [volunteerId, newShiftId]
     );
-    
+
     await client.queryObject("COMMIT");
     ctx.response.status = 200;
     ctx.response.body = { success: true, message: "Shift swapped successfully" };
@@ -326,16 +341,16 @@ export async function swapShift(ctx: RouterContext<string>) {
 
 export async function downloadPDF(ctx: RouterContext<string>) {
   const id = ctx.params.id;
-  
+
   try {
     const { generateVolunteerPDFData } = await import("../utils/pdf-generator.ts");
     const { generateServerSidePDF } = await import("../utils/server-pdf-generator.ts");
-    
-    const pdfData = await generateVolunteerPDFData(Number(id));
+
+    const pdfData = await generateVolunteerPDFData(id);
     const pdfBuffer = await generateServerSidePDF(pdfData);
 
     const filename = `theatre-shifts-${pdfData.volunteer.name.replace(/[^a-zA-Z0-9]/g, '-')}-${new Date().toISOString().split('T')[0]}.pdf`;
-    
+
     ctx.response.headers.set("Content-Type", "application/pdf");
     ctx.response.headers.set("Content-Disposition", `attachment; filename="${filename}"`);
     ctx.response.body = pdfBuffer;
@@ -348,16 +363,16 @@ export async function downloadPDF(ctx: RouterContext<string>) {
 
 export async function downloadSchedulePDF(ctx: RouterContext<string>) {
   const id = ctx.params.id;
-  
+
   try {
     const { generateVolunteerPDFData } = await import("../utils/pdf-generator.ts");
     const { generateServerSidePDF } = await import("../utils/server-pdf-generator.ts");
-    
-    const pdfData = await generateVolunteerPDFData(Number(id));
+
+    const pdfData = await generateVolunteerPDFData(id);
     const pdfBuffer = await generateServerSidePDF(pdfData);
-    
+
     const filename = `theatre-shifts-${pdfData.volunteer.name.replace(/[^a-zA-Z0-9]/g, '-')}-${new Date().toISOString().split('T')[0]}.pdf`;
-    
+
     ctx.response.headers.set("Content-Type", "application/pdf");
     ctx.response.headers.set("Content-Disposition", `inline; filename="${filename}"`);
     ctx.response.body = pdfBuffer;

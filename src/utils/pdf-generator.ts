@@ -19,7 +19,7 @@ export interface VolunteerData {
 }
 
 interface VolunteerRecord {
-  id: number;
+  id: string; // UUID
   name: string;
   email?: string;
   phone?: string;
@@ -48,7 +48,7 @@ export interface PDFData {
 
 export function generateShiftRemovalPDF(volunteer: VolunteerData, shifts: ShiftData[]): Uint8Array {
   const content = generatePDFContent(volunteer, shifts);
-  
+
   // For a simple implementation, we'll return a plain text file
   // In production, you might want to use a library like jsPDF or puppeteer
   return new TextEncoder().encode(content);
@@ -61,7 +61,7 @@ function generatePDFContent(volunteer: VolunteerData, shifts: ShiftData[]): stri
     month: 'long',
     day: 'numeric'
   });
-  
+
   const currentTime = new Date().toLocaleTimeString('en-AU', {
     hour: '2-digit',
     minute: '2-digit'
@@ -81,8 +81,8 @@ Status: Login access disabled
 
 REMOVED SHIFTS
 ==============
-${shifts.length === 0 ? 'No future shifts were assigned to this volunteer.' : 
-  shifts.map((shift, index) => `
+${shifts.length === 0 ? 'No future shifts were assigned to this volunteer.' :
+      shifts.map((shift, index) => `
 ${index + 1}. SHOW: ${shift.show_name}
    ROLE: ${shift.role}
    DATE: ${shift.date}
@@ -98,12 +98,12 @@ Reason: Administrative action - login access revoked
 
 IMPACT
 ======
-${shifts.length > 0 ? 
-  `The following ${shifts.length} shift${shifts.length > 1 ? 's' : ''} ${shifts.length > 1 ? 'are' : 'is'} now available for reassignment:
+${shifts.length > 0 ?
+      `The following ${shifts.length} shift${shifts.length > 1 ? 's' : ''} ${shifts.length > 1 ? 'are' : 'is'} now available for reassignment:
 ${shifts.map(shift => `- ${shift.show_name} (${shift.role}) on ${shift.date}`).join('\n')}
 
 Please ensure these shifts are reassigned to other volunteers before the performance dates.` :
-  'No shifts were affected by this action.'}
+      'No shifts were affected by this action.'}
 
 NEXT ACTIONS
 ============
@@ -135,16 +135,16 @@ export function getFileExtension(): string {
 /**
  * Generates PDF data for a volunteer by participant ID
  */
-export async function generateVolunteerPDFData(volunteerId: number): Promise<PDFData> {
+export async function generateVolunteerPDFData(volunteerId: string): Promise<PDFData> {
   const pool = getPool();
   const client = await pool.connect();
-  
+
   try {
     // Get volunteer details
     const volunteerRes = await client.queryObject<VolunteerRecord>(
       "SELECT * FROM participants WHERE id=$1", [volunteerId]
     );
-    
+
     if (volunteerRes.rows.length === 0) {
       throw new Error("Volunteer not found");
     }
@@ -196,10 +196,10 @@ export function generateVolunteerSchedulePDF(data: PDFData): Uint8Array {
 
 function generateVolunteerScheduleHTMLContent(data: PDFData): string {
   const { volunteer, assignedShifts, generatedAt } = data;
-  
+
   // Filter to current month and future shifts only
   const currentAndFutureShifts = filterCurrentAndFutureShifts(assignedShifts);
-  
+
   return `<!DOCTYPE html>
 <html>
 <head>
@@ -321,13 +321,13 @@ function generateVolunteerScheduleHTMLContent(data: PDFData): string {
 
     <div class="shifts-section">
         <h3>Assigned Shifts (${currentAndFutureShifts.length} total)</h3>
-        ${currentAndFutureShifts.length > 0 ? 
-          currentAndFutureShifts.map((shift, index) => {
-            const date = formatDateForDisplay(shift.show_date);
-            const arriveTime = formatTimeForDisplay(shift.arrive_time);
-            const departTime = formatTimeForDisplay(shift.depart_time);
-            
-            return `
+        ${currentAndFutureShifts.length > 0 ?
+      currentAndFutureShifts.map((shift, index) => {
+        const date = formatDateForDisplay(shift.show_date);
+        const arriveTime = formatTimeForDisplay(shift.arrive_time);
+        const departTime = formatTimeForDisplay(shift.depart_time);
+
+        return `
         <div class="shift">
             <div class="shift-header">${index + 1}. ${shift.show_name}</div>
             <div class="shift-details">
@@ -337,14 +337,14 @@ function generateVolunteerScheduleHTMLContent(data: PDFData): string {
                 <div><strong>Role:</strong> ${shift.role}</div>
             </div>
         </div>`;
-          }).join('') :
-          `
+      }).join('') :
+      `
         <div class="no-shifts">
             <p><strong>No shifts assigned</strong></p>
             <p>You don't have any shifts assigned for the current month and future dates.<br>
             Please visit the online schedule to sign up for available shifts.</p>
         </div>`
-        }
+    }
     </div>
     
     <div class="important">
@@ -381,7 +381,7 @@ export function formatShiftForDisplay(shift: ShiftRow): string {
 export function filterCurrentAndFutureShifts(shifts: ShiftRow[]): ShiftRow[] {
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  
+
   return shifts
     .filter(shift => {
       if (shift && shift.show_date) {

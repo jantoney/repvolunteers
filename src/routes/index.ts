@@ -321,7 +321,7 @@ router.get("/", (ctx) => {
               <form id="directAccessForm">
                 <div class="form-group">
                   <label for="volunteerIdInput">Account ID</label>
-                  <input type="text" id="volunteerIdInput" name="volunteerId" required placeholder="Enter your ID number">
+                  <input type="text" id="volunteerIdInput" name="volunteerId" required placeholder="Enter your volunteer UUID">
                 </div>
                 <div class="form-actions">
                   <button type="submit" class="btn">Access My Shifts</button>

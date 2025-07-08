@@ -255,7 +255,7 @@ export function renderVolunteerScheduleEmail(data: VolunteerScheduleEmailData): 
     shiftsSection = `
             <div style="background:#f8f9fa;border-radius:6px;padding:20px;margin:25px 0;">
               <h3 style="color:#333;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;font-size:16px;font-weight:bold;margin:0 0 10px 0;">
-                📅 Your Upcoming Shifts:
+                📅 Your Next Few Shifts:
               </h3>
               <ul style="color:#555;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;font-size:14px;line-height:20px;margin:0;padding-left:20px;">
                 ${shiftsList}

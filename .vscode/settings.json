@@ -5,7 +5,7 @@
     },
     "editor.formatOnSave": true,
     "gitblame.inlineMessageEnabled": true,
-    "terminal.integrated.defaultProfile.windows": "Ubuntu (WSL)",
+    "terminal.integrated.defaultProfile.windows": "Ubuntu-24.04 (WSL)",
     "github.copilot.chat.codeGeneration.useInstructionFiles": true,
     "github.copilot.chat.agent.runTasks": true,
     "deno.enable": true

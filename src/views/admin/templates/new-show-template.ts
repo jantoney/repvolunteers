@@ -9,7 +9,7 @@ export interface NewShowPageData {
 
 export function renderNewShowTemplate(data: NewShowPageData): string {
   const { existingShows } = data;
-  
+
   return `
     <!DOCTYPE html>
     <html>
@@ -35,13 +35,28 @@ export function renderNewShowTemplate(data: NewShowPageData): string {
         /* Time Group */
         .time-group { display: flex; gap: 1rem; }
         .time-group .form-group { flex: 1; }
+        .time-select { 
+          padding: 0.375rem;
+          border: 1px solid #ced4da;
+          border-radius: 0.25rem;
+          font-size: 1rem;
+        }
+        .hour-select, .minute-select { width: 70px; }
+        .ampm-select { width: 70px; }
+        .time-select-container {
+          margin-bottom: 0.5rem;
+        }
         
         /* Calendar Styles */
-        .calendar { border: 1px solid #ddd; border-radius: 8px; padding: 1rem; margin: 1rem 0; background: #f9f9f9; }
+        .calendar { border: 1px solid #ddd; border-radius: 8px; padding: 1rem; margin: 1rem 0; background: #f9f9f9; max-width: 100%; }
         .calendar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
         .calendar-nav { background: #007bff; color: white; border: none; padding: 0.5rem; border-radius: 4px; cursor: pointer; }
         .calendar-nav:hover { background: #0056b3; }
-        .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px; }
+        .calendar-grid { 
+          display: grid; 
+          grid-template-columns: repeat(7, minmax(40px, 1fr)); 
+          gap: 4px; 
+        }
         .calendar-day { 
           padding: 0.75rem; 
           text-align: center; 
@@ -49,12 +64,26 @@ export function renderNewShowTemplate(data: NewShowPageData): string {
           border: 1px solid #ddd; 
           cursor: pointer; 
           transition: background-color 0.2s;
+          min-width: 40px;
+          min-height: 40px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
         }
         .calendar-day:hover { background: #e9ecef; }
         .calendar-day.selected { background: #007bff; color: white; }
         .calendar-day.other-month { color: #ccc; background: #f8f9fa; }
         .calendar-day.today { border: 2px solid #007bff; }
-        .calendar-header-day { padding: 0.5rem; text-align: center; font-weight: bold; background: #e9ecef; }
+        .calendar-header-day { 
+          padding: 0.5rem; 
+          text-align: center; 
+          font-weight: bold; 
+          background: #e9ecef; 
+          min-width: 40px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
         
         .selected-dates { margin: 1rem 0; }
         .selected-date-item { 
@@ -87,6 +116,12 @@ export function renderNewShowTemplate(data: NewShowPageData): string {
         }
         
         .hidden { display: none; }
+        
+        .form-text {
+          color: #6c757d;
+          font-size: 0.875rem;
+          margin-top: -0.5rem;
+        }
       </style>
     </head>
     <body>
@@ -134,14 +169,17 @@ export function renderNewShowTemplate(data: NewShowPageData): string {
             
             <div class="time-group">
               <div class="form-group">
-                <label for="startTime">Start Time:</label>
+                <label for="startTime">Start Time: <small>(Adelaide time)</small></label>
                 <input type="time" id="startTime" name="startTime" required>
               </div>
               
               <div class="form-group">
-                <label for="endTime">End Time:</label>
+                <label for="endTime">End Time: <small>(Adelaide time)</small></label>
                 <input type="time" id="endTime" name="endTime" required>
               </div>
+            </div>
+            <div class="form-text text-muted small mb-3">
+              All times are stored in Adelaide, Australia timezone regardless of your local time.
             </div>
             
             <div class="form-group">
@@ -184,6 +222,118 @@ export function renderNewShowTemplate(data: NewShowPageData): string {
         ];
         
         const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        
+        // Function to create time dropdowns with 15-minute increments
+        function setupTimeInputs() {
+          const timeInputs = ['startTime', 'endTime'];
+          
+          timeInputs.forEach(inputId => {
+            const originalInput = document.getElementById(inputId);
+            const originalContainer = originalInput.parentNode;
+            
+            // Create custom select elements
+            const hourSelect = document.createElement('select');
+            hourSelect.id = \`\${inputId}-hour\`;
+            hourSelect.className = 'time-select hour-select';
+            hourSelect.required = true;
+            
+            const minuteSelect = document.createElement('select');
+            minuteSelect.id = \`\${inputId}-minute\`;
+            minuteSelect.className = 'time-select minute-select';
+            minuteSelect.required = true;
+            
+            const ampmSelect = document.createElement('select');
+            ampmSelect.id = \`\${inputId}-ampm\`;
+            ampmSelect.className = 'time-select ampm-select';
+            
+            // Add hours (12-hour format)
+            for (let i = 1; i <= 12; i++) {
+              const option = document.createElement('option');
+              option.value = i === 12 ? '0' : String(i).padStart(2, '0');
+              option.textContent = String(i);
+              hourSelect.appendChild(option);
+            }
+            
+            // Add minutes (00, 15, 30, 45)
+            ['00', '15', '30', '45'].forEach(minute => {
+              const option = document.createElement('option');
+              option.value = minute;
+              option.textContent = minute;
+              minuteSelect.appendChild(option);
+            });
+            
+            // Add AM/PM
+            ['AM', 'PM'].forEach(period => {
+              const option = document.createElement('option');
+              option.value = period;
+              option.textContent = period;
+              ampmSelect.appendChild(option);
+            });
+            
+            // Create container for selects
+            const timeSelectContainer = document.createElement('div');
+            timeSelectContainer.className = 'time-select-container';
+            timeSelectContainer.style.display = 'flex';
+            timeSelectContainer.style.gap = '0.5rem';
+            timeSelectContainer.style.alignItems = 'center';
+            
+            // Create hidden input to store the actual time value
+            const hiddenInput = document.createElement('input');
+            hiddenInput.type = 'hidden';
+            hiddenInput.name = inputId;
+            hiddenInput.id = originalInput.id;
+            
+            // Hide the original input
+            originalInput.style.display = 'none';
+            originalInput.id = \`\${inputId}-original\`;
+            
+            // Function to update the hidden input value
+            function updateTimeValue() {
+              const hour = parseInt(hourSelect.value);
+              const minute = minuteSelect.value;
+              const ampm = ampmSelect.value;
+              
+              // Convert to 24-hour format
+              let hour24 = hour;
+              if (ampm === 'PM' && hour < 12) hour24 += 12;
+              if (ampm === 'AM' && hour === 12) hour24 = 0;
+              
+              // Format as HH:MM
+              const timeValue = \`\${String(hour24).padStart(2, '0')}:\${minute}\`;
+              hiddenInput.value = timeValue;
+              originalInput.value = timeValue;
+            }
+            
+            // Add event listeners
+            hourSelect.addEventListener('change', updateTimeValue);
+            minuteSelect.addEventListener('change', updateTimeValue);
+            ampmSelect.addEventListener('change', updateTimeValue);
+            
+            // Add elements to the container
+            timeSelectContainer.appendChild(hourSelect);
+            timeSelectContainer.appendChild(document.createTextNode(':'));
+            timeSelectContainer.appendChild(minuteSelect);
+            timeSelectContainer.appendChild(ampmSelect);
+            
+            // Replace the original input with our custom selector
+            originalContainer.insertBefore(timeSelectContainer, originalInput);
+            originalContainer.insertBefore(hiddenInput, originalInput);
+            
+            // Set default values (12:00 PM for start, 1:00 PM for end)
+            if (inputId === 'startTime') {
+              hourSelect.value = '12';
+              minuteSelect.value = '00';
+              ampmSelect.value = 'PM';
+            } else {
+              hourSelect.value = '01';
+              minuteSelect.value = '00';
+              ampmSelect.value = 'PM';
+            }
+            
+            // Initialize the hidden input
+            updateTimeValue();
+          });
+        }
         
         // Handle show type radio button changes
         document.querySelectorAll('input[name="showType"]').forEach(radio => {
@@ -286,8 +436,16 @@ export function renderNewShowTemplate(data: NewShowPageData): string {
         
         function clearForm() {
           document.getElementById('name').value = '';
-          document.getElementById('startTime').value = '';
-          document.getElementById('endTime').value = '';
+          // Reset custom time selects to default values
+          document.getElementById(\`startTime-hour\`).value = '12';
+          document.getElementById(\`startTime-minute\`).value = '00';
+          document.getElementById(\`startTime-ampm\`).value = 'PM';
+          document.getElementById(\`endTime-hour\`).value = '01';
+          document.getElementById(\`endTime-minute\`).value = '00';
+          document.getElementById(\`endTime-ampm\`).value = 'PM';
+          // Update hidden inputs
+          document.getElementById('startTime').value = '12:00';
+          document.getElementById('endTime').value = '13:00';
           document.getElementById('existingShow').value = '';
           selectedDates = [];
           
@@ -373,13 +531,21 @@ export function renderNewShowTemplate(data: NewShowPageData): string {
             showName = selectElement.options[selectElement.selectedIndex].text;
           }
           
-          // For each selected date, combine with the start and end times
+          // For each selected date, combine with the start and end times and convert to Adelaide timezone
           const performances = selectedDates.map(date => {
-            // Use the time values directly from the time inputs
-            // Create timestamps for this date with the specified times
-            // The time inputs contain just HH:MM, so we combine with the selected date
-            const startTimestamp = \`\${date}T\${startTime}:00\`;
-            const endTimestamp = \`\${date}T\${endTime}:00\`;
+            // Convert times to Adelaide timezone timestamps
+            // This ensures times are recorded in Adelaide timezone regardless of user's local timezone
+            const startTimestamp = AdelaideTime.saveTimeAsAdelaideTZ(startTime, date);
+            const endTimestamp = AdelaideTime.saveTimeAsAdelaideTZ(endTime, date);
+            
+            if (!startTimestamp || !endTimestamp) {
+              console.error("Failed to convert times to Adelaide timezone for date " + date);
+              // Fallback to direct concatenation if conversion fails
+              return {
+                start_time: date + "T" + startTime + ":00",
+                end_time: date + "T" + endTime + ":00"
+              };
+            }
             
             return {
               start_time: startTimestamp,
@@ -423,8 +589,14 @@ export function renderNewShowTemplate(data: NewShowPageData): string {
               document.getElementById('existingShow').value = lastCreatedShowId;
               
               // Clear only the dates and times, keep the show selected
-              document.getElementById('startTime').value = '';
-              document.getElementById('endTime').value = '';
+              document.getElementById(\`startTime-hour\`).value = '12';
+              document.getElementById(\`startTime-minute\`).value = '00';
+              document.getElementById(\`startTime-ampm\`).value = 'PM';
+              document.getElementById(\`endTime-hour\`).value = '01';
+              document.getElementById(\`endTime-minute\`).value = '00';
+              document.getElementById(\`endTime-ampm\`).value = 'PM';
+              document.getElementById('startTime').value = '12:00';
+              document.getElementById('endTime').value = '13:00';
               selectedDates = [];
               renderCalendar();
               updateSelectedDatesDisplay();
@@ -436,11 +608,20 @@ export function renderNewShowTemplate(data: NewShowPageData): string {
           }
         });
         
-        // Initialize calendar
+        // Initialize calendar and time inputs
         renderCalendar();
         updateSelectedDatesDisplay();
-      </script>
-    </body>
-    </html>
-  `;
+        setupTimeInputs();
+        
+        // Display current Adelaide timezone info
+        const tzInfo = document.querySelector('.form-text.text-muted.small');
+        if (tzInfo) {
+          const adelaideTZ = AdelaideTime.getAdelaideTimezoneOffset();
+          const adelaideNow = AdelaideTime.formatTimeAdelaide(new Date(), { hour12: true });
+          tzInfo.innerHTML += " Current Adelaide time: <strong>" + adelaideNow + " " + adelaideTZ + "</strong>";
+        }
+</script>
+  </body>
+  </html>
+    `;
 }

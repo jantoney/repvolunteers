@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS show_dates (
 );
 
 CREATE TABLE IF NOT EXISTS participants (
-  id SERIAL PRIMARY KEY,
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL,
   email TEXT,
   phone TEXT,
@@ -33,11 +33,11 @@ CREATE TABLE IF NOT EXISTS shifts (
   role TEXT NOT NULL,
   arrive_time TIMESTAMPTZ NOT NULL,
   depart_time TIMESTAMPTZ NOT NULL,
-  assigned_participant_id INTEGER REFERENCES participants(id) ON DELETE SET NULL
+  assigned_participant_id UUID REFERENCES participants(id) ON DELETE SET NULL
 );
 
 CREATE TABLE IF NOT EXISTS participant_shifts (
-  participant_id INTEGER REFERENCES participants(id) ON DELETE CASCADE,
+  participant_id UUID REFERENCES participants(id) ON DELETE CASCADE,
   shift_id INTEGER REFERENCES shifts(id) ON DELETE CASCADE,
   PRIMARY KEY (participant_id, shift_id)
 );

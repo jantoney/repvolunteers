@@ -1,6 +1,6 @@
 import type { RouterContext } from "oak";
 import { getPool } from "../../models/db.ts";
-import { formatDateAdelaide } from "../../utils/timezone.ts";
+import { formatDateAdelaide, formatShowTimeRangeAdelaide, formatPerformanceAdelaide } from "../../utils/timezone.ts";
 import { getAdminNavigation, getAdminStyles, getAdminScripts } from "./components/navigation.ts";
 
 export interface Show {
@@ -20,7 +20,7 @@ export interface ShowsPageData {
 
 export function renderShowsTemplate(data: ShowsPageData): string {
   const { shows } = data;
-  
+
   return `
     <!DOCTYPE html>
     <html>
@@ -97,6 +97,14 @@ export function renderShowsTemplate(data: ShowsPageData): string {
         </div>
 
         <div class="content-card">
+          <div class="alert info-alert" style="background: #e9f5fd; border: 1px solid #c5e5fc; border-left: 4px solid #007bff; padding: 0.75rem 1rem; margin-bottom: 1rem; border-radius: 0.25rem; display: flex; align-items: center;">
+            <i class="fas fa-info-circle" style="color: #007bff; margin-right: 0.5rem;"></i>
+            <div>
+              <strong>All times are displayed in Adelaide, Australia timezone</strong><br>
+              <span id="currentAdelaideTime" style="color: #666; font-size: 0.875rem;"></span>
+            </div>
+          </div>
+          
           <div class="table-container">
             <table class="table">              <thead>
                 <tr>
@@ -107,35 +115,35 @@ export function renderShowsTemplate(data: ShowsPageData): string {
                   <th>Actions</th>
                 </tr>
               </thead>              <tbody>                ${shows.map(show => {                  // Calculate traffic light color based on filled vs total shifts
-                  let trafficColor = 'grey';
-                  let statusText = 'No shifts';
-                  
-                  if (show.total_shifts > 0) {
-                    const fillPercentage = (show.filled_shifts / show.total_shifts) * 100;
-                    if (fillPercentage >= 80) {
-                      trafficColor = 'green';
-                      statusText = `${show.filled_shifts}/${show.total_shifts} filled`;
-                    } else if (fillPercentage >= 50) {
-                      trafficColor = 'yellow';
-                      statusText = `${show.filled_shifts}/${show.total_shifts} filled`;
-                    } else {
-                      trafficColor = 'red';
-                      statusText = `${show.filled_shifts}/${show.total_shifts} filled`;
-                    }
-                  }
-                  
-                  return `                    <tr>                      <td>
+    let trafficColor = 'grey';
+    let statusText = 'No shifts';
+
+    if (show.total_shifts > 0) {
+      const fillPercentage = (show.filled_shifts / show.total_shifts) * 100;
+      if (fillPercentage >= 80) {
+        trafficColor = 'green';
+        statusText = `${show.filled_shifts}/${show.total_shifts} filled`;
+      } else if (fillPercentage >= 50) {
+        trafficColor = 'yellow';
+        statusText = `${show.filled_shifts}/${show.total_shifts} filled`;
+      } else {
+        trafficColor = 'red';
+        statusText = `${show.filled_shifts}/${show.total_shifts} filled`;
+      }
+    }
+
+    return `                    <tr>                      <td>
                         <strong>${show.name}</strong>
                         ${show.show_date_count > 0 ? `<br><button class="expand-btn" onclick="toggleDates(${show.id})">View ${show.show_date_count} performance date(s)</button>` : ''}
                       </td>
                       <td>${show.show_date_count} performance${show.show_date_count !== 1 ? 's' : ''}</td>
                       <td>
-                        ${show.first_date && show.last_date ? 
-                          (show.first_date.getTime() === show.last_date.getTime() ? 
-                            formatDateAdelaide(show.first_date) :
-                            `${formatDateAdelaide(show.first_date)} - ${formatDateAdelaide(show.last_date)}`
-                          ) : 'No dates set'
-                        }
+                        ${show.first_date && show.last_date ?
+        (show.first_date.getTime() === show.last_date.getTime() ?
+          formatDateAdelaide(show.first_date) :
+          `${formatDateAdelaide(show.first_date)} - ${formatDateAdelaide(show.last_date)}`
+        ) : 'No dates set'
+      }
                       </td>
                       <td>
                         <span class="traffic-light ${trafficColor}" title="${statusText}"></span>
@@ -144,7 +152,7 @@ export function renderShowsTemplate(data: ShowsPageData): string {
                       <td>
                         <div class="table-actions">
                           <a href="/admin/shows/${show.id}/edit" class="btn btn-sm btn-secondary">Edit</a>
-                          <button onclick="deleteShow(${show.id}, '${show.name.replace(/'/g, "\\'")}'))" class="btn btn-sm btn-danger">Delete</button>
+                          <button onclick="deleteShow(${show.id}, '${show.name.replace(/'/g, "\\'")}')" class="btn btn-sm btn-danger">Delete</button>
                         </div>
                       </td>
                     </tr>
@@ -154,7 +162,7 @@ export function renderShowsTemplate(data: ShowsPageData): string {
                       </td>
                     </tr>
                   `;
-                }).join('')}
+  }).join('')}
               </tbody>
             </table>
           </div>
@@ -165,6 +173,21 @@ export function renderShowsTemplate(data: ShowsPageData): string {
       <script src="/src/utils/timezone-client.js"></script>
       ${getAdminScripts()}
       <script>
+        // Display and update current Adelaide time
+        function updateAdelaideTime() {
+          const timeElement = document.getElementById('currentAdelaideTime');
+          if (timeElement) {
+            const adelaideTZ = AdelaideTime.getAdelaideTimezoneOffset();
+            const now = new Date();
+            const adelaideTime = AdelaideTime.formatDateTimeAdelaide(now);
+            timeElement.textContent = "Current time: " + adelaideTime + " " + adelaideTZ;
+          }
+        }
+        
+        // Update time immediately and then every minute
+        updateAdelaideTime();
+        setInterval(updateAdelaideTime, 60000);
+        
         const expandedShows = new Set();
         
         async function toggleDates(showId) {
@@ -212,8 +235,8 @@ export function renderShowsTemplate(data: ShowsPageData): string {
                             
                             return \`
                               <tr>
-                                <td style="padding: 0.5rem; border: none;">\${AdelaideTime.formatDateAdelaide(date.start_time)}</td>
-                                <td style="padding: 0.5rem; border: none;">\${AdelaideTime.formatTimeAdelaide(date.start_time)} - \${AdelaideTime.formatTimeAdelaide(date.end_time)}</td>
+                                <td style="padding: 0.5rem; border: none;">\${AdelaideTime.formatDateAdelaide(new Date(date.start_time))}</td>
+                                <td style="padding: 0.5rem; border: none;">\${AdelaideTime.formatShowTimeRangeAdelaide(new Date(date.start_time), new Date(date.end_time))}</td>
                                 <td style="padding: 0.5rem; border: none;">
                                   <span class="traffic-light \${trafficColor}" style="width: 16px; height: 16px; margin-right: 6px;" 
                                         title="\${date.total_shifts > 0 ? date.filled_shifts + '/' + date.total_shifts + ' filled' : 'No shifts'}"></span>
@@ -221,7 +244,7 @@ export function renderShowsTemplate(data: ShowsPageData): string {
                                 </td>
                                 <td style="padding: 0.5rem; border: none;">
                                   \${date.total_shifts > 0 ? 
-                                    \`<a href="/admin/shifts?shows=\${showId}&date=\${AdelaideTime.dateToStringAdelaide(date.start_time)}" class="performance-link">View Shifts</a>\` : 
+                                    \`<a href="/admin/shifts?shows=\${showId}&date=\${AdelaideTime.dateToStringAdelaide(new Date(date.start_time))}" class="performance-link">View Shifts</a>\` : 
                                     '<span style="color: #6c757d;">No shifts</span>'
                                   }
                                 </td>
@@ -277,8 +300,8 @@ export async function showShowsPage(ctx: RouterContext<string>) {
     const result = await client.queryObject<Show>(`
       SELECT s.id, s.name, s.created_at,
              COUNT(DISTINCT sd.id) as show_date_count,
-             MIN(DATE(sd.start_time)) as first_date,
-             MAX(DATE(sd.start_time)) as last_date,
+             MIN(sd.start_time) as first_date,
+             MAX(sd.start_time) as last_date,
              COUNT(DISTINCT sh.id) as total_shifts,
              COUNT(DISTINCT CASE WHEN vs.participant_id IS NOT NULL THEN sh.id END) as filled_shifts
       FROM shows s
@@ -287,7 +310,7 @@ export async function showShowsPage(ctx: RouterContext<string>) {
       LEFT JOIN participant_shifts vs ON vs.shift_id = sh.id
       GROUP BY s.id, s.name, s.created_at
       ORDER BY s.name    `);
-    
+
     // Convert BigInt count values to numbers
     const shows = result.rows.map(show => ({
       ...show,
@@ -295,11 +318,11 @@ export async function showShowsPage(ctx: RouterContext<string>) {
       total_shifts: Number(show.total_shifts),
       filled_shifts: Number(show.filled_shifts)
     }));
-    
+
     const data: ShowsPageData = {
       shows
     };
-    
+
     ctx.response.type = "text/html";
     ctx.response.body = renderShowsTemplate(data);
   } finally {

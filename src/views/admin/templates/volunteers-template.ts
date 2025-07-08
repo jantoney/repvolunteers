@@ -14,7 +14,7 @@ export interface VolunteersPageData {
 
 export function renderVolunteersTemplate(data: VolunteersPageData): string {
   const { volunteers } = data;
-  
+
   return `
     <!DOCTYPE html>
     <html>
@@ -161,7 +161,7 @@ export function renderVolunteersTemplate(data: VolunteersPageData): string {
                     <div class="approval-toggle">
                       <label class="switch">
                         <input type="checkbox" ${volunteer.approved ? 'checked' : ''} 
-                               onchange="toggleApproval(${volunteer.id}, this.checked, '${volunteer.name.replace(/'/g, "\\'")}')">
+                               onchange="toggleApproval('${volunteer.id}', this.checked, '${volunteer.name.replace(/'/g, "\\'").replace(/"/g, '\\"').replace(/\\/g, '\\\\')}')">
                         <span class="slider"></span>
                       </label>
                       <span class="approval-status ${volunteer.approved ? 'approved' : 'pending'}">${volunteer.approved ? 'Enabled' : 'Disabled'}</span>
@@ -170,15 +170,15 @@ export function renderVolunteersTemplate(data: VolunteersPageData): string {
                   <td>
                     <div class="signup-url-container">
                       <input type="text" class="signup-url" value="/volunteer/signup/${volunteer.id}" readonly id="url-${volunteer.id}" data-full-url="">
-                      <button class="copy-btn" onclick="copySignupUrl(${volunteer.id})" id="copy-btn-${volunteer.id}">Copy</button>
+                      <button class="copy-btn" onclick="copySignupUrl('${volunteer.id}')" id="copy-btn-${volunteer.id}">Copy</button>
                     </div>
                   </td>
                   <td>
                     <div class="table-actions">
                       <a href="/admin/volunteers/${volunteer.id}/shifts" class="btn btn-sm btn-info">Shifts</a>
                       <a href="/admin/volunteers/${volunteer.id}/edit" class="btn btn-sm btn-secondary">Edit</a>
-                      <button onclick="sendSchedulePDF(${volunteer.id}, '${volunteer.name.replace(/'/g, "\\'")}', '${volunteer.email || ''}')" class="btn btn-sm btn-success" ${!volunteer.email ? 'disabled title="No email address"' : ''}>📧 Send PDF</button>
-                      <button onclick="deleteVolunteer(${volunteer.id}, '${volunteer.name.replace(/'/g, "\\'")}'))" class="btn btn-sm btn-danger">Delete</button>
+                      <button onclick="sendSchedulePDF('${volunteer.id}', '${volunteer.name.replace(/'/g, "\\'")}', '${volunteer.email || ''}')" class="btn btn-sm btn-success" ${!volunteer.email ? 'disabled title="No email address"' : ''}>📧 Send PDF</button>
+                      <button onclick="deleteVolunteer('${volunteer.id}', '${volunteer.name.replace(/'/g, "\\'")}')" class="btn btn-sm btn-danger">Delete</button>
                     </div>
                   </td>
                 </tr>
@@ -190,6 +190,7 @@ export function renderVolunteersTemplate(data: VolunteersPageData): string {
 
       <script src="/src/utils/modal.js"></script>
       <script src="/src/utils/timezone-client.js"></script>
+      <script src="/src/views/admin/volunteers.js"></script>
       ${getAdminScripts()}
       <script>
         // Set full URLs and copy function
