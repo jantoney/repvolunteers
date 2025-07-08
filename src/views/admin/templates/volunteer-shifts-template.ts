@@ -5,8 +5,8 @@ export interface VolunteerShift {
   show_id: number;
   show_name: string;
   role: string;
-  date: string;
-  time: string;
+  start_time: string;
+  end_time: string;
   arrive_time: string | null;
   depart_time: string | null;
   performance_id?: number;
@@ -250,12 +250,12 @@ export function renderVolunteerShiftsTemplate(data: VolunteerShiftsPageData): st
                   </div>
                   <div class="shift-details">
                     <div class="shift-detail">
-                      <div class="shift-detail-label">Date</div>
-                      <div class="shift-detail-value">${shift.date}</div>
+                      <div class="shift-detail-label">Start Time</div>
+                      <div class="shift-detail-value">${shift.start_time}</div>
                     </div>
                     <div class="shift-detail">
-                      <div class="shift-detail-label">Time</div>
-                      <div class="shift-detail-value">${shift.time}</div>
+                      <div class="shift-detail-label">End Time</div>
+                      <div class="shift-detail-value">${shift.end_time}</div>
                     </div>
                   </div>
                   <div class="shift-actions">
@@ -281,67 +281,7 @@ export function renderVolunteerShiftsTemplate(data: VolunteerShiftsPageData): st
         const volunteerName = "${volunteer.name.replace(/"/g, '\\"')}";
         const allShifts = ${JSON.stringify(assignedShifts)};
         
-        // Filter out past shifts and update display
-        function filterAndDisplayShifts() {
-          const now = new Date();
-          const today = new Date(now);
-          today.setHours(0, 0, 0, 0);
-          
-          const upcomingShifts = allShifts.filter(shift => {
-            // Check if shift has arrive_time and it's in the future
-            if (shift.arrive_time) {
-              const shiftStartTime = new Date(shift.arrive_time);
-              return shiftStartTime > now;
-            }
-            return true; // Keep shifts without arrive_time
-          });
-          
-          // Update the count
-          const countElement = document.querySelector('.stat-number');
-          if (countElement) {
-            countElement.textContent = upcomingShifts.length;
-          }
-          
-          // Update the shifts display
-          const shiftsGrid = document.querySelector('.shifts-grid');
-          if (shiftsGrid) {
-            if (upcomingShifts.length === 0) {
-              shiftsGrid.innerHTML = '<div class="no-shifts">No upcoming shifts currently assigned</div>';
-            } else {
-              shiftsGrid.innerHTML = upcomingShifts.map(shift => \`
-                <div class="shift-card assigned">
-                  <div class="shift-header">
-                    <div>
-                      <div class="shift-title">\${shift.role}</div>
-                      <div class="shift-show">\${shift.show_name}</div>
-                    </div>
-                  </div>
-                  <div class="shift-details">
-                    <div class="shift-detail">
-                      <div class="shift-detail-label">Date</div>
-                      <div class="shift-detail-value">\${shift.date}</div>
-                    </div>
-                    <div class="shift-detail">
-                      <div class="shift-detail-label">Time</div>
-                      <div class="shift-detail-value">\${shift.time}</div>
-                    </div>
-                  </div>
-                  <div class="shift-actions">
-                    <button class="btn btn-sm btn-danger" onclick="removeShift(\${shift.id}, '\${shift.role}', '\${shift.show_name}')">
-                      Remove
-                    </button>
-                    <button class="btn btn-sm btn-warning" onclick="swapShift(\${shift.id}, '\${shift.role}', '\${shift.show_name}')">
-                      Swap
-                    </button>
-                  </div>
-                </div>
-              \`).join('');
-            }
-          }
-        }
-        
-        // Run filtering on page load
-        filterAndDisplayShifts();
+  // No timezone filtering or conversion. Display as received.
         
         // Remove shift function
         async function removeShift(shiftId, role, showName) {

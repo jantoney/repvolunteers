@@ -1,6 +1,10 @@
 import type { RouterContext } from "oak";
 import { getPool } from "../models/db.ts";
-import { createAdelaideTimestamp } from "../utils/timezone.ts";
+import {
+  getAdelaideTimeSelectSQL,
+  getAdelaideTimeParameterSQL,
+  getAdelaideTimeInsertSQL
+} from "../utils/timezone.ts";
 import { getAuth } from "../auth.ts";
 import { generateShiftRemovalPDF as generatePDF, getMimeType, getFileExtension, type ShiftData, type VolunteerData } from "../utils/pdf-generator.ts";
 
@@ -77,10 +81,10 @@ export async function listShows(ctx: RouterContext<string>) {
     }
 
     const result = await client.queryObject<ShowRow>(`
-      SELECT s.id, s.name, s.created_at,
+      SELECT s.id, s.name, s.created_at AT TIME ZONE 'Australia/Adelaide' as created_at,
              COUNT(sd.id) as show_date_count,
-             MIN(sd.start_time) as first_date,
-             MAX(sd.start_time) as last_date
+             MIN(sd.start_time AT TIME ZONE 'Australia/Adelaide') as first_date,
+             MAX(sd.start_time AT TIME ZONE 'Australia/Adelaide') as last_date
       FROM shows s
       LEFT JOIN show_dates sd ON sd.show_id = s.id
       GROUP BY s.id, s.name, s.created_at
@@ -115,7 +119,7 @@ export async function listShowDates(ctx: RouterContext<string>) {
     }
 
     const result = await client.queryObject<ShowDateRow>(`
-      SELECT sd.*, s.name as show_name,
+      SELECT sd.id, sd.show_id, sd.start_time AT TIME ZONE 'Australia/Adelaide' as start_time, sd.end_time AT TIME ZONE 'Australia/Adelaide' as end_time, s.name as show_name,
              COUNT(DISTINCT sh.id) as total_shifts,
              COUNT(DISTINCT CASE WHEN vs.participant_id IS NOT NULL THEN sh.id END) as filled_shifts
       FROM show_dates sd
@@ -123,7 +127,7 @@ export async function listShowDates(ctx: RouterContext<string>) {
       LEFT JOIN shifts sh ON sh.show_date_id = sd.id
       LEFT JOIN participant_shifts vs ON vs.shift_id = sh.id
       WHERE sd.show_id = $1
-      GROUP BY sd.id, sd.start_time, sd.end_time, s.name
+      GROUP BY sd.id, s.name
       ORDER BY sd.start_time
     `, [showId]);
 
@@ -200,33 +204,11 @@ export async function createShow(ctx: RouterContext<string>) {
       console.log("  End time (raw):", end_time);
 
       try {
-        // Parse the incoming datetime strings as Adelaide timezone
-        // Format: "YYYY-MM-DDTHH:MM:SS" - treat as Adelaide time
-
-        // Extract date and time components
-        const startDate = start_time.split('T')[0];
-        const startTimeOnly = start_time.split('T')[1]; // Keep full time format HH:MM:SS
-
-        const endDate = end_time.split('T')[0];
-        const endTimeOnly = end_time.split('T')[1]; // Keep full time format HH:MM:SS
-
-        console.log("  Parsed start date:", startDate, "time:", startTimeOnly);
-        console.log("  Parsed end date:", endDate, "time:", endTimeOnly);
-
-        // Create Adelaide timezone timestamps - create from the complete ISO string directly
-        // The client sends timestamps as Adelaide time directly (NOT UTC converted)
-        console.log("🌏 Creating Adelaide timestamps...");
-        const adelaideStartTime = createAdelaideTimestamp(start_time.split('T')[0], startTimeOnly);
-        const adelaideEndTime = createAdelaideTimestamp(end_time.split('T')[0], endTimeOnly);
-
-        console.log("  Adelaide start timestamp:", adelaideStartTime);
-        console.log("  Adelaide end timestamp:", adelaideEndTime);
-
         // Check if show date already exists (check for same start time)
         console.log("🔍 Checking for existing performance...");
         const existingDate = await client.queryObject(
-          "SELECT id FROM show_dates WHERE show_id = $1 AND start_time = $2",
-          [showId, adelaideStartTime] // Pass Date object, not ISO string
+          "SELECT id FROM show_dates WHERE show_id = $1 AND start_time = ($2::timestamp AT TIME ZONE 'Australia/Adelaide')",
+          [showId, start_time]
         );
 
         if (existingDate.rows.length > 0) {
@@ -241,8 +223,8 @@ export async function createShow(ctx: RouterContext<string>) {
 
         console.log("💾 Inserting new show date...");
         const result = await client.queryObject<{ id: number }>(
-          "INSERT INTO show_dates (show_id, start_time, end_time) VALUES ($1, $2, $3) RETURNING id",
-          [showId, adelaideStartTime, adelaideEndTime] // Pass Date objects, not ISO strings
+          "INSERT INTO show_dates (show_id, start_time, end_time) VALUES ($1, $2::timestamp AT TIME ZONE 'Australia/Adelaide', $3::timestamp AT TIME ZONE 'Australia/Adelaide') RETURNING id",
+          [showId, start_time, end_time]
         );
 
         console.log("✅ Successfully created show date with ID:", result.rows[0].id);
@@ -322,19 +304,20 @@ export async function createShowDate(ctx: RouterContext<string>) {
   const pool = getPool();
   const client = await pool.connect();
   try {
-    // Parse the incoming datetime strings and create Adelaide timezone timestamps
+    // Parse the incoming datetime strings
     const startDate = start_time.split('T')[0];
     const startTimeOnly = start_time.split('T')[1];
     const endDate = end_time.split('T')[0];
     const endTimeOnly = end_time.split('T')[1];
 
-    const adelaideStartTime = createAdelaideTimestamp(startDate, startTimeOnly);
-    const adelaideEndTime = createAdelaideTimestamp(endDate, endTimeOnly);
-
+    // Use SQL AT TIME ZONE to ensure dates are treated as Adelaide time
     const result = await client.queryObject<{ id: number }>(
-      "INSERT INTO show_dates (show_id, start_time, end_time) VALUES ($1, $2, $3) RETURNING id",
-      [show_id, adelaideStartTime, adelaideEndTime] // Pass Date objects, not ISO strings
+      `INSERT INTO show_dates (show_id, start_time, end_time) 
+       VALUES ($1, ${getAdelaideTimeParameterSQL('$2')}, ${getAdelaideTimeParameterSQL('$3')}) 
+       RETURNING id`,
+      [show_id, `${startDate} ${startTimeOnly}`, `${endDate} ${endTimeOnly}`]
     );
+
     ctx.response.status = 201;
     ctx.response.body = { id: result.rows[0].id };
   } finally {
@@ -349,19 +332,21 @@ export async function updateShowDate(ctx: RouterContext<string>) {
   const pool = getPool();
   const client = await pool.connect();
   try {
-    // Parse the incoming datetime strings and create Adelaide timezone timestamps
+    // Parse the incoming datetime strings
     const startDate = start_time.split('T')[0];
     const startTimeOnly = start_time.split('T')[1];
     const endDate = end_time.split('T')[0];
     const endTimeOnly = end_time.split('T')[1];
 
-    const adelaideStartTime = createAdelaideTimestamp(startDate, startTimeOnly);
-    const adelaideEndTime = createAdelaideTimestamp(endDate, endTimeOnly);
-
+    // Use SQL AT TIME ZONE to ensure dates are treated as Adelaide time
     await client.queryObject(
-      "UPDATE show_dates SET start_time = $1, end_time = $2 WHERE id = $3",
-      [adelaideStartTime, adelaideEndTime, id] // Pass Date objects, not ISO strings
+      `UPDATE show_dates 
+       SET start_time = ${getAdelaideTimeParameterSQL('$1')}, 
+           end_time = ${getAdelaideTimeParameterSQL('$2')} 
+       WHERE id = $3`,
+      [`${startDate} ${startTimeOnly}`, `${endDate} ${endTimeOnly}`, id]
     );
+
     ctx.response.status = 200;
   } finally {
     client.release();
@@ -659,23 +644,31 @@ export async function createShift(ctx: RouterContext<string>) {
           console.log("  Arrive Time:", arriveTime);
           console.log("  Depart Time:", departTime);
 
-          // Create arrive and depart timestamps in Adelaide timezone
-          const arriveTimestamp = createAdelaideTimestamp(showDate, arriveTime);
-          let departTimestamp = createAdelaideTimestamp(showDate, departTime);
+          // Create arrive and depart timestamps 
+          const arriveTimestamp = `${showDate}T${arriveTime}:00`;
+          let departTimestamp = `${showDate}T${departTime}:00`;
 
           console.log("  Arrive Timestamp:", arriveTimestamp);
           console.log("  Initial Depart Timestamp:", departTimestamp);
 
           // Handle next day if depart time is before arrive time
-          if (departTimestamp <= arriveTimestamp) {
+          const arriveTime24 = parseInt(arriveTime.split(':')[0]) * 60 + parseInt(arriveTime.split(':')[1]);
+          const departTime24 = parseInt(departTime.split(':')[0]) * 60 + parseInt(departTime.split(':')[1]);
+          
+          let isNextDay = false;
+          if (departTime24 <= arriveTime24) {
             // Add one day to depart timestamp for next day
-            departTimestamp = new Date(departTimestamp.getTime() + 24 * 60 * 60 * 1000);
+            const nextDay = new Date(showDate + 'T00:00:00');
+            nextDay.setDate(nextDay.getDate() + 1);
+            const nextDayStr = nextDay.toISOString().split('T')[0];
+            departTimestamp = `${nextDayStr}T${departTime}:00`;
+            isNextDay = true;
             console.log("  Adjusted Depart Timestamp (next day):", departTimestamp);
           }
 
           const result = await client.queryObject<{ id: number }>(
-            "INSERT INTO shifts (show_date_id, role, arrive_time, depart_time) VALUES ($1, $2, $3, $4) RETURNING id",
-            [dateId, role, arriveTimestamp, departTimestamp] // Pass Date objects, not ISO strings
+            "INSERT INTO shifts (show_date_id, role, arrive_time, depart_time) VALUES ($1, $2, $3::timestamp AT TIME ZONE 'Australia/Adelaide', $4::timestamp AT TIME ZONE 'Australia/Adelaide') RETURNING id",
+            [dateId, role, arriveTimestamp, departTimestamp]
           );
 
           results.push({
@@ -683,7 +676,7 @@ export async function createShift(ctx: RouterContext<string>) {
             role,
             id: result.rows[0].id,
             success: true,
-            nextDay: departTimestamp.getDate() !== arriveTimestamp.getDate()
+            nextDay: isNextDay
           });
         } catch (error) {
           console.error("❌ Error creating shift:", error);
@@ -725,19 +718,10 @@ export async function updateShift(ctx: RouterContext<string>) {
   const client = await pool.connect();
   try {
     // The inputs are in format YYYY-MM-DDTHH:MM and represent Adelaide time
-    // Parse them correctly as Adelaide timezone
-
-    // Extract date and time components
-    const [arriveDate, arriveTime] = arrive_time.split('T');
-    const [departDate, departTime] = depart_time.split('T');
-
-    // Create proper Adelaide timestamps
-    const arriveAdelaide = createAdelaideTimestamp(arriveDate, arriveTime);
-    const departAdelaide = createAdelaideTimestamp(departDate, departTime);
 
     await client.queryObject(
-      "UPDATE shifts SET role=$1, arrive_time=$2, depart_time=$3 WHERE id=$4",
-      [role, arriveAdelaide, departAdelaide, id] // Pass Date objects, not ISO strings
+      "UPDATE shifts SET role=$1, arrive_time=$2::timestamp AT TIME ZONE 'Australia/Adelaide', depart_time=$3::timestamp AT TIME ZONE 'Australia/Adelaide' WHERE id=$4",
+      [role, arrive_time, depart_time, id]
     );
     ctx.response.status = 200;
   } finally {
@@ -774,13 +758,17 @@ export async function unfilledShifts(ctx: RouterContext<string>) {
       show_end: string;
     };
     const result = await client.queryObject<ShiftRow>(
-      `SELECT s.*, DATE(sd.start_time) as date, sd.start_time as show_start, sd.end_time as show_end,
+      `SELECT s.id, s.show_date_id, s.role, 
+              s.arrive_time AT TIME ZONE 'Australia/Adelaide' as arrive_time,
+              s.depart_time AT TIME ZONE 'Australia/Adelaide' as depart_time,
+              DATE(sd.start_time) as date, sd.start_time as show_start, sd.end_time as show_end,
               sh.name as show_name, sh.id as show_id
        FROM shifts s
        JOIN show_dates sd ON sd.id = s.show_date_id
        JOIN shows sh ON sh.id = sd.show_id
        LEFT JOIN participant_shifts vs ON vs.shift_id = s.id
-       GROUP BY s.id, DATE(sd.start_time), sd.start_time, sd.end_time, sh.name, sh.id
+       GROUP BY s.id, s.show_date_id, s.role, s.arrive_time, s.depart_time, 
+                DATE(sd.start_time), sd.start_time, sd.end_time, sh.name, sh.id
        HAVING COUNT(vs.participant_id) = 0
        ORDER BY sh.name, DATE(sd.start_time), sd.start_time, s.arrive_time`
     );
@@ -869,15 +857,18 @@ export async function getVolunteerShifts(ctx: RouterContext<string>) {
       show_end: string;
     };
     const result = await client.queryObject<ShiftRow>(
-      `SELECT s.id, s.role, s.arrive_time, s.depart_time, s.show_date_id,
-              DATE(sd.start_time) as date, sd.start_time as show_start, sd.end_time as show_end,
+      `SELECT s.id, s.role, s.arrive_time AT TIME ZONE 'Australia/Adelaide' as arrive_time, 
+              s.depart_time AT TIME ZONE 'Australia/Adelaide' as depart_time, s.show_date_id,
+              DATE(sd.start_time AT TIME ZONE 'Australia/Adelaide') as date, 
+              sd.start_time AT TIME ZONE 'Australia/Adelaide' as show_start, 
+              sd.end_time AT TIME ZONE 'Australia/Adelaide' as show_end,
               sh.name as show_name, sh.id as show_id
        FROM shifts s
        JOIN participant_shifts vs ON vs.shift_id = s.id
        JOIN show_dates sd ON sd.id = s.show_date_id
        JOIN shows sh ON sh.id = sd.show_id
        WHERE vs.participant_id = $1
-       ORDER BY sh.name, DATE(sd.start_time), sd.start_time, s.arrive_time`,
+       ORDER BY sh.name, DATE(sd.start_time AT TIME ZONE 'Australia/Adelaide'), sd.start_time, s.arrive_time`,
       [volunteerId]
     );
     // Group by show, then by performance (date/start_time)
@@ -1070,8 +1061,11 @@ export async function getAvailableShiftsForVolunteer(ctx: RouterContext<string>)
     };
     // Get shifts not already assigned to this volunteer
     const result = await client.queryObject<ShiftRow>(
-      `SELECT s.id, s.role, s.arrive_time, s.depart_time, s.show_date_id,
-              DATE(sd.start_time) as date, sd.start_time as show_start, sd.end_time as show_end,
+      `SELECT s.id, s.role, s.arrive_time AT TIME ZONE 'Australia/Adelaide' as arrive_time, 
+              s.depart_time AT TIME ZONE 'Australia/Adelaide' as depart_time, s.show_date_id,
+              DATE(sd.start_time AT TIME ZONE 'Australia/Adelaide') as date, 
+              sd.start_time AT TIME ZONE 'Australia/Adelaide' as show_start, 
+              sd.end_time AT TIME ZONE 'Australia/Adelaide' as show_end,
               sh.name as show_name, sh.id as show_id
        FROM shifts s
        JOIN show_dates sd ON sd.id = s.show_date_id
@@ -1081,7 +1075,7 @@ export async function getAvailableShiftsForVolunteer(ctx: RouterContext<string>)
          FROM participant_shifts vs 
          WHERE vs.participant_id = $1
        )
-       ORDER BY sh.name, DATE(sd.start_time), sd.start_time, s.arrive_time`,
+       ORDER BY sh.name, DATE(sd.start_time AT TIME ZONE 'Australia/Adelaide'), sd.start_time, s.arrive_time`,
       [volunteerId]
     );
     // Group by show, then by performance (date/start_time)
@@ -1308,8 +1302,8 @@ export async function emailVolunteerSchedulePDF(ctx: RouterContext<string>) {
     const { generateServerSidePDF } = await import("../utils/server-pdf-generator.ts");
     const { sendVolunteerScheduleEmail, createVolunteerLoginUrl } = await import("../utils/email.ts");
 
-    // Generate PDF data
-    const pdfData = await generateVolunteerPDFData(Number(volunteerId));
+    // Generate PDF data (pass volunteerId as string, not Number)
+    const pdfData = await generateVolunteerPDFData(volunteerId);
 
     // Check if volunteer has email
     if (!pdfData.volunteer.email) {

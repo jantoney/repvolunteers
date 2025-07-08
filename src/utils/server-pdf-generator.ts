@@ -22,34 +22,7 @@ interface ShiftRow {
 }
 
 // Helper functions for date/time formatting (Adelaide timezone)
-function formatDateAdelaide(dateString: string): string {
-  try {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-AU', {
-      weekday: 'short',
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-      timeZone: 'Australia/Adelaide'
-    });
-  } catch {
-    return dateString;
-  }
-}
 
-function formatTimeAdelaide(timeString: string): string {
-  try {
-    const time = new Date(timeString);
-    return time.toLocaleTimeString('en-AU', {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true,
-      timeZone: 'Australia/Adelaide'
-    });
-  } catch {
-    return timeString;
-  }
-}
 
 function formatCurrentDateAdelaide(): string {
   const now = new Date();
@@ -75,6 +48,35 @@ function formatCurrentTimeAdelaide(): string {
  * Generates a PDF buffer using the same logic as the client-side implementation
  */
 export async function generateServerSidePDF(data: PDFData): Promise<Uint8Array> {
+  // Helper to extract HH:mm from a string like 'Thu Jul 17 2025 14:45:00 GMT+1000 (Australian Eastern Standard Time)' or ISO string
+  function extractTime(str: unknown): string {
+    if (!str) return '';
+    if (typeof str === 'string') {
+      // Try ISO first
+      const match = str.match(/T(\d{2}:\d{2})/);
+      if (match) return match[1];
+    }
+    // Try Date object or string
+    const dateObj = new Date(str as string);
+    if (!isNaN(dateObj.getTime())) {
+      return String(dateObj.getHours()).padStart(2, '0') + ':' + String(dateObj.getMinutes()).padStart(2, '0');
+    }
+    // Fallback: just return the string
+    return String(str);
+  }
+
+  // (+1d) if depart is on the next day
+  function plusOneDayIfNeeded(arrive: unknown, depart: unknown): string {
+    if (!arrive || !depart) return '';
+    const a = new Date(arrive as string);
+    const d = new Date(depart as string);
+    if (!isNaN(a.getTime()) && !isNaN(d.getTime())) {
+      if (d.getDate() !== a.getDate() || d.getMonth() !== a.getMonth() || d.getFullYear() !== a.getFullYear()) {
+        return ' (+1d)';
+      }
+    }
+    return '';
+  }
   // Function to add footer to current page
   function addPageFooter(doc: jsPDF, pageWidth: number, pageHeight: number, margin: number) {
     // Website info at bottom left
@@ -226,16 +228,21 @@ export async function generateServerSidePDF(data: PDFData): Promise<Uint8Array> 
         }
 
         xPos = margin + 8;
-        const formattedDate = formatDateAdelaide(shift.show_date);
-        const showName = (shift.show_name || 'Unknown Show').substring(0, 50); // Wider for landscape
+
+        // Date: show only YYYY-MM-DD part
+        const formattedDate = (shift.show_date && typeof shift.show_date === 'string') ? shift.show_date.split('T')[0] : '';
+        const showName = (shift.show_name || 'Unknown Show').substring(0, 50);
         const role = (shift.role || '').substring(0, 35);
-        const arriveTime = formatTimeAdelaide(shift.arrive_time);
-        const departTime = formatTimeAdelaide(shift.depart_time);
+
+
+        const arriveTime = extractTime(shift.arrive_time);
+        const departTime = extractTime(shift.depart_time) + plusOneDayIfNeeded(shift.arrive_time, shift.depart_time);
 
         const rowData = [formattedDate, showName, role, arriveTime, departTime];
 
         rowData.forEach((data, i) => {
-          doc.text(data, xPos, yPos);
+          // Ensure all values are strings for jsPDF
+          doc.text(String(data), xPos, yPos);
           xPos += colWidths[i];
         });
 
@@ -366,8 +373,9 @@ export async function generateServerSidePDF(data: PDFData): Promise<Uint8Array> 
                 let shiftY = y + 9;
                 doc.setFontSize(8);
                 shiftsByDate[dateStr].forEach(shift => {
-                  const arrive = formatTimeAdelaide(shift.arrive_time);
-                  const depart = formatTimeAdelaide(shift.depart_time);
+                  // Use extractTime and plusOneDayIfNeeded as above
+                  const arrive = extractTime(shift.arrive_time);
+                  const depart = extractTime(shift.depart_time) + plusOneDayIfNeeded(shift.arrive_time, shift.depart_time);
                   doc.text(`${arrive} - ${depart}`, x + 1, shiftY);
                   shiftY += 5;
                 });

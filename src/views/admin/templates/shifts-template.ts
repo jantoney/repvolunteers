@@ -1,5 +1,26 @@
+// TypeScript global declaration for DateTimeFormat to avoid implicit 'any' errors
+declare global {
+  // eslint-disable-next-line no-var
+  var DateTimeFormat: {
+    formatDate: (date: Date | string) => string;
+    [key: string]: any;
+  } | undefined;
+}
 import { getAdminNavigation, getAdminStyles } from "../components/navigation.ts";
-import { formatDateAdelaide, formatTimeAdelaide, isDifferentDayAdelaide } from "../../../utils/timezone.ts";
+// Use formatDate from timezone-client.js if available (browser), else fallback for server-side
+let formatDate: (date: Date|string) => string;
+if (typeof globalThis !== 'undefined' && globalThis.DateTimeFormat && globalThis.DateTimeFormat.formatDate) {
+  formatDate = globalThis.DateTimeFormat.formatDate;
+} else {
+  // Fallback for server-side: basic DD/MM/YYYY
+  formatDate = function(date: Date|string) {
+    const d = typeof date === 'string' ? new Date(date) : date;
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+    return `${day}/${month}/${year}`;
+  };
+}
 
 export interface Show {
   id: number;
@@ -12,8 +33,8 @@ export interface Shift {
   show_id: number;
   show_name: string;
   date: string;
-  show_start: string;
-  show_end: string;
+  show_start: Date;
+  show_end: Date;
   role: string;
   arrive_time: Date;
   depart_time: Date;
@@ -212,6 +233,14 @@ export function renderShiftsTemplate(data: ShiftsPageData): string {
           </div>
         </div>        <!-- Filters -->
         <div class="content-card filters-card">
+          <div class="alert info-alert" style="background: #e9f5fd; border: 1px solid #c5e5fc; border-left: 4px solid #007bff; padding: 0.75rem 1rem; margin-bottom: 1rem; border-radius: 0.25rem; display: flex; align-items: center;">
+            <i class="fas fa-info-circle" style="color: #007bff; margin-right: 0.5rem;"></i>
+            <div>
+              <strong>All times are displayed in Adelaide, Australia timezone</strong><br>
+              <span id="currentAdelaideTime" style="color: #666; font-size: 0.875rem;"></span>
+            </div>
+          </div>
+          
           <form method="GET" id="shiftsFilterForm">
             <div class="filter-section">
               <h4>Filter by Shows</h4>
@@ -259,16 +288,13 @@ export function renderShiftsTemplate(data: ShiftsPageData): string {
               <div class="performance-header">
                 <h3 class="performance-title">${firstShift.show_name}</h3>
                 <p class="performance-details">
-                  ${formatDateAdelaide(new Date(firstShift.date))} | 
-                  Show: ${firstShift.show_start} - ${firstShift.show_end}
+                  ${formatDate(new Date(firstShift.date))} | 
+                  <span class="show-time" data-start-time="${firstShift.show_start.toISOString()}" data-end-time="${firstShift.show_end.toISOString()}">Loading...</span>
                 </p>
               </div>
               
               <div class="shifts-grid">
                 ${shifts.map(shift => {
-                  const arriveTime = formatTimeAdelaide(shift.arrive_time);
-                  const departTime = formatTimeAdelaide(shift.depart_time);
-                  const isNextDay = isDifferentDayAdelaide(shift.arrive_time, shift.depart_time);
                   const isFilled = shift.volunteer_count > 0;
                   
                   return `
@@ -281,9 +307,8 @@ export function renderShiftsTemplate(data: ShiftsPageData): string {
                       </div>
                       
                       <div class="shift-times">
-                        <span class="time-range">
-                          ${arriveTime} - ${departTime}
-                          ${isNextDay ? '<span class="next-day">+1 day</span>' : ''}
+                        <span class="time-range shift-time" data-arrive-time="${shift.arrive_time.toISOString()}" data-depart-time="${shift.depart_time.toISOString()}">
+                          Loading...
                         </span>
                       </div>
                       
@@ -311,7 +336,52 @@ export function renderShiftsTemplate(data: ShiftsPageData): string {
       </div>
 
       <script src="/src/utils/modal.js"></script>
+      <script src="/src/utils/timezone-client.js"></script>
       <script src="/src/views/admin/shifts.js"></script>
+      <script>
+        // Display and update current Adelaide time
+        function updateAdelaideTime() {
+          const timeElement = document.getElementById('currentAdelaideTime');
+          if (timeElement) {
+            const adelaideTZ = DateTimeFormat.ADELAIDE_TIMEZONE;
+            const now = new Date();
+            const adelaideTime = DateTimeFormat.formatDateTime(now);
+            timeElement.textContent = "Current time: " + adelaideTime + " " + adelaideTZ;
+          }
+        }
+        
+        // Format show times on page load
+        function formatShowTimes() {
+          // Format show time ranges
+          document.querySelectorAll('.show-time').forEach(element => {
+            const startTime = element.getAttribute('data-start-time');
+            const endTime = element.getAttribute('data-end-time');
+            if (startTime && endTime) {
+              const formatted = DateTimeFormat.formatShowTimeRange(startTime, endTime);
+              element.textContent = "Show: " + formatted;
+            }
+          });
+          
+          // Format shift time ranges
+          document.querySelectorAll('.shift-time').forEach(element => {
+            const arriveTime = element.getAttribute('data-arrive-time');
+            const departTime = element.getAttribute('data-depart-time');
+            if (arriveTime && departTime) {
+              const formatted = DateTimeFormat.formatShiftTime(arriveTime, departTime);
+              element.textContent = formatted;
+            }
+          });
+        }
+        
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+          formatShowTimes();
+        });
+        
+        // Update time immediately and then every minute
+        updateAdelaideTime();
+        setInterval(updateAdelaideTime, 60000);
+      </script>
     </body>
     </html>
   `;

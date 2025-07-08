@@ -27,9 +27,13 @@ export async function showShiftsPage(ctx: RouterContext<string>) {
     
     // Build the shifts query with optional show filter
     let shiftsQuery = `
-      SELECT s.id, s.show_date_id, sh.id as show_id, sh.name as show_name, DATE(sd.start_time) as date, 
-             sd.start_time as show_start, sd.end_time as show_end,
-             s.role, s.arrive_time, s.depart_time,
+      SELECT s.id, s.show_date_id, sh.id as show_id, sh.name as show_name, 
+             DATE(sd.start_time AT TIME ZONE 'Australia/Adelaide') as date, 
+             sd.start_time AT TIME ZONE 'Australia/Adelaide' as show_start, 
+             sd.end_time AT TIME ZONE 'Australia/Adelaide' as show_end,
+             s.role, 
+             s.arrive_time AT TIME ZONE 'Australia/Adelaide' as arrive_time, 
+             s.depart_time AT TIME ZONE 'Australia/Adelaide' as depart_time,
              COUNT(vs.participant_id) as volunteer_count
       FROM shifts s
       JOIN show_dates sd ON sd.id = s.show_date_id
@@ -47,7 +51,7 @@ export async function showShiftsPage(ctx: RouterContext<string>) {
     }
     
     if (selectedDate) {
-      whereConditions.push(`DATE(sd.start_time) = $${queryParams.length + 1}`);
+      whereConditions.push(`DATE(sd.start_time AT TIME ZONE 'Australia/Adelaide') = $${queryParams.length + 1}`);
       queryParams.push(selectedDate);
     }
     
@@ -56,8 +60,8 @@ export async function showShiftsPage(ctx: RouterContext<string>) {
     }
     
     shiftsQuery += `
-      GROUP BY s.id, sh.id, sh.name, DATE(sd.start_time), sd.start_time, sd.end_time
-      ORDER BY DATE(sd.start_time), s.arrive_time
+      GROUP BY s.id, sh.id, sh.name, DATE(sd.start_time AT TIME ZONE 'Australia/Adelaide'), sd.start_time, sd.end_time, s.arrive_time, s.depart_time
+      ORDER BY DATE(sd.start_time AT TIME ZONE 'Australia/Adelaide'), s.arrive_time AT TIME ZONE 'Australia/Adelaide'
     `;
     
     const shiftsResult = await client.queryObject<{
@@ -66,8 +70,8 @@ export async function showShiftsPage(ctx: RouterContext<string>) {
       show_id: number;
       show_name: string;
       date: string;
-      show_start: string;
-      show_end: string;
+      show_start: Date;
+      show_end: Date;
       role: string;
       arrive_time: Date;
       depart_time: Date;
@@ -81,7 +85,17 @@ export async function showShiftsPage(ctx: RouterContext<string>) {
       if (!groupedShifts.has(key)) {
         groupedShifts.set(key, []);
       }
-      groupedShifts.get(key)!.push(shift);
+      
+      // Pass the timestamps as received from the database (already in Adelaide time)
+      const formattedShift: Shift = {
+        ...shift,
+        show_start: shift.show_start,
+        show_end: shift.show_end,
+        arrive_time: shift.arrive_time,
+        depart_time: shift.depart_time
+      };
+      
+      groupedShifts.get(key)!.push(formattedShift);
     }
     
     const data: ShiftsPageData = {

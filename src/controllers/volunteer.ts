@@ -29,35 +29,42 @@ export async function viewSignup(ctx: RouterContext<string>) {
       role: string;
       arrive_time: string;
       depart_time: string;
-      show_date: string;
       start_time: string;
       end_time: string;
     };
 
     // Get assigned shifts
     const assignedShiftsRes = await client.queryObject<ShiftRow>(
-      `SELECT s.id, s.role, s.arrive_time, s.depart_time, s.show_date_id,
-              sh.name as show_name, sh.id as show_id, DATE(sd.start_time) as show_date, sd.start_time, sd.end_time
+      `SELECT s.id, s.role,
+              s.arrive_time AT TIME ZONE 'Australia/Adelaide' as arrive_time,
+              s.depart_time AT TIME ZONE 'Australia/Adelaide' as depart_time, s.show_date_id,
+              sh.name as show_name, sh.id as show_id,
+              sd.start_time AT TIME ZONE 'Australia/Adelaide' as start_time,
+              sd.end_time AT TIME ZONE 'Australia/Adelaide' as end_time
        FROM shifts s
        JOIN show_dates sd ON sd.id = s.show_date_id
        JOIN shows sh ON sh.id = sd.show_id
        JOIN participant_shifts vs ON vs.shift_id = s.id
        WHERE vs.participant_id = $1
-       ORDER BY sh.name, DATE(sd.start_time), sd.start_time, s.arrive_time`,
+       ORDER BY sh.name, sd.start_time, s.arrive_time`,
       [id]
     );
 
-    // Get available shifts (not assigned to this volunteer)
+    // Get available shifts (not assigned to any participant)
     const shiftsRes = await client.queryObject<ShiftRow>(
-      `SELECT s.id, s.role, s.arrive_time, s.depart_time, s.show_date_id,
-              sh.name as show_name, sh.id as show_id, DATE(sd.start_time) as show_date, sd.start_time, sd.end_time
+      `SELECT s.id, s.role,
+              s.arrive_time AT TIME ZONE 'Australia/Adelaide' as arrive_time,
+              s.depart_time AT TIME ZONE 'Australia/Adelaide' as depart_time, s.show_date_id,
+              sh.name as show_name, sh.id as show_id,
+              sd.start_time AT TIME ZONE 'Australia/Adelaide' as start_time,
+              sd.end_time AT TIME ZONE 'Australia/Adelaide' as end_time
        FROM shifts s
        JOIN show_dates sd ON sd.id = s.show_date_id
        JOIN shows sh ON sh.id = sd.show_id
-       LEFT JOIN participant_shifts vs ON vs.shift_id = s.id AND vs.participant_id = $1
+       LEFT JOIN participant_shifts vs ON vs.shift_id = s.id
        WHERE vs.participant_id IS NULL
-       ORDER BY sh.name, DATE(sd.start_time), sd.start_time, s.arrive_time`,
-      [id],
+       ORDER BY sh.name, sd.start_time, s.arrive_time`,
+      [],
     );
 
     // Group assigned shifts by show, then by performance
@@ -68,7 +75,6 @@ export async function viewSignup(ctx: RouterContext<string>) {
         show_name: string;
         performances: {
           [perfKey: string]: {
-            date: string;
             start_time: string;
             end_time: string;
             shifts: ShiftRow[];
@@ -77,6 +83,19 @@ export async function viewSignup(ctx: RouterContext<string>) {
       }
     } = {};
     for (const row of assignedShiftsRes.rows) {
+      // Add a 'date' field (YYYY-MM-DD) for frontend compatibility
+      let startTimeStr: string;
+      if (typeof row.start_time === 'string') {
+        startTimeStr = row.start_time;
+      } else {
+        try {
+          startTimeStr = new Date(row.start_time).toISOString();
+        } catch {
+          startTimeStr = '';
+        }
+      }
+      const date = startTimeStr && typeof startTimeStr === 'string' ? startTimeStr.split('T')[0] : '';
+      const rowWithDate = { ...row, date };
       const showKey = `${row.show_id}`;
       if (!groupedAssigned[showKey]) {
         groupedAssigned[showKey] = {
@@ -85,16 +104,15 @@ export async function viewSignup(ctx: RouterContext<string>) {
           performances: {}
         };
       }
-      const perfKey = `${row.show_date}T${row.start_time}`;
+      const perfKey = `${startTimeStr}`;
       if (!groupedAssigned[showKey].performances[perfKey]) {
         groupedAssigned[showKey].performances[perfKey] = {
-          date: row.show_date,
-          start_time: row.start_time,
+          start_time: startTimeStr,
           end_time: row.end_time,
           shifts: []
         };
       }
-      groupedAssigned[showKey].performances[perfKey].shifts.push(row);
+      groupedAssigned[showKey].performances[perfKey].shifts.push(rowWithDate);
     }
 
     // Group available shifts by show, then by performance
@@ -105,7 +123,6 @@ export async function viewSignup(ctx: RouterContext<string>) {
         show_name: string;
         performances: {
           [perfKey: string]: {
-            date: string;
             start_time: string;
             end_time: string;
             shifts: ShiftRow[];
@@ -114,6 +131,19 @@ export async function viewSignup(ctx: RouterContext<string>) {
       }
     } = {};
     for (const row of shiftsRes.rows) {
+      // Add a 'date' field (YYYY-MM-DD) for frontend compatibility
+      let startTimeStr: string;
+      if (typeof row.start_time === 'string') {
+        startTimeStr = row.start_time;
+      } else {
+        try {
+          startTimeStr = new Date(row.start_time).toISOString();
+        } catch {
+          startTimeStr = '';
+        }
+      }
+      const date = startTimeStr && typeof startTimeStr === 'string' ? startTimeStr.split('T')[0] : '';
+      const rowWithDate = { ...row, date };
       const showKey = `${row.show_id}`;
       if (!groupedAvailable[showKey]) {
         groupedAvailable[showKey] = {
@@ -122,16 +152,15 @@ export async function viewSignup(ctx: RouterContext<string>) {
           performances: {}
         };
       }
-      const perfKey = `${row.show_date}T${row.start_time}`;
+      const perfKey = `${startTimeStr}`;
       if (!groupedAvailable[showKey].performances[perfKey]) {
         groupedAvailable[showKey].performances[perfKey] = {
-          date: row.show_date,
-          start_time: row.start_time,
+          start_time: startTimeStr,
           end_time: row.end_time,
           shifts: []
         };
       }
-      groupedAvailable[showKey].performances[perfKey].shifts.push(row);
+      groupedAvailable[showKey].performances[perfKey].shifts.push(rowWithDate);
     }
 
     // Convert to array structure

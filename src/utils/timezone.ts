@@ -1,17 +1,17 @@
 /**
  * Timezone utilities for The Rep Volunteers application
- * All dates and times are displayed in Adelaide, Australia timezone
+ * All dates and times are treated as Adelaide, Australia timezone
+ * This module provides server-side utilities for database operations
  */
 
 const ADELAIDE_TIMEZONE = 'Australia/Adelaide';
 
 /**
- * Format a date for Adelaide timezone
+ * Format a date for display (DD/MM/YYYY)
  */
-export function formatDateAdelaide(date: Date | string): string {
+export function formatDate(date: Date | string): string {
   const d = typeof date === 'string' ? new Date(date) : date;
   return d.toLocaleDateString('en-AU', {
-    timeZone: ADELAIDE_TIMEZONE,
     year: 'numeric',
     month: '2-digit',
     day: '2-digit'
@@ -19,25 +19,23 @@ export function formatDateAdelaide(date: Date | string): string {
 }
 
 /**
- * Format a time for Adelaide timezone
+ * Format a time for display (24-hour format)
  */
-export function formatTimeAdelaide(date: Date | string, options: { hour12?: boolean } = {}): string {
+export function formatTime(date: Date | string): string {
   const d = typeof date === 'string' ? new Date(date) : date;
   return d.toLocaleTimeString('en-AU', {
-    timeZone: ADELAIDE_TIMEZONE,
     hour: '2-digit',
     minute: '2-digit',
-    hour12: options.hour12 || false
+    hour12: false
   });
 }
 
 /**
- * Format a date and time for Adelaide timezone
+ * Format a date and time for display (DD/MM/YYYY HH:MM)
  */
-export function formatDateTimeAdelaide(date: Date | string): string {
+export function formatDateTime(date: Date | string): string {
   const d = typeof date === 'string' ? new Date(date) : date;
   return d.toLocaleDateString('en-AU', {
-    timeZone: ADELAIDE_TIMEZONE,
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
@@ -48,248 +46,201 @@ export function formatDateTimeAdelaide(date: Date | string): string {
 }
 
 /**
- * Get the current date in Adelaide timezone as YYYY-MM-DD string
+ * Get the current date as YYYY-MM-DD string
  */
-export function getCurrentDateAdelaide(): string {
+export function getCurrentDate(): string {
   const now = new Date();
-  return now.toLocaleDateString('en-CA', { timeZone: ADELAIDE_TIMEZONE }); // en-CA gives YYYY-MM-DD format
+  return now.toISOString().split('T')[0]; // Returns YYYY-MM-DD
 }
 
 /**
- * Get the current time in Adelaide timezone
+ * Get the current time in HH:MM format
  */
-export function getCurrentTimeAdelaide(): string {
+export function getCurrentTime(): string {
   const now = new Date();
-  return now.toLocaleTimeString('en-AU', {
-    timeZone: ADELAIDE_TIMEZONE,
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false
-  });
+  return now.toTimeString().substring(0, 5); // Returns HH:MM
 }
 
 /**
- * Check if a date is today in Adelaide timezone
+ * Check if a date is today
  */
 export function isToday(date: Date | string): boolean {
   const d = typeof date === 'string' ? new Date(date) : date;
-  const today = getCurrentDateAdelaide();
-  const dateStr = d.toLocaleDateString('en-CA', { timeZone: ADELAIDE_TIMEZONE });
-  return dateStr === today;
+  const today = new Date();
+  return d.getDate() === today.getDate() &&
+    d.getMonth() === today.getMonth() &&
+    d.getFullYear() === today.getFullYear();
 }
 
 /**
- * Check if two dates are on different days in Adelaide timezone
+ * Check if two dates are on different days
  */
-export function isDifferentDayAdelaide(date1: Date | string, date2: Date | string): boolean {
+export function isDifferentDay(date1: Date | string, date2: Date | string): boolean {
   const d1 = typeof date1 === 'string' ? new Date(date1) : date1;
   const d2 = typeof date2 === 'string' ? new Date(date2) : date2;
 
-  const day1 = d1.toLocaleDateString('en-CA', { timeZone: ADELAIDE_TIMEZONE });
-  const day2 = d2.toLocaleDateString('en-CA', { timeZone: ADELAIDE_TIMEZONE });
-
-  return day1 !== day2;
+  return d1.getDate() !== d2.getDate() ||
+    d1.getMonth() !== d2.getMonth() ||
+    d1.getFullYear() !== d2.getFullYear();
 }
 
 /**
  * Format shift time with next day indicator if applicable
  */
-export function formatShiftTimeAdelaide(arriveTime: Date | string, departTime: Date | string): string {
+export function formatShiftTime(arriveTime: Date | string, departTime: Date | string): string {
   const arrive = typeof arriveTime === 'string' ? new Date(arriveTime) : arriveTime;
   const depart = typeof departTime === 'string' ? new Date(departTime) : departTime;
 
-  const arriveStr = formatTimeAdelaide(arrive);
-  const departStr = formatTimeAdelaide(depart);
+  const arriveStr = formatTime(arrive);
+  const departStr = formatTime(depart);
 
-  // Check if depart is next day in Adelaide timezone
-  const arriveDate = arrive.toLocaleDateString('en-CA', { timeZone: ADELAIDE_TIMEZONE });
-  const departDate = depart.toLocaleDateString('en-CA', { timeZone: ADELAIDE_TIMEZONE });
-
-  const isNextDay = arriveDate !== departDate;
+  // Check if depart is next day
+  const isNextDay = isDifferentDay(arrive, depart);
 
   return `${arriveStr} - ${departStr}${isNextDay ? ' +1 day' : ''}`;
 }
 
 /**
- * Get timezone offset string for Adelaide (for debugging)
+ * Get timezone offset string for Adelaide (for reference only)
  */
 export function getAdelaideTimezoneOffset(): string {
-  const now = new Date();
-  const formatter = new Intl.DateTimeFormat('en-AU', {
-    timeZone: ADELAIDE_TIMEZONE,
-    timeZoneName: 'short'
-  });
-  const parts = formatter.formatToParts(now);
-  const timeZoneName = parts.find(part => part.type === 'timeZoneName');
-  return timeZoneName?.value || 'ACDT/ACST';
+  return ADELAIDE_TIMEZONE;
 }
 
 /**
- * Convert a date to Adelaide timezone and return as ISO string
+ * Format a date for input fields (YYYY-MM-DD)
  */
-export function toAdelaideISOString(date: Date | string): string {
+export function formatDateForInput(date: Date | string): string {
   const d = typeof date === 'string' ? new Date(date) : date;
-  // Get the date/time components in Adelaide timezone
-  const year = d.toLocaleDateString('en-CA', { timeZone: ADELAIDE_TIMEZONE, year: 'numeric' });
-  const month = d.toLocaleDateString('en-CA', { timeZone: ADELAIDE_TIMEZONE, month: '2-digit' });
-  const day = d.toLocaleDateString('en-CA', { timeZone: ADELAIDE_TIMEZONE, day: '2-digit' });
-  const time = d.toLocaleTimeString('en-GB', { timeZone: ADELAIDE_TIMEZONE, hour12: false });
-
-  return `${year}-${month}-${day}T${time}`;
+  return d.toISOString().split('T')[0]; // Returns YYYY-MM-DD
 }
 
 /**
- * Convert a date to Adelaide timezone and format for datetime-local input
- * @param date - Date object to convert
- * @returns String in YYYY-MM-DDTHH:MM format representing Adelaide time
+ * Format a time for input fields (HH:MM)
  */
-export function toAdelaideDateTimeLocal(date: Date | string): string {
+export function formatTimeForInput(date: Date | string): string {
   const d = typeof date === 'string' ? new Date(date) : date;
-
-  // Get the date/time components in Adelaide timezone
-  const formatter = new Intl.DateTimeFormat('en-CA', {
-    timeZone: ADELAIDE_TIMEZONE,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false
-  });
-
-  const parts = formatter.formatToParts(d);
-  const year = parts.find(p => p.type === 'year')?.value;
-  const month = parts.find(p => p.type === 'month')?.value;
-  const day = parts.find(p => p.type === 'day')?.value;
-  const hour = parts.find(p => p.type === 'hour')?.value;
-  const minute = parts.find(p => p.type === 'minute')?.value;
-
-  return `${year}-${month}-${day}T${hour}:${minute}`;
+  return d.toTimeString().substring(0, 5); // Returns HH:MM
 }
 
 /**
- * Create a timestamp in Adelaide timezone from a date and time
- * @param date - The date (YYYY-MM-DD string or Date object)  
- * @param time - The time (HH:MM or HH:MM:SS string)
- * @returns Date object representing the time in Adelaide timezone stored as UTC
+ * Format date and time for datetime-local input fields (YYYY-MM-DDTHH:MM)
+ * Replaces the old toAdelaideDateTimeLocal function
  */
-/**
- * Format a show time range in Adelaide timezone (start_time to end_time)
- * This function is specifically for displaying performance times on the shows page
- */
-export function formatShowTimeRangeAdelaide(startTime: Date | string, endTime: Date | string): string {
-  const startTimeStr = formatTimeAdelaide(startTime);
-  const endTimeStr = formatTimeAdelaide(endTime);
+export function formatDateTimeForInput(date: Date | string): string {
+  const d = typeof date === 'string' ? new Date(date) : date;
+  const dateStr = d.toISOString().split('T')[0]; // YYYY-MM-DD
+  const timeStr = d.toTimeString().substring(0, 5); // HH:MM
+  return `${dateStr}T${timeStr}`; // YYYY-MM-DDTHH:MM
+}
 
-  // Check if start and end are on different days in Adelaide timezone
-  const isMultiDay = isDifferentDayAdelaide(startTime, endTime);
+/**
+ * Combine date string and time string into ISO format
+ * This function does NOT perform any timezone conversion
+ * @param {string} dateStr - Date string in ISO format (YYYY-MM-DD)
+ * @param {string} timeStr - Time string in 24-hour format (e.g., "14:30")
+ * @return {string} ISO string representing the date and time
+ */
+export function combineDateTimeToISO(dateStr: string, timeStr: string): string {
+  if (!timeStr || !dateStr) {
+    console.error('Missing time or date for ISO conversion');
+    return null;
+  }
+
+  try {
+    // Format: YYYY-MM-DDT18:00:00 (for 6pm)
+    return `${dateStr}T${timeStr}:00`;
+  } catch (error) {
+    console.error('Error combining date and time:', error);
+    return null;
+  }
+}
+
+/**
+ * Format a show time range (start_time to end_time)
+ */
+export function formatShowTimeRange(startTime: Date | string, endTime: Date | string): string {
+  const start = typeof startTime === 'string' ? new Date(startTime) : startTime;
+  const end = typeof endTime === 'string' ? new Date(endTime) : endTime;
+
+  const startTimeStr = formatTime(start);
+  const endTimeStr = formatTime(end);
+
+  // Check if start and end are on different days
+  const isMultiDay = isDifferentDay(start, end);
 
   return `${startTimeStr} - ${endTimeStr}${isMultiDay ? ' +1 day' : ''}`;
 }
 
 /**
- * Format performance date and time for display in the admin interface
+ * Format performance date and time for display
  * @param startTime - The performance start time
  * @param endTime - The performance end time
- * @returns Formatted string showing date and time range in Adelaide timezone
+ * @returns Formatted string showing date and time range
  */
-export function formatPerformanceAdelaide(startTime: Date | string, endTime: Date | string): string {
-  const dateStr = formatDateAdelaide(startTime);
-  const timeRangeStr = formatShowTimeRangeAdelaide(startTime, endTime);
+export function formatPerformance(startTime: Date | string, endTime: Date | string): string {
+  const dateStr = formatDate(startTime);
+  const timeRangeStr = formatShowTimeRange(startTime, endTime);
 
   return `${dateStr}, ${timeRangeStr}`;
 }
 
+/**
+ * Generate SQL fragment for selecting a timestamptz column as Adelaide time
+ * 
+ * @param {string} columnName - The name of the timestamptz column
+ * @param {string} [alias=null] - Optional alias for the result column
+ * @return {string} SQL fragment for the query
+ */
+export function getAdelaideTimeSelectSQL(columnName: string, alias?: string): string {
+  const resultAlias = alias || columnName;
+  return `${columnName} AT TIME ZONE '${ADELAIDE_TIMEZONE}' AS ${resultAlias}`;
+}
+
+/**
+ * Generate SQL parameter placeholder for inserting Adelaide timezone
+ * 
+ * @param {string} paramName - Parameter placeholder (e.g., '$1', ':time')
+ * @return {string} SQL fragment for parameterized query
+ */
+export function getAdelaideTimeParameterSQL(paramName: string): string {
+  return `TIMESTAMP ${paramName} AT TIME ZONE '${ADELAIDE_TIMEZONE}'`;
+}
+
+/**
+ * Generate SQL for inserting a timestamp that will be treated as Adelaide time
+ * Use this in INSERT/UPDATE queries
+ * 
+ * @param {string|Date} date - Date in YYYY-MM-DD format or Date object
+ * @param {string} time - Time in HH:MM or HH:MM:SS format
+ * @return {string} SQL fragment for inserting timestamp in Adelaide timezone
+ */
+export function getAdelaideTimeInsertSQL(date: Date | string, time: string): string {
+  const dateStr = typeof date === 'string' ? date : date.toISOString().slice(0, 10);
+  const timeStr = time.includes(':') ? time : `${time}:00`;
+
+  return `TIMESTAMP '${dateStr} ${timeStr}' AT TIME ZONE '${ADELAIDE_TIMEZONE}'`;
+}
+
+/**
+ * Creates a parameter object for inserting Adelaide timestamps in PostgreSQL
+ * 
+ * @param {string|Date} date - Date in YYYY-MM-DD format or Date object
+ * @param {string} time - Time in HH:MM or HH:MM:SS format
+ * @return {Object} Parameter object for use with postgres client
+ */
 export function createAdelaideTimestamp(date: Date | string, time: string): Date {
   const dateStr = typeof date === 'string' ? date : date.toISOString().slice(0, 10);
+  const timeStr = time.includes(':') ? time : `${time}:00`;
 
-  // Parse the components
+  // Create timestamp string in format that PostgreSQL expects
+  const timestamp = `${dateStr} ${timeStr}`;
+
+  // This function should just create a JavaScript Date object that will be 
+  // treated as Adelaide time in PostgreSQL when using AT TIME ZONE
   const [year, month, day] = dateStr.split('-').map(Number);
+  const [hours, minutes, seconds = 0] = timeStr.split(':').map(Number);
 
-  // Parse the components - handle both HH:MM and HH:MM:SS formats
-  const timeParts = time.split(':').map(Number);
-  const [hours, minutes, seconds = 0] = timeParts; // Default seconds to 0 if not provided
-
-  console.log(`Creating Adelaide timestamp for: ${year}-${month}-${day} ${hours}:${minutes}:${seconds}`);
-
-  // Create a temporary date object representing the desired Adelaide time
-  // We need to convert this to UTC time for storage in the database
-
-  // First, create a date object in UTC with the same year, month, day, hour, minute
-  // This creates a UTC timestamp
-  const utcDate = new Date(Date.UTC(year, month - 1, day, hours, minutes, seconds));
-
-  // Now, get the difference between Adelaide time and UTC
-  // This gives us how many hours to subtract from the Adelaide time to get UTC
-  const adelaideDate = new Date(year, month - 1, day, hours, minutes, seconds);
-  adelaideDate.setSeconds(0, 0);
-
-  // Format both dates to see the difference
-  console.log(`Adelaide date (local): ${adelaideDate.toISOString()}`);
-  console.log(`UTC date: ${utcDate.toISOString()}`);
-
-  // Create a formatter to show Adelaide time
-  const adelaideTZFormatter = new Intl.DateTimeFormat('en-AU', {
-    timeZone: ADELAIDE_TIMEZONE,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false
-  });
-
-  // Get the exact offset between Adelaide and UTC for this specific date
-  const targetAdelaideString = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')} ${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-
-  // Calculate the UTC time that, when displayed in Adelaide, will show the target time
-  // Adelaide is typically UTC+9:30 or UTC+10:30 depending on daylight saving time
-
-  // Start with an estimate: subtract ~10 hours from the Adelaide time to get UTC
-  // The exact offset varies based on daylight saving time
-  const estimatedOffset = 10 * 60 * 60 * 1000; // 10 hours in milliseconds
-  let estimatedUtcTime = new Date(adelaideDate.getTime() - estimatedOffset);
-
-  // Check if our estimate is correct by displaying it in Adelaide time
-  const adelaideView = adelaideTZFormatter.format(estimatedUtcTime).replace(/\//g, '-');
-  console.log(`Estimated UTC time: ${estimatedUtcTime.toISOString()}`);
-  console.log(`This displays as ${adelaideView} in Adelaide`);
-
-  // If needed, refine this estimate using binary search to get the exact UTC time
-  // that will display as the target Adelaide time
-
-  // Binary search with a maximum of 10 iterations should be sufficient
-  let low = estimatedUtcTime.getTime() - (2 * 60 * 60 * 1000); // 2 hours earlier
-  let high = estimatedUtcTime.getTime() + (2 * 60 * 60 * 1000); // 2 hours later
-
-  for (let i = 0; i < 10; i++) {
-    const mid = Math.floor((low + high) / 2);
-    const testDate = new Date(mid);
-
-    const testAdelaideView = adelaideTZFormatter.format(testDate).replace(/\//g, '-');
-
-    if (testAdelaideView === targetAdelaideString) {
-      console.log(`Found exact match at UTC time: ${testDate.toISOString()}`);
-      console.log(`This displays as ${testAdelaideView} in Adelaide`);
-      return testDate;
-    }
-
-    // Compare the formatted strings - if our test time is earlier than target in Adelaide,
-    // we need to increase our UTC time
-    if (testAdelaideView < targetAdelaideString) {
-      low = mid + 1000; // Add 1 second
-    } else {
-      high = mid - 1000; // Subtract 1 second
-    }
-  }
-
-  // Use the best approximation we found
-  const result = new Date(Math.floor((low + high) / 2));
-  const finalAdelaideView = adelaideTZFormatter.format(result).replace(/\//g, '-');
-
-  console.log(`Final UTC time: ${result.toISOString()}`);
-  console.log(`This displays as ${finalAdelaideView} in Adelaide`);
-
-  return result;
+  // Create a date object with the given components
+  return new Date(year, month - 1, day, hours, minutes, seconds);
 }

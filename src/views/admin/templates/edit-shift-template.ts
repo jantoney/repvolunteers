@@ -1,5 +1,5 @@
 import { getAdminNavigation, getAdminStyles } from "../components/navigation.ts";
-import { toAdelaideDateTimeLocal, formatDateAdelaide, formatTimeAdelaide } from "../../../utils/timezone.ts";
+import { formatDateTimeForInput, formatDate, formatTime } from "../../../utils/timezone.ts";
 
 export interface ShowDate {
   id: number;
@@ -57,7 +57,7 @@ export function renderEditShiftTemplate(data: EditShiftPageData): string {
               <select id="show_date_id" name="show_date_id" required>
                 ${showDates.map(showDate => 
                   `<option value="${showDate.id}" ${showDate.id === shift.show_date_id ? 'selected' : ''}>
-                    ${showDate.show_name} - ${formatDateAdelaide(showDate.date)} (${formatTimeAdelaide(showDate.start_time)} - ${formatTimeAdelaide(showDate.end_time)})
+                    ${showDate.show_name} - ${formatDate(showDate.date)} (${formatTime(showDate.start_time)} - ${formatTime(showDate.end_time)})
                   </option>`
                 ).join('')}
               </select>
@@ -70,13 +70,13 @@ export function renderEditShiftTemplate(data: EditShiftPageData): string {
               <div class="form-group">
               <label for="arrive_time">Arrive Time:</label>
               <input type="datetime-local" id="arrive_time" name="arrive_time" 
-                     value="${toAdelaideDateTimeLocal(shift.arrive_time)}" required>
+                     value="${formatDateTimeForInput(shift.arrive_time)}" required>
             </div>
             
             <div class="form-group">
               <label for="depart_time">Depart Time:</label>
               <input type="datetime-local" id="depart_time" name="depart_time" 
-                     value="${toAdelaideDateTimeLocal(shift.depart_time)}" required>
+                     value="${formatDateTimeForInput(shift.depart_time)}" required>
             </div>
             
             <div class="form-actions">

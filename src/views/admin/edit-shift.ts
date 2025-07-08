@@ -9,7 +9,7 @@ export async function showEditShiftForm(ctx: RouterContext<string>) {
   
   try {
     const [shiftResult, showDatesResult] = await Promise.all([
-      client.queryObject<Shift>("SELECT id, show_date_id, role, arrive_time, depart_time FROM shifts WHERE id=$1", [id]),
+      client.queryObject<Shift>("SELECT id, show_date_id, role, arrive_time AT TIME ZONE 'Australia/Adelaide' as arrive_time, depart_time AT TIME ZONE 'Australia/Adelaide' as depart_time FROM shifts WHERE id=$1", [id]),
       client.queryObject<ShowDate>(
         `SELECT sd.id, s.name as show_name, DATE(sd.start_time) as date, sd.start_time, sd.end_time 
          FROM show_dates sd 

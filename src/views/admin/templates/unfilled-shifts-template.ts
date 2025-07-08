@@ -1,5 +1,5 @@
 import { getAdminNavigation, getAdminStyles } from "../components/navigation.ts";
-import { formatDateAdelaide, formatTimeAdelaide, isDifferentDayAdelaide } from "../../../utils/timezone.ts";
+import { formatDate, formatTime, isDifferentDay } from "../../../utils/timezone.ts";
 
 export interface UnfilledShift {
   id: number;
@@ -127,16 +127,16 @@ export function renderUnfilledShiftsTemplate(data: UnfilledShiftsPageData): stri
                 <div class="performance-header">
                   <h3 class="performance-title">${firstShift.show_name}</h3>
                   <p class="performance-details">
-                    ${formatDateAdelaide(new Date(firstShift.date))} | 
+                    ${formatDate(new Date(firstShift.date))} | 
                     Show: ${firstShift.show_start} - ${firstShift.show_end}
                   </p>
                 </div>
                 
                 <div class="shifts-grid">
                   ${shiftsGroup.map(shift => {
-                    const arriveTime = formatTimeAdelaide(shift.arrive_time);
-                    const departTime = formatTimeAdelaide(shift.depart_time);
-                    const isNextDay = isDifferentDayAdelaide(shift.arrive_time, shift.depart_time);
+                    const arriveTime = formatTime(shift.arrive_time);
+                    const departTime = formatTime(shift.depart_time);
+                    const isNextDay = isDifferentDay(shift.arrive_time, shift.depart_time);
                     
                     return `
                       <div class="shift-card">

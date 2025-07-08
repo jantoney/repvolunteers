@@ -13,14 +13,14 @@ function toggleMobileMenu() {
 }
 
 // Close mobile menu when clicking outside
-document.addEventListener('click', function(event) {
+document.addEventListener('click', function (event) {
   const navMenu = document.getElementById('navMenu');
   const toggle = document.querySelector('.mobile-menu-toggle');
-  
+
   if (navMenu && toggle && !navMenu.contains(event.target) && !toggle.contains(event.target)) {
     navMenu.classList.remove('active');
   }
-  
+
   // Close mobile dropdowns when clicking outside
   const dropdowns = document.querySelectorAll('.dropdown');
   dropdowns.forEach(dropdown => {
@@ -48,8 +48,8 @@ async function initCalendar() {
 
 async function loadAvailableShows() {
   try {
-    const response = await fetch('/admin/api/shifts/calendar-shows', { 
-      credentials: 'include' 
+    const response = await fetch('/admin/api/shifts/calendar-shows', {
+      credentials: 'include'
     });
     if (response.ok) {
       availableShows = await response.json();
@@ -67,12 +67,12 @@ async function loadAvailableShows() {
 function renderShowCheckboxes() {
   const container = document.getElementById('showCheckboxes');
   if (!container) return;
-  
+
   if (availableShows.length === 0) {
     container.innerHTML = '<p style="color: #666; margin: 0;">No shows with shifts found.</p>';
     return;
   }
-  
+
   container.innerHTML = availableShows.map(show => `
     <div class="show-checkbox">
       <input type="checkbox" id="show-${show.id}" value="${show.id}" 
@@ -109,8 +109,8 @@ async function loadShiftData() {
   try {
     const showsParam = selectedShows.length > 0 ? `?shows=${selectedShows.join(',')}` : '';
     console.log('Loading shift data with params:', showsParam);
-    const response = await fetch(`/admin/api/shifts/calendar-data${showsParam}`, { 
-      credentials: 'include' 
+    const response = await fetch(`/admin/api/shifts/calendar-data${showsParam}`, {
+      credentials: 'include'
     });
     if (response.ok) {
       const data = await response.json();
@@ -134,15 +134,19 @@ async function loadShiftData() {
 function renderCalendar() {
   const calendar = document.getElementById('calendar');
   const monthSpan = document.getElementById('currentMonth');
-  
+
   if (!calendar || !monthSpan) return;
-  
+
   // Clear calendar
   calendar.innerHTML = '';
-  
-  // Set month header using AdelaideTime utility
-  monthSpan.textContent = AdelaideTime.getMonthYearAdelaide(currentDate);
-  
+
+  // Set month header using native JS
+  const monthNames = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+  ];
+  monthSpan.textContent = `${monthNames[currentDate.getMonth()]} ${currentDate.getFullYear()}`;
+
   // Add day headers
   const dayHeaders = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   dayHeaders.forEach(day => {
@@ -151,42 +155,48 @@ function renderCalendar() {
     header.textContent = day;
     calendar.appendChild(header);
   });
-    // Get first day of month and number of days
+  // Get first day of month and number of days
   const firstDay = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
   const startDate = new Date(firstDay);
   startDate.setDate(startDate.getDate() - firstDay.getDay());
-  
+
   // Generate calendar days
   for (let i = 0; i < 42; i++) {
     const date = new Date(startDate);
     date.setDate(startDate.getDate() + i);
-    
+
     const dayElement = document.createElement('div');
     dayElement.className = 'calendar-day';
-    
+
     const isCurrentMonth = date.getMonth() === currentDate.getMonth();
-    const isToday = AdelaideTime.isTodayAdelaide(date);
-    
+    const today = new Date();
+    const isToday = date.getDate() === today.getDate() &&
+      date.getMonth() === today.getMonth() &&
+      date.getFullYear() === today.getFullYear();
+
     if (!isCurrentMonth) {
       dayElement.classList.add('other-month');
     }
     if (isToday) {
       dayElement.classList.add('today');
     }
-    
+
     // Add day number
     const dayNumber = document.createElement('div');
     dayNumber.className = 'day-number';
     dayNumber.textContent = date.getDate();
     dayElement.appendChild(dayNumber);
-    
+
     // Add shift information if available
-    const dateStr = date.toISOString().split('T')[0];
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const dateStr = `${year}-${month}-${day}`;
     const shifts = shiftData.get(dateStr);
-    
+
     if (shifts && shifts.total > 0) {
       dayElement.classList.add('has-shifts');
-      
+
       // Determine status color
       if (shifts.filled === shifts.total) {
         // All shifts filled - keep default green
@@ -195,24 +205,24 @@ function renderCalendar() {
       } else {
         dayElement.classList.add('unfilled');
       }
-      
+
       // Add shift indicator
       const indicator = document.createElement('div');
       indicator.className = 'shift-indicator';
-      
+
       const countDiv = document.createElement('div');
       countDiv.className = 'shift-count';
       countDiv.textContent = `(${shifts.filled}/${shifts.total})`;
-      
+
       const showsDiv = document.createElement('div');
       showsDiv.className = 'shift-shows';
       showsDiv.textContent = shifts.shows;
       showsDiv.title = shifts.shows; // Full text on hover
-      
+
       indicator.appendChild(countDiv);
       indicator.appendChild(showsDiv);
       dayElement.appendChild(indicator);
-      
+
       // Add click handler to go to shifts page
       dayElement.addEventListener('click', () => {
         // Navigate to shifts page filtered by this date and selected shows
@@ -226,7 +236,7 @@ function renderCalendar() {
       });
       dayElement.style.cursor = 'pointer';
     }
-    
+
     calendar.appendChild(dayElement);
   }
 }
@@ -258,7 +268,7 @@ document.addEventListener('DOMContentLoaded', () => {
   checkAuth();
   initCalendar();
   loadCounters();
-  
+
   // Add logout handler - the navigation component uses a link, so we need to handle it differently
   const logoutBtn = document.querySelector('.logout-btn');
   if (logoutBtn) {
@@ -289,8 +299,8 @@ async function loadCounters() {
 
 async function loadUnfilledShiftsCount() {
   try {
-    const response = await fetch('/admin/api/unfilled-shifts/count', { 
-      credentials: 'include' 
+    const response = await fetch('/admin/api/unfilled-shifts/count', {
+      credentials: 'include'
     });
     if (response.ok) {
       const data = await response.json();
@@ -308,8 +318,8 @@ async function loadUnfilledShiftsCount() {
 
 async function loadPerformancesWithoutShiftsCount() {
   try {
-    const response = await fetch('/admin/api/performances-without-shifts/count', { 
-      credentials: 'include' 
+    const response = await fetch('/admin/api/performances-without-shifts/count', {
+      credentials: 'include'
     });
     if (response.ok) {
       const data = await response.json();

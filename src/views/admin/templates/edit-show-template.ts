@@ -1,5 +1,5 @@
 import { getAdminNavigation, getAdminStyles } from "../components/navigation.ts";
-import { formatDateAdelaide, toAdelaideDateTimeLocal } from "../../../utils/timezone.ts";
+import { formatDate, formatDateTimeForInput } from "../../../utils/timezone.ts";
 
 export interface Show {
   id: number;
@@ -88,17 +88,17 @@ export function renderEditShowTemplate(data: EditShowPageData): string {
               showDates.map(date => `
                 <div class="show-date-item" data-date-id="${date.id}">
                   <div class="show-date-header">
-                    <strong>${formatDateAdelaide(date.start_time)}</strong>
+                    <strong>${formatDate(date.start_time)}</strong>
                     <button type="button" class="btn btn-danger btn-sm" onclick="deleteShowDate(${date.id})">Delete</button>
                   </div>
                   <div class="time-group">
                     <div class="form-group">
                       <label>Start Date & Time:</label>
-                      <input type="datetime-local" id="start_${date.id}" value="${toAdelaideDateTimeLocal(date.start_time)}" onchange="updateShowDate(${date.id})">
+                      <input type="datetime-local" id="start_${date.id}" value="${formatDateTimeForInput(date.start_time)}" onchange="updateShowDate(${date.id})">
                     </div>
                     <div class="form-group">
                       <label>End Date & Time:</label>
-                      <input type="datetime-local" id="end_${date.id}" value="${toAdelaideDateTimeLocal(date.end_time)}" onchange="updateShowDate(${date.id})">
+                      <input type="datetime-local" id="end_${date.id}" value="${formatDateTimeForInput(date.end_time)}" onchange="updateShowDate(${date.id})">
                     </div>
                   </div>
                 </div>

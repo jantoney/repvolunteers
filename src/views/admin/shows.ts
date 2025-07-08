@@ -1,6 +1,6 @@
 import type { RouterContext } from "oak";
 import { getPool } from "../../models/db.ts";
-import { formatDateAdelaide, formatShowTimeRangeAdelaide, formatPerformanceAdelaide } from "../../utils/timezone.ts";
+import { formatDate } from "../../utils/timezone.ts";
 import { getAdminNavigation, getAdminStyles, getAdminScripts } from "./components/navigation.ts";
 
 export interface Show {
@@ -140,8 +140,8 @@ export function renderShowsTemplate(data: ShowsPageData): string {
                       <td>
                         ${show.first_date && show.last_date ?
         (show.first_date.getTime() === show.last_date.getTime() ?
-          formatDateAdelaide(show.first_date) :
-          `${formatDateAdelaide(show.first_date)} - ${formatDateAdelaide(show.last_date)}`
+          formatDate(show.first_date) :
+          `${formatDate(show.first_date)} - ${formatDate(show.last_date)}`
         ) : 'No dates set'
       }
                       </td>
@@ -173,13 +173,16 @@ export function renderShowsTemplate(data: ShowsPageData): string {
       <script src="/src/utils/timezone-client.js"></script>
       ${getAdminScripts()}
       <script>
+        // Global variable for tracking expanded shows
+        var expandedShows = new Set();
+        
         // Display and update current Adelaide time
         function updateAdelaideTime() {
           const timeElement = document.getElementById('currentAdelaideTime');
           if (timeElement) {
-            const adelaideTZ = AdelaideTime.getAdelaideTimezoneOffset();
+            const adelaideTZ = DateTimeFormat.ADELAIDE_TIMEZONE;
             const now = new Date();
-            const adelaideTime = AdelaideTime.formatDateTimeAdelaide(now);
+            const adelaideTime = DateTimeFormat.formatDateTime(now);
             timeElement.textContent = "Current time: " + adelaideTime + " " + adelaideTZ;
           }
         }
@@ -188,9 +191,8 @@ export function renderShowsTemplate(data: ShowsPageData): string {
         updateAdelaideTime();
         setInterval(updateAdelaideTime, 60000);
         
-        const expandedShows = new Set();
-        
-        async function toggleDates(showId) {
+        // Global function for toggling show dates
+        window.toggleDates = async function(showId) {
           const row = document.getElementById(\`dates-\${showId}\`);
           const content = document.getElementById(\`dates-content-\${showId}\`);
           
@@ -235,8 +237,8 @@ export function renderShowsTemplate(data: ShowsPageData): string {
                             
                             return \`
                               <tr>
-                                <td style="padding: 0.5rem; border: none;">\${AdelaideTime.formatDateAdelaide(new Date(date.start_time))}</td>
-                                <td style="padding: 0.5rem; border: none;">\${AdelaideTime.formatShowTimeRangeAdelaide(new Date(date.start_time), new Date(date.end_time))}</td>
+                                <td style="padding: 0.5rem; border: none;">\${DateTimeFormat.formatDate(new Date(date.start_time))}</td>
+                                <td style="padding: 0.5rem; border: none;">\${DateTimeFormat.formatShowTimeRange(new Date(date.start_time), new Date(date.end_time))}</td>
                                 <td style="padding: 0.5rem; border: none;">
                                   <span class="traffic-light \${trafficColor}" style="width: 16px; height: 16px; margin-right: 6px;" 
                                         title="\${date.total_shifts > 0 ? date.filled_shifts + '/' + date.total_shifts + ' filled' : 'No shifts'}"></span>
@@ -244,7 +246,7 @@ export function renderShowsTemplate(data: ShowsPageData): string {
                                 </td>
                                 <td style="padding: 0.5rem; border: none;">
                                   \${date.total_shifts > 0 ? 
-                                    \`<a href="/admin/shifts?shows=\${showId}&date=\${AdelaideTime.dateToStringAdelaide(new Date(date.start_time))}" class="performance-link">View Shifts</a>\` : 
+                                    \`<a href="/admin/shifts?shows=\${showId}&date=\${DateTimeFormat.formatDateForInput(new Date(date.start_time))}" class="performance-link">View Shifts</a>\` : 
                                     '<span style="color: #6c757d;">No shifts</span>'
                                   }
                                 </td>
@@ -266,7 +268,8 @@ export function renderShowsTemplate(data: ShowsPageData): string {
           }
         }
         
-        async function deleteShow(id, name) {
+        // Global function for deleting shows
+        window.deleteShow = async function(id, name) {
           if (!confirm(\`Are you sure you want to delete the show "\${name}"? This will also delete all associated performance dates and shifts.\`)) {
             return;
           }

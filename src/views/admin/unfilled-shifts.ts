@@ -19,7 +19,8 @@ export async function showUnfilledShiftsPage(ctx: RouterContext<string>) {
     }>(
       `SELECT s.id, s.show_date_id, sh.name as show_name, DATE(sd.start_time) as date,
               sd.start_time as show_start, sd.end_time as show_end,
-              s.role, s.arrive_time, s.depart_time
+              s.role, s.arrive_time AT TIME ZONE 'Australia/Adelaide' as arrive_time, 
+              s.depart_time AT TIME ZONE 'Australia/Adelaide' as depart_time
        FROM shifts s
        JOIN show_dates sd ON sd.id = s.show_date_id
        JOIN shows sh ON sh.id = sd.show_id

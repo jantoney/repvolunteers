@@ -248,10 +248,8 @@ export function renderVolunteersTemplate(data: VolunteersPageData): string {
                 if (shifts.length > 0) {
                   // Show modal with shift details
                   const shiftsList = shifts.map(shift => {
-                    // Format dates properly for Adelaide timezone
-                    const shiftDate = typeof AdelaideTime !== 'undefined' ? 
-                      AdelaideTime.formatDateAdelaide(shift.date) : 
-                      new Date(shift.date).toLocaleDateString('en-AU');
+                    // Use date string directly without timezone conversion
+                    const shiftDate = shift.date;
                     
                     return \`<li>• \${shift.show_name} - \${shift.role} (\${shiftDate} at \${shift.time})</li>\`;
                   }).join('');

@@ -366,7 +366,6 @@ export function renderDashboardTemplate(): string {
       </div>
 
       <!-- Include required JavaScript files -->
-      <script src="/src/utils/timezone-client.js"></script>
       <script src="/src/views/admin/dashboard.js"></script>
     </body>
     </html>

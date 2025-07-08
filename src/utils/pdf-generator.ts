@@ -4,7 +4,7 @@
  */
 
 import { getPool } from "../models/db.ts";
-import { formatDateTimeAdelaide } from "./timezone.ts";
+import { formatDateTime } from "./timezone.ts";
 
 export interface ShiftData {
   show_name: string;
@@ -151,7 +151,8 @@ export async function generateVolunteerPDFData(volunteerId: string): Promise<PDF
 
     // Get assigned shifts
     const assignedShiftsRes = await client.queryObject<ShiftRow>(
-      `SELECT s.id, s.role, s.arrive_time, s.depart_time, s.show_date_id,
+      `SELECT s.id, s.role, s.arrive_time AT TIME ZONE 'Australia/Adelaide' as arrive_time, 
+              s.depart_time AT TIME ZONE 'Australia/Adelaide' as depart_time, s.show_date_id,
               sh.name as show_name, sh.id as show_id, DATE(sd.start_time) as show_date, sd.start_time, sd.end_time
        FROM shifts s
        JOIN show_dates sd ON sd.id = s.show_date_id
@@ -164,7 +165,8 @@ export async function generateVolunteerPDFData(volunteerId: string): Promise<PDF
 
     // Get available shifts (not assigned to this volunteer)
     const shiftsRes = await client.queryObject<ShiftRow>(
-      `SELECT s.id, s.role, s.arrive_time, s.depart_time, s.show_date_id,
+      `SELECT s.id, s.role, s.arrive_time AT TIME ZONE 'Australia/Adelaide' as arrive_time, 
+              s.depart_time AT TIME ZONE 'Australia/Adelaide' as depart_time, s.show_date_id,
               sh.name as show_name, sh.id as show_id, DATE(sd.start_time) as show_date, sd.start_time, sd.end_time
        FROM shifts s
        JOIN show_dates sd ON sd.id = s.show_date_id
@@ -175,11 +177,28 @@ export async function generateVolunteerPDFData(volunteerId: string): Promise<PDF
       [volunteerId]
     );
 
+    // Ensure show_date is always a string in YYYY-MM-DD format
+    const normalizeDate = (d: unknown) => {
+      if (!d) return '';
+      if (typeof d === 'string') return d.length > 10 ? d.split('T')[0] : d;
+      if (d instanceof Date) return d.toISOString().split('T')[0];
+      return String(d);
+    };
+
+    const assignedShifts = assignedShiftsRes.rows.map(shift => ({
+      ...shift,
+      show_date: normalizeDate(shift.show_date)
+    }));
+    const availableShifts = shiftsRes.rows.map(shift => ({
+      ...shift,
+      show_date: normalizeDate(shift.show_date)
+    }));
+
     return {
       volunteer: volunteerRes.rows[0],
-      assignedShifts: assignedShiftsRes.rows,
-      availableShifts: shiftsRes.rows,
-      generatedAt: formatDateTimeAdelaide(new Date())
+      assignedShifts,
+      availableShifts,
+      generatedAt: formatDateTime(new Date())
     };
   } finally {
     client.release();
@@ -203,164 +222,166 @@ function generateVolunteerScheduleHTMLContent(data: PDFData): string {
   return `<!DOCTYPE html>
 <html>
 <head>
-    <meta charset="UTF-8">
-    <title>Theatre Shifts Schedule - ${volunteer.name}</title>
-    <style>
-        body { 
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif; 
-            margin: 40px; 
-            line-height: 1.6; 
-            color: #333;
-        }
-        .header { 
-            text-align: center; 
-            border-bottom: 3px solid #007bff; 
-            padding-bottom: 20px; 
-            margin-bottom: 30px; 
-        }
-        .header h1 { 
-            color: #007bff; 
-            margin: 0; 
-            font-size: 28px; 
-        }
-        .header h2 { 
-            color: #666; 
-            margin: 5px 0; 
-            font-size: 18px; 
-            font-weight: normal; 
-        }
-        .volunteer-info { 
-            background: #f8f9fa; 
-            padding: 20px; 
-            border-radius: 8px; 
-            margin-bottom: 30px; 
-        }
-        .volunteer-info h3 { 
-            margin: 0 0 15px 0; 
-            color: #333; 
-        }
-        .volunteer-info p { 
-            margin: 5px 0; 
-        }
-        .shifts-section h3 { 
-            color: #333; 
-            border-bottom: 2px solid #007bff; 
-            padding-bottom: 10px; 
-        }
-        .shift { 
-            background: #fff; 
-            border: 1px solid #ddd; 
-            border-radius: 6px; 
-            padding: 15px; 
-            margin-bottom: 15px; 
-            break-inside: avoid;
-        }
-        .shift-header { 
-            font-weight: bold; 
-            color: #007bff; 
-            font-size: 16px; 
-            margin-bottom: 8px; 
-        }
-        .shift-details { 
-            color: #555; 
-        }
-        .shift-details div { 
-            margin: 3px 0; 
-        }
-        .no-shifts { 
-            background: #fff3cd; 
-            border: 1px solid #ffc107; 
-            border-radius: 6px; 
-            padding: 20px; 
-            text-align: center; 
-            color: #856404; 
-        }
-        .footer { 
-            margin-top: 40px; 
-            padding-top: 20px; 
-            border-top: 2px solid #eee; 
-            font-size: 12px; 
-            color: #666; 
-        }
-        .important { 
-            background: #e3f2fd; 
-            border: 1px solid #2196f3; 
-            border-radius: 6px; 
-            padding: 15px; 
-            margin-top: 30px; 
-        }
-        .important h4 { 
-            margin: 0 0 10px 0; 
-            color: #1976d2; 
-        }
-        .important ul { 
-            margin: 10px 0; 
-            padding-left: 20px; 
-        }
-        @media print {
-            body { margin: 20px; }
-            .header { page-break-after: avoid; }
-            .shift { page-break-inside: avoid; }
-        }
-    </style>
+Shift Times: 14:45 - 16:15 +1 day (+1d) | FOH Manager
+  <meta charset="UTF-8">
+  <title>Theatre Shifts Schedule - ${volunteer.name}</title>
+  <style>
+    body { 
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif; 
+      margin: 40px; 
+      line-height: 1.6; 
+      color: #333;
+    }
+    .header { 
+      text-align: center; 
+      border-bottom: 3px solid #007bff; 
+      padding-bottom: 20px; 
+      margin-bottom: 30px; 
+    }
+    .header h1 { 
+      color: #007bff; 
+      margin: 0; 
+      font-size: 28px; 
+    }
+    .header h2 { 
+      color: #666; 
+      margin: 5px 0; 
+      font-size: 18px; 
+      font-weight: normal; 
+    }
+    .volunteer-info { 
+      background: #f8f9fa; 
+      padding: 20px; 
+      border-radius: 8px; 
+      margin-bottom: 30px; 
+    }
+    .volunteer-info h3 { 
+      margin: 0 0 15px 0; 
+      color: #333; 
+    }
+    .volunteer-info p { 
+      margin: 5px 0; 
+    }
+    .shifts-section h3 { 
+      color: #333; 
+      border-bottom: 2px solid #007bff; 
+      padding-bottom: 10px; 
+    }
+    .shift { 
+      background: #fff; 
+      border: 1px solid #ddd; 
+      border-radius: 6px; 
+      padding: 15px; 
+      margin-bottom: 15px; 
+      break-inside: avoid;
+    }
+    .shift-header { 
+      font-weight: bold; 
+      color: #007bff; 
+      font-size: 16px; 
+      margin-bottom: 8px; 
+    }
+    .shift-details { 
+      color: #555; 
+    }
+    .shift-details div { 
+      margin: 3px 0; 
+    }
+    .no-shifts { 
+      background: #fff3cd; 
+      border: 1px solid #ffc107; 
+      border-radius: 6px; 
+      padding: 20px; 
+      text-align: center; 
+      color: #856404; 
+    }
+    .footer { 
+      margin-top: 40px; 
+      padding-top: 20px; 
+      border-top: 2px solid #eee; 
+      font-size: 12px; 
+      color: #666; 
+    }
+    .important { 
+      background: #e3f2fd; 
+      border: 1px solid #2196f3; 
+      border-radius: 6px; 
+      padding: 15px; 
+      margin-top: 30px; 
+    }
+    .important h4 { 
+      margin: 0 0 10px 0; 
+      color: #1976d2; 
+    }
+    .important ul { 
+      margin: 10px 0; 
+      padding-left: 20px; 
+    }
+    @media print {
+      body { margin: 20px; }
+      .header { page-break-after: avoid; }
+      .shift { page-break-inside: avoid; }
+    }
+  </style>
 </head>
 <body>
-    <div class="header">
-        <h1>🎭 Theatre Shifts</h1>
-        <h2>Volunteer Schedule</h2>
-    </div>
+  <div class="header">
+    <h1>🎭 Theatre Shifts</h1>
+    <h2>Volunteer Schedule</h2>
+  </div>
     
-    <div class="volunteer-info">
-        <h3>Volunteer Information</h3>
-        <p><strong>Name:</strong> ${volunteer.name}</p>
-        ${volunteer.email ? `<p><strong>Email:</strong> ${volunteer.email}</p>` : ''}
-        ${volunteer.phone ? `<p><strong>Phone:</strong> ${volunteer.phone}</p>` : ''}
-        <p><strong>Generated:</strong> ${generatedAt}</p>
-        <p><strong>For updates visit:</strong> ${Deno.env.get('BASE_URL') || 'https://theatre-shifts.com'}/volunteer/signup/${volunteer.id}</p>
-    </div>
+  <div class="volunteer-info">
+    <h3>Volunteer Information</h3>
+    <p><strong>Name:</strong> ${volunteer.name}</p>
+    ${volunteer.email ? `<p><strong>Email:</strong> ${volunteer.email}</p>` : ''}
+    ${volunteer.phone ? `<p><strong>Phone:</strong> ${volunteer.phone}</p>` : ''}
+    <p><strong>Generated:</strong> ${generatedAt}</p>
+    <p><strong>For updates visit:</strong> ${Deno.env.get('BASE_URL')}/volunteer/signup/${volunteer.id} || 'https://theatre-shifts.com/volunteer/signup/${volunteer.id}'</p>
+  </div>
 
-    <div class="shifts-section">
-        <h3>Assigned Shifts (${currentAndFutureShifts.length} total)</h3>
-        ${currentAndFutureShifts.length > 0 ?
-      currentAndFutureShifts.map((shift, index) => {
-        const date = formatDateForDisplay(shift.show_date);
-        const arriveTime = formatTimeForDisplay(shift.arrive_time);
-        const departTime = formatTimeForDisplay(shift.depart_time);
+  <div class="shifts-section">
+    <h3>Assigned Shifts (${currentAndFutureShifts.length} total)</h3>
+    ${currentAndFutureShifts.length > 0 ?
+    currentAndFutureShifts.map((shift, index) => {
+    // Use arrive_time for date and time, depart_time for end time
+    const date = formatDateForDisplay(shift.arrive_time);
+    const arriveTime = formatTimeForDisplay(shift.arrive_time);
+    const departTime = formatTimeForDisplay(shift.depart_time);
 
-        return `
-        <div class="shift">
-            <div class="shift-header">${index + 1}. ${shift.show_name}</div>
-            <div class="shift-details">
-                <div><strong>Date:</strong> ${date}</div>
-                <div><strong>Call Time:</strong> ${arriveTime}</div>
-                <div><strong>End Time:</strong> ${departTime}</div>
-                <div><strong>Role:</strong> ${shift.role}</div>
-            </div>
-        </div>`;
-      }).join('') :
-      `
-        <div class="no-shifts">
-            <p><strong>No shifts assigned</strong></p>
-            <p>You don't have any shifts assigned for the current month and future dates.<br>
-            Please visit the online schedule to sign up for available shifts.</p>
-        </div>`
-    }
-    </div>
+    return `
+    <div class="shift">
+      <div class="shift-header">${index + 1}. ${shift.show_name}</div>
+      <div class="shift-details">
+        <div><strong>Date:</strong> ${date}</div>
+        <div><strong>Call Time:</strong> ${arriveTime}</div>
+        <div><strong>End Time:</strong> ${departTime}</div>
+        <div><strong>Role:</strong> ${shift.role}</div>
+      </div>
+    </div>`;
+    }).join('') :
+    `
+    <div class="no-shifts">
+      <p><strong>No shifts assigned</strong></p>
+      <p>You don't have any shifts assigned for the current month and future dates.<br>
+      Please visit the online schedule to sign up for available shifts.</p>
+    </div>`
+  }
+  </div>
     
-    <div class="important">
-        <h4>Important Information</h4>
-        <ul>
-            <li>Please arrive 15 minutes before your call time</li>
-            <li>Contact the theatre if you cannot make your shift</li>
-            <li>Check the online schedule regularly for updates</li>
-            <li>All times are in Adelaide, Australia timezone</li>
-        </ul>
-    </div>
+  <div class="important">
+    <h4>Important Information</h4>
+    <ul>
+      <li>Please arrive 15 minutes before your call time</li>
+      <li>Contact the theatre if you cannot make your shift</li>
+      <li>Check the online schedule regularly for updates</li>
+      <li>All times are in Adelaide, Australia timezone</li>
+    </ul>
+  </div>
     
-    <div class="footer">
-        <p>For questions or changes, visit the online schedule or contact theatre administration.</p>
-        <p>This document was generated on ${generatedAt} from Theatre Shifts volunteer management system.</p>
-    </div>
+  <div class="footer">
+    <p>For questions or changes, visit the online schedule or contact theatre administration.</p>
+    <p>This document was generated on ${generatedAt} from Theatre Shifts volunteer management system.</p>
+  </div>
 </body>
 </html>`;
 }
