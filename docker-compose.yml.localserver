@@ -1,5 +1,6 @@
 services:
   theatreapp:
+    build: .
     image: theatre-app:latest
     env_file: .env
     ports:
