@@ -1,9 +1,10 @@
+import { APP_VERSION } from "../../../version.ts";
 export function getAdminNavigation(currentPage: string = '') {
   return `
     <!-- Top Navigation -->
     <nav class="top-nav">
       <div class="nav-container">
-        <a href="/admin" class="nav-brand">Theatre Shifts Admin</a>
+        <a href="/admin" class="nav-brand" title="Version: ${APP_VERSION}">Theatre Shifts Admin</a>
         
         <button class="mobile-menu-toggle" onclick="toggleMobileMenu()">☰</button>        <ul class="nav-menu" id="navMenu">
           <li class="nav-item"><a href="/admin/dashboard" class="nav-link ${currentPage === 'dashboard' ? 'active' : ''}">Dashboard</a></li>
