@@ -42,6 +42,5 @@ jobs:
 
     - name: Restart app with Docker Compose
       run: |
-        cd ~/
         docker compose down theatreapp
         docker compose up -d --always-pull theatreapp
