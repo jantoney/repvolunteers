@@ -1,0 +1,13 @@
+services:
+  theatreapp:
+    image: theatre-app:latest
+    env_file: .env
+    ports:
+      - "8044:8044"
+    restart: unless-stopped
+    networks:
+      - backend
+
+networks:
+  backend:
+    external: true

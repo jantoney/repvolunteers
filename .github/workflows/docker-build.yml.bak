@@ -12,9 +12,16 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v3
 
+    - name: Log in to DigitalOcean Container Registry
+      run: echo "${{ secrets.DO_TOKEN }}" | docker login registry.digitalocean.com -u doctl --password-stdin
+
     - name: Build Docker image
       run: |
-        docker build -t theatre-app:latest .
+        docker build -t registry.digitalocean.com/djshopdevregistry/theatre-app:latest .
+
+    - name: Push Docker image
+      run: |
+        docker push registry.digitalocean.com/djshopdevregistry/theatre-app:latest
 
     - name: Create .env file
       run: |
@@ -36,4 +43,5 @@ jobs:
     - name: Restart app with Docker Compose
       run: |
         docker compose down theatreapp
-        docker compose up -d -f docker-compose.yml.localserver
+        docker compose pull theatreapp
+        docker compose up -d theatreapp
