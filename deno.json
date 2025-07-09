@@ -22,5 +22,9 @@
   "compilerOptions": {
     "lib": ["deno.window"],
     "strict": true
+  },
+  "npm": {
+    "unsafelyIgnoreLifecycleScripts": false,
+    "allowScripts": ["npm:core-js@3.43.0"]
   }
 }
