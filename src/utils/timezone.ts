@@ -144,7 +144,7 @@ export function formatDateTimeForInput(date: Date | string): string {
 export function combineDateTimeToISO(dateStr: string, timeStr: string): string {
   if (!timeStr || !dateStr) {
     console.error('Missing time or date for ISO conversion');
-    return null;
+    return "";
   }
 
   try {
@@ -152,9 +152,10 @@ export function combineDateTimeToISO(dateStr: string, timeStr: string): string {
     return `${dateStr}T${timeStr}:00`;
   } catch (error) {
     console.error('Error combining date and time:', error);
-    return null;
+    return "";
   }
 }
+
 
 /**
  * Format a show time range (start_time to end_time)
@@ -167,10 +168,13 @@ export function formatShowTimeRange(startTime: Date | string, endTime: Date | st
   const endTimeStr = formatTime(end);
 
   // Check if start and end are on different days
-  const isMultiDay = isDifferentDay(start, end);
+  const isMultiDay = start.getDate() !== end.getDate() ||
+    start.getMonth() !== end.getMonth() ||
+    start.getFullYear() !== end.getFullYear();
 
   return `${startTimeStr} - ${endTimeStr}${isMultiDay ? ' +1 day' : ''}`;
 }
+
 
 /**
  * Format performance date and time for display

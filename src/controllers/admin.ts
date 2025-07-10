@@ -137,7 +137,9 @@ export async function listShowDates(ctx: RouterContext<string>) {
       total_shifts: Number(date.total_shifts),
       filled_shifts: Number(date.filled_shifts),
       date: date.start_time // Add the date field that the frontend expects
-    }));
+    }));  
+
+
 
     ctx.response.body = showDates;
   } finally {
