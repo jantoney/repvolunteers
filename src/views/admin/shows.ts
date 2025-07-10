@@ -301,17 +301,18 @@ export async function showShowsPage(ctx: RouterContext<string>) {
   try {
     const result = await client.queryObject<Show>(`
       SELECT s.id, s.name, s.created_at,
-             COUNT(DISTINCT sd.id) as show_date_count,
-             MIN(sd.start_time) as first_date,
-             MAX(sd.start_time) as last_date,
-             COUNT(DISTINCT sh.id) as total_shifts,
-             COUNT(DISTINCT CASE WHEN vs.participant_id IS NOT NULL THEN sh.id END) as filled_shifts
+         COUNT(DISTINCT sd.id) as show_date_count,
+         MIN(sd.start_time AT TIME ZONE 'Australia/Adelaide') as first_date,
+         MAX(sd.start_time AT TIME ZONE 'Australia/Adelaide') as last_date,
+         COUNT(DISTINCT sh.id) as total_shifts,
+         COUNT(DISTINCT CASE WHEN vs.participant_id IS NOT NULL THEN sh.id END) as filled_shifts
       FROM shows s
       LEFT JOIN show_dates sd ON sd.show_id = s.id
       LEFT JOIN shifts sh ON sh.show_date_id = sd.id
       LEFT JOIN participant_shifts vs ON vs.shift_id = sh.id
       GROUP BY s.id, s.name, s.created_at
-      ORDER BY s.name    `);
+      ORDER BY s.name
+    `);
 
     // Convert BigInt count values to numbers
     const shows = result.rows.map(show => ({
