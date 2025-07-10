@@ -111,15 +111,18 @@ export async function listShowDates(ctx: RouterContext<string>) {
     interface ShowDateRow {
       id: number;
       show_id: number;
-      start_time: Date;
-      end_time: Date;
+      start_time: string;
+      end_time: string;
       show_name: string;
       total_shifts: bigint;
       filled_shifts: bigint;
     }
 
     const result = await client.queryObject<ShowDateRow>(`
-      SELECT sd.id, sd.show_id, sd.start_time AT TIME ZONE 'Australia/Adelaide' as start_time, sd.end_time AT TIME ZONE 'Australia/Adelaide' as end_time, s.name as show_name,
+      SELECT sd.id, sd.show_id, 
+             TO_CHAR(sd.start_time AT TIME ZONE 'Australia/Adelaide', 'YYYY-MM-DD"T"HH24:MI:SS') as start_time, 
+             TO_CHAR(sd.end_time AT TIME ZONE 'Australia/Adelaide', 'YYYY-MM-DD"T"HH24:MI:SS') as end_time, 
+             s.name as show_name,
              COUNT(DISTINCT sh.id) as total_shifts,
              COUNT(DISTINCT CASE WHEN vs.participant_id IS NOT NULL THEN sh.id END) as filled_shifts
       FROM show_dates sd
@@ -127,7 +130,7 @@ export async function listShowDates(ctx: RouterContext<string>) {
       LEFT JOIN shifts sh ON sh.show_date_id = sd.id
       LEFT JOIN participant_shifts vs ON vs.shift_id = sh.id
       WHERE sd.show_id = $1
-      GROUP BY sd.id, s.name
+      GROUP BY sd.id, s.name, sd.start_time, sd.end_time
       ORDER BY sd.start_time
     `, [showId]);
 
@@ -138,8 +141,6 @@ export async function listShowDates(ctx: RouterContext<string>) {
       filled_shifts: Number(date.filled_shifts),
       date: date.start_time // Add the date field that the frontend expects
     }));  
-
-
 
     ctx.response.body = showDates;
   } finally {
