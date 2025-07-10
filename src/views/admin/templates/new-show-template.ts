@@ -205,7 +205,7 @@ export function renderNewShowTemplate(data: NewShowPageData): string {
         </div>
       </div>
 
-      <script src="/src/utils/modal.js">
+      <script src="/src/utils/modal.js"></script>
       ${getAdminScripts()}
       <script>
         let currentDate = new Date();

@@ -75,6 +75,9 @@ router.get("/api/analytics/unfilled", adminController.unfilledShifts);
 router.get("/api/unfilled-shifts/count", adminController.getUnfilledShiftsCount);
 router.get("/api/performances-without-shifts/count", adminController.getPerformancesWithoutShiftsCount);
 
+// Server time API endpoint
+router.get("/api/server-time", adminController.getServerTime);
+
 // Volunteer-Shift Assignment API endpoints
 router.get("/api/shifts/:shiftId/volunteers", adminController.getShiftVolunteers);
 router.get("/api/shifts/:shiftId/available-roles", adminController.getAvailableRolesForShift);

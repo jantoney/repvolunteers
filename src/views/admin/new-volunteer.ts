@@ -1,5 +1,5 @@
 import type { RouterContext } from "oak";
-import { getAdminNavigation, getAdminStyles } from "./components/navigation.ts";
+import { getAdminNavigation, getAdminStyles, getAdminScripts } from "./components/navigation.ts";
 
 export function renderNewVolunteerTemplate(): string {
   return `
@@ -64,6 +64,7 @@ export function renderNewVolunteerTemplate(): string {
       </div>
 
       <script src="/src/utils/modal.js"></script>
+      ${getAdminScripts()}
       <script>
         document.getElementById('volunteerForm').addEventListener('submit', async (e) => {
           e.preventDefault();

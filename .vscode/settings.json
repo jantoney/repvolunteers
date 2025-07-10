@@ -5,7 +5,7 @@
     },
     "editor.formatOnSave": true,
     "gitblame.inlineMessageEnabled": true,
-    "terminal.integrated.defaultProfile.windows": "Ubuntu-24.04 (WSL)",
+    "terminal.integrated.defaultProfile.windows": "PowerShell",
     "github.copilot.chat.codeGeneration.useInstructionFiles": true,
     "github.copilot.chat.agent.runTasks": true,
     "deno.enable": true

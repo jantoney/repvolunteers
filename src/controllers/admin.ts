@@ -1161,6 +1161,26 @@ export async function getPerformancesWithoutShiftsCount(ctx: RouterContext<strin
   }
 }
 
+export async function getServerTime(ctx: RouterContext<string>) {
+  const pool = getPool();
+  const client = await pool.connect();
+  try {
+    // Get current time in Adelaide timezone from the database
+    const result = await client.queryObject<{ 
+      current_time: string, 
+      current_date: string 
+    }>(
+      `SELECT 
+        TO_CHAR(NOW() AT TIME ZONE 'Australia/Adelaide', 'HH24:MI') as current_time,
+        TO_CHAR(NOW() AT TIME ZONE 'Australia/Adelaide', 'DD/MM/YYYY') as current_date`
+    );
+    
+    ctx.response.body = result.rows[0];
+  } finally {
+    client.release();
+  }
+}
+
 // API Functions for Volunteer Approval
 export async function toggleVolunteerApproval(ctx: RouterContext<string>) {
   const id = ctx.params.id;

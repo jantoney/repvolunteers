@@ -1,4 +1,4 @@
-import { getAdminNavigation, getAdminStyles } from "../components/navigation.ts";
+import { getAdminNavigation, getAdminStyles, getAdminScripts } from "../components/navigation.ts";
 import { formatDate, formatTime, isDifferentDay } from "../../../utils/timezone.ts";
 
 export interface UnfilledShift {
@@ -174,6 +174,7 @@ export function renderUnfilledShiftsTemplate(data: UnfilledShiftsPageData): stri
         </div>
       </div>
 
+      ${getAdminScripts()}
       <script src="/src/views/admin/unfilled-shifts.js"></script>
     </body>
     </html>

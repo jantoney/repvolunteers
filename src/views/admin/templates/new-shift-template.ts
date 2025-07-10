@@ -1,4 +1,4 @@
-import { getAdminNavigation, getAdminStyles } from "../components/navigation.ts";
+import { getAdminNavigation, getAdminStyles, getAdminScripts } from "../components/navigation.ts";
 
 export interface Show {
   id: number;
@@ -184,6 +184,7 @@ export function renderNewShiftTemplate(data: NewShiftPageData): string {
 
       <script src="/src/utils/modal.js"></script>
       <script src="/src/utils/timezone-client.js"></script>
+      ${getAdminScripts()}
       <script src="/src/views/admin/new-shift.js"></script>
       <script>
         // Function to create time dropdowns with 15-minute increments

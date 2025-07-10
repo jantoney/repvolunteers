@@ -31,7 +31,9 @@ export function getAdminNavigation(currentPage: string = '') {
           </li>
           <li class="nav-item"><a href="/admin/unfilled-shifts" class="nav-link ${currentPage === 'unfilled' ? 'active' : ''}" id="unfilled-nav">Unfilled</a></li>
         </ul>
-        
+        <div class="nav-item" id="server-time">
+          <span class="server-time-display"></span>
+        </div>
         <div class="nav-actions">
           <a href="/admin/logout" class="logout-btn">Logout</a>
         </div>
@@ -740,7 +742,8 @@ export function getAdminScripts() {
           const response = await fetch('/api/admin/unfilled-shifts/count', { credentials: 'include' });
           if (response.ok) {
             const data = await response.json();
-            const unfilledNav = document.getElementById('unfilled-nav');            if (data.count > 0) {
+            const unfilledNav = document.getElementById('unfilled-nav');
+            if (data.count > 0) {
               unfilledNav.innerHTML = 'Unfilled (' + data.count + ')';
             } else {
               unfilledNav.innerHTML = 'Unfilled';
@@ -768,12 +771,97 @@ export function getAdminScripts() {
         }
       }
       
+      // Server time management
+      let serverTimeOffset = 0; // Difference between server and client time in milliseconds
+      let serverTimeInitialized = false;
+
+      // Get initial server time and calculate offset
+      async function initializeServerTime() {
+        try {
+          const clientTimeBeforeRequest = Date.now();
+          const response = await fetch('/admin/api/server-time', { credentials: 'include' });
+          const clientTimeAfterRequest = Date.now();
+          
+          if (response.ok) {
+            const data = await response.json();
+            
+            // Parse server time (format: "HH:MM" and "DD/MM/YYYY")
+            const [day, month, year] = data.current_date.split('/');
+            const [hours, minutes] = data.current_time.split(':');
+            
+            // Create server time as Date object
+            const serverTime = new Date(
+              parseInt(year), 
+              parseInt(month) - 1, // Month is 0-indexed
+              parseInt(day),
+              parseInt(hours),
+              parseInt(minutes),
+              0, // seconds
+              0  // milliseconds
+            );
+            
+            // Estimate network delay and adjust
+            const networkDelay = (clientTimeAfterRequest - clientTimeBeforeRequest) / 2;
+            const adjustedClientTime = clientTimeBeforeRequest + networkDelay;
+            
+            // Calculate offset
+            serverTimeOffset = serverTime.getTime() - adjustedClientTime;
+            serverTimeInitialized = true;
+            
+            console.log('Server time initialized. Offset:', serverTimeOffset, 'ms');
+            updateServerTimeDisplay();
+          } else {
+            console.error('Failed to fetch server time:', response.status);
+          }
+        } catch (error) {
+          console.error('Error fetching server time:', error);
+        }
+      }
+
+      // Update server time display using local time + offset
+      function updateServerTimeDisplay() {
+        if (!serverTimeInitialized) return;
+        
+        const serverTime = new Date(Date.now() + serverTimeOffset);
+        
+        const hours = String(serverTime.getHours()).padStart(2, '0');
+        const minutes = String(serverTime.getMinutes()).padStart(2, '0');
+        const day = String(serverTime.getDate()).padStart(2, '0');
+        const month = String(serverTime.getMonth() + 1).padStart(2, '0');
+        const year = serverTime.getFullYear();
+
+        const timeDisplay = hours + ':' + minutes;
+        const dateDisplay = day + '/' + month + '/' + year;
+
+        const serverTimeElement = document.querySelector('.server-time-display');
+        if (serverTimeElement) {
+          serverTimeElement.innerHTML = timeDisplay + '<br>' + dateDisplay;
+        }
+      }
+
       // Initialize
       checkAuth();
       updateUnfilledCount();
+      initializeServerTime();
       
-      // Update unfilled count every 30 seconds
-      setInterval(updateUnfilledCount, 30000);
+      // Update counters and time regularly
+      setInterval(updateUnfilledCount, 30000); // Update unfilled count every 30 seconds
+      setInterval(updateServerTimeDisplay, 1000); // Update time display every second (local calculation)
     </script>
+    <style>
+      .server-time-display { 
+        font-size: 0.8em; 
+        text-align: center; 
+        line-height: 1.2; 
+        color: white;
+        font-weight: 500;
+        min-width: 70px;
+      }
+      #server-time {
+        background: rgba(255,255,255,0.1);
+        border-radius: 4px;
+        padding: 0.5rem;
+      }
+    </style>
   `;
 }

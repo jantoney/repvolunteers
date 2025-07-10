@@ -1,4 +1,4 @@
-import { getAdminNavigation, getAdminStyles } from "../components/navigation.ts";
+import { getAdminNavigation, getAdminStyles, getAdminScripts } from "../components/navigation.ts";
 import { formatDate, formatDateTimeForInput } from "../../../utils/timezone.ts";
 
 export interface Show {
@@ -123,6 +123,7 @@ export function renderEditShowTemplate(data: EditShowPageData): string {
         </div>
       </div>
 
+      ${getAdminScripts()}
       <script src="/src/views/admin/edit-show.js" data-show-id="${show.id}"></script>
     </body>
     </html>

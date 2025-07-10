@@ -1,4 +1,4 @@
-import { getAdminNavigation, getAdminStyles } from "../components/navigation.ts";
+import { getAdminNavigation, getAdminStyles, getAdminScripts } from "../components/navigation.ts";
 
 export interface Volunteer {
   id: number;
@@ -65,6 +65,7 @@ export function renderEditVolunteerTemplate(data: EditVolunteerPageData): string
       </div>
 
       <script src="/src/utils/modal.js"></script>
+      ${getAdminScripts()}
       <script src="/src/views/admin/edit-volunteer.js" data-volunteer-id="${volunteer.id}"></script>
     </body>
     </html>

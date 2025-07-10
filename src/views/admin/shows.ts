@@ -183,7 +183,6 @@ export function renderShowsTemplate(data: ShowsPageData): string {
             const adelaideTZ = DateTimeFormat.ADELAIDE_TIMEZONE;
             const now = new Date();
             const adelaideTime = DateTimeFormat.formatDateTime(now);
-            timeElement.textContent = "Current time: " + adelaideTime + " " + adelaideTZ;
           }
         }
         

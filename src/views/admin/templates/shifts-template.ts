@@ -6,7 +6,7 @@ declare global {
     [key: string]: any;
   } | undefined;
 }
-import { getAdminNavigation, getAdminStyles } from "../components/navigation.ts";
+import { getAdminNavigation, getAdminStyles, getAdminScripts } from "../components/navigation.ts";
 // Use formatDate from timezone-client.js if available (browser), else fallback for server-side
 let formatDate: (date: Date|string) => string;
 if (typeof globalThis !== 'undefined' && globalThis.DateTimeFormat && globalThis.DateTimeFormat.formatDate) {
@@ -337,6 +337,7 @@ export function renderShiftsTemplate(data: ShiftsPageData): string {
 
       <script src="/src/utils/modal.js"></script>
       <script src="/src/utils/timezone-client.js"></script>
+      ${getAdminScripts()}
       <script src="/src/views/admin/shifts.js"></script>
       <script>
         // Display and update current Adelaide time
@@ -346,7 +347,6 @@ export function renderShiftsTemplate(data: ShiftsPageData): string {
             const adelaideTZ = DateTimeFormat.ADELAIDE_TIMEZONE;
             const now = new Date();
             const adelaideTime = DateTimeFormat.formatDateTime(now);
-            timeElement.textContent = "Current time: " + adelaideTime + " " + adelaideTZ;
           }
         }
         

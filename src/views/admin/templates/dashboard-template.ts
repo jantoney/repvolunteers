@@ -1,4 +1,4 @@
-import { getAdminNavigation, getAdminStyles } from "../components/navigation.ts";
+import { getAdminNavigation, getAdminStyles, getAdminScripts } from "../components/navigation.ts";
 
 export function renderDashboardTemplate(): string {
   
@@ -367,6 +367,7 @@ export function renderDashboardTemplate(): string {
 
       <!-- Include required JavaScript files -->
       <script src="/src/views/admin/dashboard.js"></script>
+      ${getAdminScripts()}
     </body>
     </html>
   `;

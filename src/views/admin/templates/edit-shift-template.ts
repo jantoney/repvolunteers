@@ -1,4 +1,4 @@
-import { getAdminNavigation, getAdminStyles } from "../components/navigation.ts";
+import { getAdminNavigation, getAdminStyles, getAdminScripts } from "../components/navigation.ts";
 import { formatDateTimeForInput, formatDate, formatTime } from "../../../utils/timezone.ts";
 
 export interface ShowDate {
@@ -88,6 +88,7 @@ export function renderEditShiftTemplate(data: EditShiftPageData): string {
       </div>
 
       <script src="/src/utils/modal.js"></script>
+      ${getAdminScripts()}
       <script src="/src/views/admin/edit-shift.js" data-shift-id="${shift.id}"></script>
     </body>
     </html>
