@@ -317,7 +317,7 @@ export function renderShiftsTemplate(data: ShiftsPageData): string {
                       
                       <div class="table-actions">
                         <a href="/admin/shifts/${shift.id}/edit" class="btn btn-sm btn-secondary">Edit</a>
-                        <button onclick="deleteShift(${shift.id}, '${shift.role.replace(/'/g, "\\'")}'))" class="btn btn-sm btn-danger">Delete</button>
+                        <button onclick="deleteShift(${shift.id}, '${shift.role.replace(/'/g, "\\'")}')" class="btn btn-sm btn-danger">Delete</button>
                         <button onclick="viewShiftDetails(${shift.id})" class="btn btn-sm btn-info">Details</button>
                       </div>
                     </div>
