@@ -192,7 +192,7 @@ router.post("/send-link", async (ctx) => {
       // Import and use the email utility
       const { sendVolunteerLoginEmail, createVolunteerLoginUrl } = await import("../utils/email.ts");
       
-      const loginUrl = createVolunteerLoginUrl(ctx.request.url.origin, volunteer.id);
+      const loginUrl = createVolunteerLoginUrl(Deno.env.get('BASE_URL') || ctx.request.url.origin, volunteer.id);
       
       // Send the email using our template
       const emailSent = await sendVolunteerLoginEmail({

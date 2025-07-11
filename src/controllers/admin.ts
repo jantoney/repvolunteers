@@ -1354,7 +1354,7 @@ export async function emailVolunteerSchedulePDF(ctx: RouterContext<string>) {
       return `${date} ${arriveTime}<br><span style="margin-left:1.5em;display:inline-block;">${shift.show_name} (${shift.role})</span>`;
     });
 
-    const baseUrl = `${ctx.request.url.protocol}//${ctx.request.url.host}`;
+    const baseUrl = Deno.env.get('BASE_URL') || `${ctx.request.url.protocol}//${ctx.request.url.host}`;
     const loginUrl = createVolunteerLoginUrl(baseUrl, pdfData.volunteer.id);
 
     const emailData = {
