@@ -348,7 +348,7 @@ export async function generateServerSidePDF(data: PDFData): Promise<Uint8Array> 
             } else {
               // Draw normal or thick border for date cells
               if (hasShifts) {
-                doc.setLineWidth(0.8); // Thicker border for days with shifts
+                doc.setLineWidth(1.2); // Thicker border for days with shifts
                 doc.setDrawColor(0, 0, 0); // Ensure border is black
                 doc.rect(x, y, cellWidth, cellHeight);
                 doc.setLineWidth(0.2); // Reset to default
