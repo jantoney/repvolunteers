@@ -7,8 +7,9 @@ document.addEventListener('DOMContentLoaded', function () {
     'Usher 3 (Can see show)',
     'Tea and Coffee 1 (Can see show)',
     'Tea and Coffee 2 (Can see show)',
-    'Raffle Ticket Selling',
-    'Box Office'
+    'Raffle Ticket Selling (Can see show)',
+    'Box Office (Can see show)',
+    'FOH Door (Can see show)'
   ];
   const customRoles = [];
   const allRoles = [...defaultRoles];
@@ -16,11 +17,98 @@ document.addEventListener('DOMContentLoaded', function () {
   function loadDefaultRoles() {
     const container = document.getElementById('defaultRolesList');
     container.innerHTML = defaultRoles.map((role, index) => `
-      <div class="checkbox-item">
+      <div class="checkbox-item" data-checkbox="role_default_${index}">
         <input type="checkbox" id="role_default_${index}" value="${role}">
         <label for="role_default_${index}">${role}</label>
       </div>
     `).join('');
+    
+    // Add click handlers to make entire tile clickable
+    addCheckboxItemClickHandlers('#defaultRolesList');
+  }
+
+  // Function to add click handlers to checkbox items
+  function addCheckboxItemClickHandlers(containerSelector) {
+    const container = document.querySelector(containerSelector);
+    if (!container) return;
+    
+    container.addEventListener('click', function(e) {
+      const checkboxItem = e.target.closest('.checkbox-item');
+      if (!checkboxItem) return;
+      
+      const checkboxId = checkboxItem.getAttribute('data-checkbox');
+      if (!checkboxId) return;
+      
+      const checkbox = document.getElementById(checkboxId);
+      if (!checkbox) return;
+      
+      // Toggle checkbox
+      checkbox.checked = !checkbox.checked;
+      
+      // Update visual state
+      updateCheckboxItemState(checkboxItem, checkbox.checked);
+      
+      // Prevent event bubbling
+      e.stopPropagation();
+    });
+    
+    // Also add direct checkbox change listeners to keep visual state in sync
+    container.addEventListener('change', function(e) {
+      if (e.target.type === 'checkbox') {
+        const checkboxItem = e.target.closest('.checkbox-item');
+        if (checkboxItem) {
+          updateCheckboxItemState(checkboxItem, e.target.checked);
+        }
+      }
+    });
+  }
+
+  // Function to update visual state of checkbox item
+  function updateCheckboxItemState(checkboxItem, isChecked) {
+    if (isChecked) {
+      checkboxItem.classList.add('checked');
+    } else {
+      checkboxItem.classList.remove('checked');
+    }
+  }
+
+  // Function to create time group buttons
+  function createTimeGroupButtons(dates) {
+    const timeGroupActions = document.getElementById('timeGroupActions');
+    
+    // Group dates by their show times
+    const timeGroups = {};
+    dates.forEach(date => {
+      const timeKey = `${DateTimeFormat.formatTime(date.start_time)} to ${DateTimeFormat.formatTime(date.end_time)}`;
+      if (!timeGroups[timeKey]) {
+        timeGroups[timeKey] = {
+          dates: [],
+          start_time: date.start_time,
+          end_time: date.end_time
+        };
+      }
+      timeGroups[timeKey].dates.push(date);
+    });
+    
+    // Create buttons for each time group (only if there are multiple groups)
+    const timeGroupKeys = Object.keys(timeGroups);
+    if (timeGroupKeys.length > 1) {
+      timeGroupActions.innerHTML = timeGroupKeys.map(timeKey => {
+        const group = timeGroups[timeKey];
+        const count = group.dates.length;
+        const [startTime, endTime] = timeKey.split(' to ');
+        return `
+          <button type="button" class="filter-btn" onclick="selectTimeGroup('${startTime}', '${endTime}', '${group.start_time}', '${group.end_time}')" style="margin-right: 0.5rem;">
+            Select ${timeKey} (${count})
+          </button>
+          <button type="button" class="filter-btn" onclick="deselectTimeGroup('${startTime}', '${endTime}')" style="margin-right: 1rem;">
+            Deselect ${timeKey}
+          </button>
+        `;
+      }).join('');
+    } else {
+      timeGroupActions.innerHTML = '';
+    }
   }
 
   // Show selector changed
@@ -31,6 +119,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     if (!showId) {
       section.style.display = 'none';
+      document.getElementById('dateFilterActions').style.display = 'none';
       return;
     }
 
@@ -42,7 +131,7 @@ document.addEventListener('DOMContentLoaded', function () {
       if (response.ok) {
         const dates = await response.json();
         container.innerHTML = dates.map(date => `
-          <div class="checkbox-item">
+          <div class="checkbox-item checked" data-checkbox="date_${date.id}">
             <input type="checkbox" id="date_${date.id}" value="${date.id}" checked>
             <label for="date_${date.id}">
               ${DateTimeFormat.formatDate(date.date)} - 
@@ -51,6 +140,24 @@ document.addEventListener('DOMContentLoaded', function () {
           </div>
         `).join('');
         section.style.display = 'block';
+        
+        // Show date filter actions
+        document.getElementById('dateFilterActions').style.display = 'block';
+        
+        // Create time group buttons
+        createTimeGroupButtons(dates);
+        
+        // Add click handlers for show dates
+        addCheckboxItemClickHandlers('#showDatesList');
+        
+        // Initialize visual states for pre-checked items
+        container.querySelectorAll('.checkbox-item').forEach(item => {
+          const checkboxId = item.getAttribute('data-checkbox');
+          const checkbox = document.getElementById(checkboxId);
+          if (checkbox && checkbox.checked) {
+            item.classList.add('checked');
+          }
+        });
       }
     } catch (_error) {
       console.error('Error loading show dates:', _error);
@@ -105,7 +212,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
     const container = document.getElementById('customRolesList');
     const newRole = document.createElement('div');
-    newRole.className = 'checkbox-item';
+    newRole.className = 'checkbox-item checked';
+    newRole.setAttribute('data-checkbox', `role_custom_${customRoles.length}`);
     newRole.innerHTML = `
       <input type="checkbox" id="role_custom_${customRoles.length}" value="${roleName}" checked>
       <label for="role_custom_${customRoles.length}">${roleName}</label>
@@ -203,11 +311,6 @@ document.addEventListener('DOMContentLoaded', function () {
         if (nextDayShifts.length > 0) {
           showSuccess(`Note: ${nextDayShifts.length} shifts were saved with depart time on the following day`);
         }
-
-        // Reset form after short delay
-        setTimeout(() => {
-          globalThis.location.href = '/admin/shifts';
-        }, 2000);
       } else {
         const error = await response.json();
         showError(error.error || 'Failed to create shifts');
@@ -234,4 +337,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
   // Initialize
   loadDefaultRoles();
+  
+  // Set up click handlers for custom roles container (even though it starts empty)
+  addCheckboxItemClickHandlers('#customRolesList');
 });

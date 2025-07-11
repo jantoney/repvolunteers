@@ -44,7 +44,7 @@ export function renderNewShiftTemplate(data: NewShiftPageData): string {
           gap: 0.5rem;
           align-items: center;
         }
-          .checkbox-group { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.75rem; margin-top: 1rem; }
+          .checkbox-group { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 0.75rem; margin-top: 1rem; }
         .checkbox-item { 
           display: flex; 
           align-items: center; 
@@ -54,21 +54,43 @@ export function renderNewShiftTemplate(data: NewShiftPageData): string {
           border-radius: 8px;
           transition: all 0.2s ease;
           cursor: pointer;
+          user-select: none;
+          position: relative;
+          min-height: 50px;
+          overflow: hidden;
         }
         .checkbox-item:hover {
           border-color: #007bff;
           background: #f8f9fa;
+          transform: translateY(-1px);
+          box-shadow: 0 2px 8px rgba(0, 123, 255, 0.15);
+        }
+        .checkbox-item:active {
+          transform: translateY(0);
+          box-shadow: 0 1px 4px rgba(0, 123, 255, 0.2);
+        }
+        .checkbox-item.checked {
+          border-color: #007bff;
+          background: #e3f2fd;
         }
         .checkbox-item input[type="checkbox"] { 
-          margin-right: 0.75rem; 
-          transform: scale(1.2);
+          margin-right: 0.5rem; 
+          transform: scale(0.9);
           cursor: pointer;
+          pointer-events: none;
+          flex-shrink: 0;
+          width: 16px;
+          height: 16px;
         }
         .checkbox-item label {
           cursor: pointer;
           margin: 0;
           font-weight: 500;
           color: #495057;
+          pointer-events: none;
+          flex: 1;
+          word-wrap: break-word;
+          line-height: 1.3;
         }
           .roles-section { background: #f8f9fa; padding: 1.5rem; border-radius: 8px; margin: 1rem 0; }
         .show-dates-section { background: #f8f9fa; padding: 1.5rem; border-radius: 8px; margin: 1rem 0; }
@@ -133,6 +155,15 @@ export function renderNewShiftTemplate(data: NewShiftPageData): string {
               <div class="show-dates-section" id="showDatesSection" style="display: none;">
               <label>Show Dates:</label>
               <p class="help-text">Select the performance dates for this shift. Each selected date will get its own shift with the times specified below.</p>
+              
+              <div class="filter-actions" id="dateFilterActions" style="margin-bottom: 1rem; display: none;">
+                <button type="button" class="filter-btn" onclick="selectAllDates()">Select All</button>
+                <button type="button" class="filter-btn" onclick="selectNoDates()">Select None</button>
+                <div id="timeGroupActions" style="display: inline-block; margin-left: 1rem;">
+                  <!-- Time group buttons will be added here dynamically -->
+                </div>
+              </div>
+              
               <div id="showDatesList" class="checkbox-group">
               </div>
             </div>
@@ -328,6 +359,173 @@ export function renderNewShiftTemplate(data: NewShiftPageData): string {
           originalArrive.addEventListener('change', checkNextDayWarning);
           originalDepart.addEventListener('change', checkNextDayWarning);
         });
+        
+        // Date selection functions
+        function selectAllDates() {
+          const checkboxes = document.querySelectorAll('#showDatesList input[type="checkbox"]');
+          checkboxes.forEach(checkbox => {
+            checkbox.checked = true;
+            const checkboxItem = checkbox.closest('.checkbox-item');
+            if (checkboxItem) {
+              checkboxItem.classList.add('checked');
+            }
+          });
+        }
+        
+        function selectNoDates() {
+          const checkboxes = document.querySelectorAll('#showDatesList input[type="checkbox"]');
+          checkboxes.forEach(checkbox => {
+            checkbox.checked = false;
+            const checkboxItem = checkbox.closest('.checkbox-item');
+            if (checkboxItem) {
+              checkboxItem.classList.remove('checked');
+            }
+          });
+        }
+        
+        function selectTimeGroup(startTime, endTime, showStartTime, showEndTime) {
+          const checkboxes = document.querySelectorAll('#showDatesList input[type="checkbox"]');
+          checkboxes.forEach(checkbox => {
+            const label = checkbox.nextElementSibling;
+            if (label && label.textContent.includes(\`\${startTime} to \${endTime}\`)) {
+              checkbox.checked = true;
+              const checkboxItem = checkbox.closest('.checkbox-item');
+              if (checkboxItem) {
+                checkboxItem.classList.add('checked');
+              }
+            }
+          });
+          
+          // Auto-set arrive and depart times
+          if (showStartTime && showEndTime) {
+            setArriveTime(showStartTime, -60); // 1 hour before show start
+            setDepartTime(showEndTime, 30);    // 30 minutes after show end
+          }
+        }
+        
+        function setArriveTime(showStartTime, offsetMinutes) {
+          // Extract time portion from datetime string (e.g., "2025-07-17T19:30:00" -> "19:30:00")
+          const timeOnly = showStartTime.includes('T') ? showStartTime.split('T')[1] : showStartTime;
+          const [hours24, minutes] = timeOnly.split(':').map(Number);
+          
+          // Create date object and add offset
+          const showStart = new Date();
+          showStart.setHours(hours24, minutes, 0, 0);
+          const arriveTime = new Date(showStart.getTime() + (offsetMinutes * 60000));
+          
+          // Get final hour and minute values
+          let finalHour = arriveTime.getHours();
+          let finalMinute = arriveTime.getMinutes();
+          
+          // Round to nearest 15-minute increment
+          const roundedMinute = Math.round(finalMinute / 15) * 15;
+          if (roundedMinute === 60) {
+            finalMinute = 0;
+            finalHour += 1;
+          } else {
+            finalMinute = roundedMinute;
+          }
+          
+          // Convert to 12-hour format for the dropdowns
+          const ampm = finalHour >= 12 ? 'PM' : 'AM';
+          let hour12 = finalHour;
+          if (finalHour > 12) {
+            hour12 = finalHour - 12;
+          } else if (finalHour === 0) {
+            hour12 = 12;
+          }
+          
+          // Get the time selector elements
+          const hourSelect = document.getElementById('arrive_time-hour');
+          const minuteSelect = document.getElementById('arrive_time-minute');
+          const ampmSelect = document.getElementById('arrive_time-ampm');
+          
+          if (!hourSelect || !minuteSelect || !ampmSelect) {
+            console.error('Time selectors not found');
+            return;
+          }
+          
+          // For hour dropdown: 12 uses '0', others use their actual value as string
+          const hourValue = hour12 === 12 ? '0' : String(hour12).padStart(2, '0');
+          const minuteValue = String(finalMinute).padStart(2, '0');
+          
+          // Update the selectors
+          hourSelect.value = hourValue;
+          minuteSelect.value = minuteValue;
+          ampmSelect.value = ampm;
+          
+          // Trigger the update function
+          hourSelect.dispatchEvent(new Event('change'));
+        }
+        
+        function setDepartTime(showEndTime, offsetMinutes) {
+          // Extract time portion from datetime string (e.g., "2025-07-17T21:30:00" -> "21:30:00")
+          const timeOnly = showEndTime.includes('T') ? showEndTime.split('T')[1] : showEndTime;
+          const [hours24, minutes] = timeOnly.split(':').map(Number);
+          
+          // Create date object and add offset
+          const showEnd = new Date();
+          showEnd.setHours(hours24, minutes, 0, 0);
+          const departTime = new Date(showEnd.getTime() + (offsetMinutes * 60000));
+          
+          // Get final hour and minute values
+          let finalHour = departTime.getHours();
+          let finalMinute = departTime.getMinutes();
+          
+          // Round to nearest 15-minute increment
+          const roundedMinute = Math.round(finalMinute / 15) * 15;
+          if (roundedMinute === 60) {
+            finalMinute = 0;
+            finalHour += 1;
+          } else {
+            finalMinute = roundedMinute;
+          }
+          
+          // Convert to 12-hour format for the dropdowns
+          const ampm = finalHour >= 12 ? 'PM' : 'AM';
+          let hour12 = finalHour;
+          if (finalHour > 12) {
+            hour12 = finalHour - 12;
+          } else if (finalHour === 0) {
+            hour12 = 12;
+          }
+          
+          // Get the time selector elements
+          const hourSelect = document.getElementById('depart_time-hour');
+          const minuteSelect = document.getElementById('depart_time-minute');
+          const ampmSelect = document.getElementById('depart_time-ampm');
+          
+          if (!hourSelect || !minuteSelect || !ampmSelect) {
+            console.error('Time selectors not found');
+            return;
+          }
+          
+          // For hour dropdown: 12 uses '0', others use their actual value as string
+          const hourValue = hour12 === 12 ? '0' : String(hour12).padStart(2, '0');
+          const minuteValue = String(finalMinute).padStart(2, '0');
+          
+          // Update the selectors
+          hourSelect.value = hourValue;
+          minuteSelect.value = minuteValue;
+          ampmSelect.value = ampm;
+          
+          // Trigger the update function
+          hourSelect.dispatchEvent(new Event('change'));
+        }
+        
+        function deselectTimeGroup(startTime, endTime) {
+          const checkboxes = document.querySelectorAll('#showDatesList input[type="checkbox"]');
+          checkboxes.forEach(checkbox => {
+            const label = checkbox.nextElementSibling;
+            if (label && label.textContent.includes(\`\${startTime} to \${endTime}\`)) {
+              checkbox.checked = false;
+              const checkboxItem = checkbox.closest('.checkbox-item');
+              if (checkboxItem) {
+                checkboxItem.classList.remove('checked');
+              }
+            }
+          });
+        }
       </script>
     </body>
     </html>
