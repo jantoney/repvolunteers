@@ -87,7 +87,7 @@ export async function generateServerSidePDF(data: PDFData): Promise<Uint8Array> 
     
     // Generated date/time at bottom right (in adelaide timezone)  
     doc.setFontSize(9);
-    const generatedText = `Printed: ${formatCurrentDateAdelaide()} ${formatCurrentTimeAdelaide()}`;
+    const generatedText = `Generated: ${formatCurrentDateAdelaide()} ${formatCurrentTimeAdelaide()}`;
     const textWidth = doc.getTextWidth(generatedText);
     doc.text(generatedText, pageWidth - margin - textWidth, pageHeight - margin);
   }
