@@ -36,11 +36,12 @@ export async function viewSignup(ctx: RouterContext<string>) {
     // Get assigned shifts
     const assignedShiftsRes = await client.queryObject<ShiftRow>(
       `SELECT s.id, s.role,
-              s.arrive_time AT TIME ZONE 'Australia/Adelaide' as arrive_time,
-              s.depart_time AT TIME ZONE 'Australia/Adelaide' as depart_time, s.show_date_id,
+              TO_CHAR(s.arrive_time AT TIME ZONE 'Australia/Adelaide', 'YYYY-MM-DD"T"HH24:MI:SS') as arrive_time,
+              TO_CHAR(s.depart_time AT TIME ZONE 'Australia/Adelaide', 'YYYY-MM-DD"T"HH24:MI:SS') as depart_time, 
+              s.show_date_id,
               sh.name as show_name, sh.id as show_id,
-              sd.start_time AT TIME ZONE 'Australia/Adelaide' as start_time,
-              sd.end_time AT TIME ZONE 'Australia/Adelaide' as end_time
+              TO_CHAR(sd.start_time AT TIME ZONE 'Australia/Adelaide', 'YYYY-MM-DD"T"HH24:MI:SS') as start_time,
+              TO_CHAR(sd.end_time AT TIME ZONE 'Australia/Adelaide', 'YYYY-MM-DD"T"HH24:MI:SS') as end_time
        FROM shifts s
        JOIN show_dates sd ON sd.id = s.show_date_id
        JOIN shows sh ON sh.id = sd.show_id
@@ -53,11 +54,12 @@ export async function viewSignup(ctx: RouterContext<string>) {
     // Get available shifts (not assigned to any participant)
     const shiftsRes = await client.queryObject<ShiftRow>(
       `SELECT s.id, s.role,
-              s.arrive_time AT TIME ZONE 'Australia/Adelaide' as arrive_time,
-              s.depart_time AT TIME ZONE 'Australia/Adelaide' as depart_time, s.show_date_id,
+              TO_CHAR(s.arrive_time AT TIME ZONE 'Australia/Adelaide', 'YYYY-MM-DD"T"HH24:MI:SS') as arrive_time,
+              TO_CHAR(s.depart_time AT TIME ZONE 'Australia/Adelaide', 'YYYY-MM-DD"T"HH24:MI:SS') as depart_time,
+              s.show_date_id,
               sh.name as show_name, sh.id as show_id,
-              sd.start_time AT TIME ZONE 'Australia/Adelaide' as start_time,
-              sd.end_time AT TIME ZONE 'Australia/Adelaide' as end_time
+              TO_CHAR(sd.start_time AT TIME ZONE 'Australia/Adelaide', 'YYYY-MM-DD"T"HH24:MI:SS') as start_time,
+              TO_CHAR(sd.end_time AT TIME ZONE 'Australia/Adelaide', 'YYYY-MM-DD"T"HH24:MI:SS') as end_time
        FROM shifts s
        JOIN show_dates sd ON sd.id = s.show_date_id
        JOIN shows sh ON sh.id = sd.show_id
