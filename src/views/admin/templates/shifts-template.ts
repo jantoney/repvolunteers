@@ -3,7 +3,10 @@ declare global {
   // eslint-disable-next-line no-var
   var DateTimeFormat: {
     formatDate: (date: Date | string) => string;
-    [key: string]: any;
+    formatDateTime: (date: Date) => string;
+    formatShowTimeRange: (startTime: string, endTime: string) => string;
+    formatShiftTime: (arriveTime: string, departTime: string) => string;
+    ADELAIDE_TIMEZONE: string;
   } | undefined;
 }
 import { getAdminNavigation, getAdminStyles, getAdminScripts } from "../components/navigation.ts";
@@ -33,11 +36,11 @@ export interface Shift {
   show_id: number;
   show_name: string;
   date: string;
-  show_start: Date;
-  show_end: Date;
+  show_start: string;
+  show_end: string;
   role: string;
-  arrive_time: Date;
-  depart_time: Date;
+  arrive_time: string;
+  depart_time: string;
   volunteer_count: number;
 }
 
@@ -289,7 +292,7 @@ export function renderShiftsTemplate(data: ShiftsPageData): string {
                 <h3 class="performance-title">${firstShift.show_name}</h3>
                 <p class="performance-details">
                   ${formatDate(new Date(firstShift.date))} | 
-                  <span class="show-time" data-start-time="${firstShift.show_start.toISOString()}" data-end-time="${firstShift.show_end.toISOString()}">Loading...</span>
+                  <span class="show-time" data-start-time="${firstShift.show_start}" data-end-time="${firstShift.show_end}">Loading...</span>
                 </p>
               </div>
               
@@ -307,7 +310,7 @@ export function renderShiftsTemplate(data: ShiftsPageData): string {
                       </div>
                       
                       <div class="shift-times">
-                        <span class="time-range shift-time" data-arrive-time="${shift.arrive_time.toISOString()}" data-depart-time="${shift.depart_time.toISOString()}">
+                        <span class="time-range shift-time" data-arrive-time="${shift.arrive_time}" data-depart-time="${shift.depart_time}">
                           Loading...
                         </span>
                       </div>

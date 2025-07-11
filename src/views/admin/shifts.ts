@@ -29,11 +29,11 @@ export async function showShiftsPage(ctx: RouterContext<string>) {
     let shiftsQuery = `
       SELECT s.id, s.show_date_id, sh.id as show_id, sh.name as show_name, 
              DATE(sd.start_time AT TIME ZONE 'Australia/Adelaide') as date, 
-             sd.start_time AT TIME ZONE 'Australia/Adelaide' as show_start, 
-             sd.end_time AT TIME ZONE 'Australia/Adelaide' as show_end,
+             TO_CHAR(sd.start_time AT TIME ZONE 'Australia/Adelaide', 'YYYY-MM-DD"T"HH24:MI:SS') as show_start, 
+             TO_CHAR(sd.end_time AT TIME ZONE 'Australia/Adelaide', 'YYYY-MM-DD"T"HH24:MI:SS') as show_end,
              s.role, 
-             s.arrive_time AT TIME ZONE 'Australia/Adelaide' as arrive_time, 
-             s.depart_time AT TIME ZONE 'Australia/Adelaide' as depart_time,
+             TO_CHAR(s.arrive_time AT TIME ZONE 'Australia/Adelaide', 'YYYY-MM-DD"T"HH24:MI:SS') as arrive_time, 
+             TO_CHAR(s.depart_time AT TIME ZONE 'Australia/Adelaide', 'YYYY-MM-DD"T"HH24:MI:SS') as depart_time,
              COUNT(vs.participant_id) as volunteer_count
       FROM shifts s
       JOIN show_dates sd ON sd.id = s.show_date_id
@@ -70,11 +70,11 @@ export async function showShiftsPage(ctx: RouterContext<string>) {
       show_id: number;
       show_name: string;
       date: string;
-      show_start: Date;
-      show_end: Date;
+      show_start: string;
+      show_end: string;
       role: string;
-      arrive_time: Date;
-      depart_time: Date;
+      arrive_time: string;
+      depart_time: string;
       volunteer_count: number;
     }>(shiftsQuery, queryParams);
     
@@ -86,7 +86,7 @@ export async function showShiftsPage(ctx: RouterContext<string>) {
         groupedShifts.set(key, []);
       }
       
-      // Pass the timestamps as received from the database (already in Adelaide time)
+      // Pass the formatted string timestamps as received from the database (already in Adelaide time)
       const formattedShift: Shift = {
         ...shift,
         show_start: shift.show_start,

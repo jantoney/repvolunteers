@@ -28,24 +28,23 @@ export async function showVolunteerShiftsPage(ctx: RouterContext<string>) {
         sd.show_id,
         sh.name as show_name,
         s.role,
-        TO_CHAR(s.arrive_time AT TIME ZONE 'Australia/Adelaide', 'DD/MM/YYYY') as date,
         CASE 
-          WHEN s.arrive_time IS NOT NULL AND s.depart_time IS NOT NULL THEN
-            'Arrive: ' || TO_CHAR(s.arrive_time AT TIME ZONE 'Australia/Adelaide', 'FMHH12:MI AM') || 
-            ' | Depart: ' || TO_CHAR(s.depart_time AT TIME ZONE 'Australia/Adelaide', 'FMHH12:MI AM') ||
+          WHEN s.arrive_time IS NOT NULL THEN
+            TO_CHAR(s.arrive_time AT TIME ZONE 'Australia/Adelaide', 'DD/MM/YYYY at FMHH12:MI AM')
+          ELSE 'Time TBD'
+        END as start_time,
+        CASE 
+          WHEN s.depart_time IS NOT NULL THEN
+            TO_CHAR(s.depart_time AT TIME ZONE 'Australia/Adelaide', 'DD/MM/YYYY at FMHH12:MI AM') ||
             CASE 
-              WHEN (s.arrive_time AT TIME ZONE 'Australia/Adelaide')::date != (s.depart_time AT TIME ZONE 'Australia/Adelaide')::date 
+              WHEN s.arrive_time IS NOT NULL AND (s.arrive_time AT TIME ZONE 'Australia/Adelaide')::date != (s.depart_time AT TIME ZONE 'Australia/Adelaide')::date 
               THEN ' (+1 day)'
               ELSE ''
             END
-          WHEN s.arrive_time IS NOT NULL THEN
-            'Arrive: ' || TO_CHAR(s.arrive_time AT TIME ZONE 'Australia/Adelaide', 'FMHH12:MI AM')
-          WHEN s.depart_time IS NOT NULL THEN
-            'Depart: ' || TO_CHAR(s.depart_time AT TIME ZONE 'Australia/Adelaide', 'FMHH12:MI AM')
           ELSE 'Time TBD'
-        END as time,
-        s.arrive_time,
-        s.depart_time,
+        END as end_time,
+        TO_CHAR(s.arrive_time AT TIME ZONE 'Australia/Adelaide', 'YYYY-MM-DD"T"HH24:MI:SS') as arrive_time,
+        TO_CHAR(s.depart_time AT TIME ZONE 'Australia/Adelaide', 'YYYY-MM-DD"T"HH24:MI:SS') as depart_time,
         sd.id as performance_id
       FROM shifts s
       JOIN participant_shifts ps ON ps.shift_id = s.id
