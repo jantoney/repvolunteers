@@ -739,7 +739,7 @@ export function getAdminScripts() {
       // Update unfilled shifts count
       async function updateUnfilledCount() {
         try {
-          const response = await fetch('/api/admin/unfilled-shifts/count', { credentials: 'include' });
+          const response = await fetch('/admin/api/unfilled-shifts/count', { credentials: 'include' });
           if (response.ok) {
             const data = await response.json();
             const unfilledNav = document.getElementById('unfilled-nav');
