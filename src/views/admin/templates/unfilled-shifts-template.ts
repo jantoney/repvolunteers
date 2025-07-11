@@ -87,6 +87,7 @@ export function renderUnfilledShiftsTemplate(data: UnfilledShiftsPageData): stri
         <div class="page-header">
           <h1 class="page-title">Unfilled Shifts</h1>
           <div class="page-actions">
+            <button id="pdfButton" class="btn btn-primary" onclick="downloadPDF()">📄 PDF</button>
             <a href="/admin/shifts" class="btn btn-secondary">All Shifts</a>
           </div>
         </div>        ${shifts.length > 0 ? `

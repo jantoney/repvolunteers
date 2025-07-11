@@ -149,31 +149,37 @@ export async function generateVolunteerPDFData(volunteerId: string): Promise<PDF
       throw new Error("Volunteer not found");
     }
 
-    // Get assigned shifts
+    // Get assigned shifts - retrieve timestamps in Adelaide timezone
     const assignedShiftsRes = await client.queryObject<ShiftRow>(
       `SELECT s.id, s.role, s.arrive_time AT TIME ZONE 'Australia/Adelaide' as arrive_time, 
               s.depart_time AT TIME ZONE 'Australia/Adelaide' as depart_time, s.show_date_id,
-              sh.name as show_name, sh.id as show_id, DATE(sd.start_time) as show_date, sd.start_time, sd.end_time
+              sh.name as show_name, sh.id as show_id, 
+              TO_CHAR(sd.start_time AT TIME ZONE 'Australia/Adelaide', 'YYYY-MM-DD') as show_date, 
+              sd.start_time AT TIME ZONE 'Australia/Adelaide' as start_time, 
+              sd.end_time AT TIME ZONE 'Australia/Adelaide' as end_time
        FROM shifts s
        JOIN show_dates sd ON sd.id = s.show_date_id
        JOIN shows sh ON sh.id = sd.show_id
        JOIN participant_shifts vs ON vs.shift_id = s.id
        WHERE vs.participant_id = $1
-       ORDER BY sh.name, DATE(sd.start_time), sd.start_time, s.arrive_time`,
+       ORDER BY sh.name, sd.start_time AT TIME ZONE 'Australia/Adelaide', s.arrive_time AT TIME ZONE 'Australia/Adelaide'`,
       [volunteerId]
     );
 
-    // Get available shifts (not assigned to this volunteer)
+    // Get available shifts (not assigned to this volunteer) - retrieve timestamps in Adelaide timezone
     const shiftsRes = await client.queryObject<ShiftRow>(
       `SELECT s.id, s.role, s.arrive_time AT TIME ZONE 'Australia/Adelaide' as arrive_time, 
               s.depart_time AT TIME ZONE 'Australia/Adelaide' as depart_time, s.show_date_id,
-              sh.name as show_name, sh.id as show_id, DATE(sd.start_time) as show_date, sd.start_time, sd.end_time
+              sh.name as show_name, sh.id as show_id, 
+              TO_CHAR(sd.start_time AT TIME ZONE 'Australia/Adelaide', 'YYYY-MM-DD') as show_date, 
+              sd.start_time AT TIME ZONE 'Australia/Adelaide' as start_time, 
+              sd.end_time AT TIME ZONE 'Australia/Adelaide' as end_time
        FROM shifts s
        JOIN show_dates sd ON sd.id = s.show_date_id
        JOIN shows sh ON sh.id = sd.show_id
        LEFT JOIN participant_shifts vs ON vs.shift_id = s.id AND vs.participant_id = $1
        WHERE vs.participant_id IS NULL
-       ORDER BY sh.name, DATE(sd.start_time), sd.start_time, s.arrive_time`,
+       ORDER BY sh.name, sd.start_time AT TIME ZONE 'Australia/Adelaide', s.arrive_time AT TIME ZONE 'Australia/Adelaide'`,
       [volunteerId]
     );
 
@@ -400,41 +406,95 @@ export function formatShiftForDisplay(shift: ShiftRow): string {
  * Gets current and future shifts only, ordered by date (next shift first)
  */
 export function filterCurrentAndFutureShifts(shifts: ShiftRow[]): ShiftRow[] {
+  // Get current date in Adelaide timezone for comparison
+  // Use a more reliable method to get Adelaide's current date
   const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const adelaide = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Australia/Adelaide',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).format(now); // Returns YYYY-MM-DD format
+  
+  const [todayYear, todayMonth, todayDay] = adelaide.split('-').map(Number);
+  const today = new Date(todayYear, todayMonth - 1, todayDay);
 
   return shifts
     .filter(shift => {
       if (shift && shift.show_date) {
-        const shiftDate = new Date(shift.show_date);
+        // Parse the show_date as a local date (since it's already in Adelaide timezone from the DB)
+        const [year, month, day] = shift.show_date.split('-').map(Number);
+        const shiftDate = new Date(year, month - 1, day);
+        
         return shiftDate >= today;
       }
       return false;
     })
     .sort((a, b) => {
-      const dateA = new Date(a.show_date);
-      const dateB = new Date(b.show_date);
+      // Parse dates correctly for sorting
+      const [yearA, monthA, dayA] = a.show_date.split('-').map(Number);
+      const [yearB, monthB, dayB] = b.show_date.split('-').map(Number);
+      const dateA = new Date(yearA, monthA - 1, dayA);
+      const dateB = new Date(yearB, monthB - 1, dayB);
+      
       return dateA.getTime() - dateB.getTime();
     });
 }
 
 function formatDateForDisplay(dateString: string): string {
-  const date = new Date(dateString);
-  return date.toLocaleDateString('en-AU', {
-    weekday: 'short',
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric'
-  });
+  // The database returns timestamps already in Adelaide timezone
+  // We need to parse them as local time without timezone conversion
+  
+  if (dateString.includes('T')) {
+    // Format: 2025-07-15T18:00:00 (already in Adelaide time)
+    const datePart = dateString.split('T')[0];
+    const [year, month, day] = datePart.split('-').map(Number);
+    
+    // Create a date object directly from the components to avoid timezone issues
+    const date = new Date(year, month - 1, day, 12, 0, 0); // Use noon to avoid DST edge cases
+    
+    return date.toLocaleDateString('en-AU', {
+      weekday: 'short',
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric'
+    });
+  } else {
+    // Format: 2025-07-15 (date only)
+    const [year, month, day] = dateString.split('-').map(Number);
+    const date = new Date(year, month - 1, day, 12, 0, 0); // Use noon to avoid DST edge cases
+    
+    return date.toLocaleDateString('en-AU', {
+      weekday: 'short',
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric'
+    });
+  }
 }
 
 function formatTimeForDisplay(timeString: string): string {
-  const time = new Date(timeString);
-  return time.toLocaleTimeString('en-AU', {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: true
-  });
+  // The database returns timestamps already in Adelaide timezone
+  // We need to parse them as local time without timezone conversion
+  
+  if (timeString.includes('T')) {
+    // Format: 2025-07-15T18:00:00 (already in Adelaide time)
+    const timePart = timeString.split('T')[1];
+    const [hours, minutes] = timePart.split(':').map(Number);
+    
+    // Create a date object using a fixed date but with the specific time
+    // This avoids timezone conversion issues
+    const time = new Date(2025, 0, 1, hours, minutes); // Use a fixed date to avoid DST issues
+    
+    return time.toLocaleTimeString('en-AU', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true
+    });
+  } else {
+    // Fallback: assume it's already a time string
+    return timeString;
+  }
 }
 
 export function getVolunteerScheduleMimeType(): string {

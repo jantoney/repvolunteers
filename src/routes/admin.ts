@@ -73,6 +73,7 @@ router.get("/unfilled-shifts", adminController.showUnfilledShiftsPage);
 // Analytics API endpoints
 router.get("/api/analytics/unfilled", adminController.unfilledShifts);
 router.get("/api/unfilled-shifts/count", adminController.getUnfilledShiftsCount);
+router.get("/api/unfilled-shifts/pdf", adminController.downloadUnfilledShiftsPDF);
 router.get("/api/performances-without-shifts/count", adminController.getPerformancesWithoutShiftsCount);
 
 // Server time API endpoint

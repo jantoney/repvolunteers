@@ -1299,7 +1299,7 @@ export async function downloadVolunteerSchedulePDF(ctx: RouterContext<string>) {
   try {
     const { generateVolunteerPDFData, generateVolunteerSchedulePDF, getVolunteerScheduleMimeType, getVolunteerScheduleFileExtension } = await import("../utils/pdf-generator.ts");
 
-    const pdfData = await generateVolunteerPDFData(Number(volunteerId));
+    const pdfData = await generateVolunteerPDFData(volunteerId);
     const pdfBuffer = generateVolunteerSchedulePDF(pdfData);
 
     const filename = `theatre-shifts-${pdfData.volunteer.name.replace(/[^a-zA-Z0-9]/g, '-')}-${new Date().toISOString().split('T')[0]}.${getVolunteerScheduleFileExtension()}`;
@@ -1387,5 +1387,27 @@ export async function emailVolunteerSchedulePDF(ctx: RouterContext<string>) {
     console.error("Error sending volunteer schedule PDF:", error);
     ctx.response.status = 500;
     ctx.response.body = { error: "Failed to send schedule PDF" };
+  }
+}
+
+/**
+ * Generates and downloads unfilled shifts PDF - admin only
+ */
+export async function downloadUnfilledShiftsPDF(ctx: RouterContext<string>) {
+  try {
+    const { generateUnfilledShiftsPDF } = await import("../utils/unfilled-shifts-pdf-generator.ts");
+
+    // Generate PDF buffer
+    const pdfBuffer = await generateUnfilledShiftsPDF();
+
+    const filename = `unfilled-shifts-${new Date().toISOString().split('T')[0]}.pdf`;
+
+    ctx.response.headers.set("Content-Type", "application/pdf");
+    ctx.response.headers.set("Content-Disposition", `inline; filename="${filename}"`);
+    ctx.response.body = pdfBuffer;
+  } catch (error) {
+    console.error("Error generating unfilled shifts PDF:", error);
+    ctx.response.status = 500;
+    ctx.response.body = { error: "Failed to generate PDF" };
   }
 }

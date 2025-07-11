@@ -109,3 +109,40 @@ globalThis.onclick = function(event) {
     closeAssignmentModal();
   }
 }
+
+// Download PDF function
+function downloadPDF() {
+  const pdfButton = document.getElementById('pdfButton');
+  const originalText = pdfButton.innerHTML;
+  
+  try {
+    pdfButton.disabled = true;
+    pdfButton.innerHTML = '⏳ Generating...';
+    
+    // Open the PDF in a new tab/window
+    const pdfUrl = '/admin/api/unfilled-shifts/pdf';
+    globalThis.open(pdfUrl, '_blank');
+    
+    // Reset button after a short delay
+    setTimeout(() => {
+      pdfButton.disabled = false;
+      pdfButton.innerHTML = '✓ PDF Generated!';
+      
+      // Reset to original text after 2 seconds
+      setTimeout(() => {
+        pdfButton.innerHTML = originalText;
+      }, 2000);
+    }, 1000);
+    
+  } catch (error) {
+    console.error('PDF generation failed:', error);
+    pdfButton.disabled = false;
+    pdfButton.innerHTML = originalText;
+    
+    if (typeof Modal !== 'undefined') {
+      Modal.error('Error', 'Failed to generate PDF. Please try again.');
+    } else {
+      alert('Failed to generate PDF. Please try again.');
+    }
+  }
+}

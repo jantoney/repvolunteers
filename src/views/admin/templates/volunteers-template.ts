@@ -177,7 +177,7 @@ export function renderVolunteersTemplate(data: VolunteersPageData): string {
                     <div class="table-actions">
                       <a href="/admin/volunteers/${volunteer.id}/shifts" class="btn btn-sm btn-info">Shifts</a>
                       <a href="/admin/volunteers/${volunteer.id}/edit" class="btn btn-sm btn-secondary">Edit</a>
-                      <button onclick="sendSchedulePDF('${volunteer.id}', '${volunteer.name.replace(/'/g, "\\'")}', '${volunteer.email || ''}')" class="btn btn-sm btn-success" ${!volunteer.email ? 'disabled title="No email address"' : ''}>📧 Send PDF</button>
+                      <button class="send-pdf-btn btn btn-sm btn-success" data-volunteer-id="${volunteer.id}" data-volunteer-name="${volunteer.name}" data-volunteer-email="${volunteer.email || ''}" ${!volunteer.email ? 'disabled title="No email address"' : ''}>📧 Send PDF</button>
                       <button onclick="deleteVolunteer('${volunteer.id}', '${volunteer.name.replace(/'/g, "\\'")}')" class="btn btn-sm btn-danger">Delete</button>
                     </div>
                   </td>
@@ -202,6 +202,22 @@ export function renderVolunteersTemplate(data: VolunteersPageData): string {
             const fullUrl = globalThis.location.origin + relativeUrl;
             input.setAttribute('data-full-url', fullUrl);
             input.value = fullUrl;
+          });
+
+          // Add event listeners for Send PDF buttons
+          const sendPdfButtons = document.querySelectorAll('.send-pdf-btn');
+          sendPdfButtons.forEach(button => {
+            button.addEventListener('click', function() {
+              const volunteerId = this.getAttribute('data-volunteer-id');
+              const volunteerName = this.getAttribute('data-volunteer-name');
+              const volunteerEmail = this.getAttribute('data-volunteer-email');
+              
+              console.log('Send PDF clicked:', { volunteerId, volunteerName, volunteerEmail });
+              
+              if (volunteerId && volunteerName) {
+                sendSchedulePDF(volunteerId, volunteerName, volunteerEmail);
+              }
+            });
           });
         });
         
@@ -394,6 +410,8 @@ export function renderVolunteersTemplate(data: VolunteersPageData): string {
         
         // Send schedule PDF via email
         async function sendSchedulePDF(volunteerId, volunteerName, volunteerEmail) {
+          console.log('sendSchedulePDF called with:', { volunteerId, volunteerName, volunteerEmail });
+          
           if (!volunteerEmail) {
             if (typeof Modal !== 'undefined') {
               Modal.error('Cannot Send PDF', 'This volunteer does not have an email address on file.');
@@ -403,55 +421,95 @@ export function renderVolunteersTemplate(data: VolunteersPageData): string {
             return;
           }
           
-          const confirmMessage = \`Send \${volunteerName}'s schedule PDF to \${volunteerEmail}?\`;
+          // Generate the confirmation message fresh each time
+          console.log('Generating modal with:', { volunteerName, volunteerEmail });
           
-          const sendEmail = async () => {
-            try {
-              const response = await fetch(\`/admin/api/volunteers/\${volunteerId}/email-schedule-pdf\`, {
-                method: 'POST',
-                credentials: 'include'
-              });
-              
-              if (response.ok) {
-                const result = await response.json();
-                const message = result.hasShifts 
-                  ? \`Schedule PDF sent to \${volunteerEmail}! They have \${result.shiftsCount} upcoming shifts.\`
-                  : \`Schedule PDF sent to \${volunteerEmail}! They currently have no assigned shifts for future dates.\`;
-                  
-                if (typeof Modal !== 'undefined') {
-                  Modal.success('PDF Sent', message);
-                } else {
-                  alert(message);
+          if (typeof Modal !== 'undefined') {
+            // Generate unique modal ID to prevent caching issues
+            const uniqueModalId = \`send-pdf-\${Date.now()}-\${Math.random().toString(36).substr(2, 9)}\`;
+            const modalTitle = 'Send Schedule PDF';
+            const modalMessage = \`Send \${volunteerName}'s schedule PDF to \${volunteerEmail}?\`;
+            
+            console.log('Modal message will be:', modalMessage);
+            console.log('Using modal ID:', uniqueModalId);
+            
+            // Use showModal with unique ID instead of confirm method
+            Modal.showModal(uniqueModalId, {
+              title: modalTitle,
+              body: \`<p>\${modalMessage}</p>\`,
+              buttons: [
+                {
+                  text: 'Cancel',
+                  className: 'modal-btn-outline',
+                  action: 'cancel',
+                  handler: () => {
+                    console.log('Send PDF cancelled');
+                  }
+                },
+                {
+                  text: 'Send PDF',
+                  className: 'modal-btn-primary',
+                  action: 'confirm',
+                  handler: async () => {
+                    // Capture the variables at modal confirmation time
+                    const currentVolunteerId = volunteerId;
+                    const currentVolunteerEmail = volunteerEmail;
+                    const currentVolunteerName = volunteerName;
+                    
+                    try {
+                      console.log('Modal confirmed, sending to:', { currentVolunteerId, currentVolunteerName, currentVolunteerEmail });
+                      
+                      const response = await fetch(\`/admin/api/volunteers/\${currentVolunteerId}/email-schedule-pdf\`, {
+                        method: 'POST',
+                        credentials: 'include'
+                      });
+                      
+                      if (response.ok) {
+                        const result = await response.json();
+                        const message = result.hasShifts 
+                          ? \`Schedule PDF sent to \${currentVolunteerEmail}! They have \${result.shiftsCount} upcoming shifts.\`
+                          : \`Schedule PDF sent to \${currentVolunteerEmail}! They currently have no assigned shifts for future dates.\`;
+                          
+                        Modal.success('PDF Sent', message);
+                      } else {
+                        const error = await response.json();
+                        Modal.error('Error', 'Failed to send PDF: ' + (error.error || 'Unknown error'));
+                      }
+                    } catch (error) {
+                      console.error('Error sending PDF:', error);
+                      Modal.error('Error', 'Error sending schedule PDF');
+                    }
+                  }
                 }
-              } else {
-                const error = await response.json();
-                if (typeof Modal !== 'undefined') {
-                  Modal.error('Error', 'Failed to send PDF: ' + (error.error || 'Unknown error'));
+              ]
+            });
+          } else {
+            const confirmMessage = \`Send \${volunteerName}'s schedule PDF to \${volunteerEmail}?\`;
+            if (confirm(confirmMessage)) {
+              try {
+                const response = await fetch(\`/admin/api/volunteers/\${volunteerId}/email-schedule-pdf\`, {
+                  method: 'POST',
+                  credentials: 'include'
+                });
+                
+                if (response.ok) {
+                  const result = await response.json();
+                  const message = result.hasShifts 
+                    ? \`Schedule PDF sent to \${volunteerEmail}! They have \${result.shiftsCount} upcoming shifts.\`
+                    : \`Schedule PDF sent to \${volunteerEmail}! They currently have no assigned shifts for future dates.\`;
+                    
+                  alert(message);
                 } else {
+                  const error = await response.json();
                   alert('Failed to send PDF: ' + (error.error || 'Unknown error'));
                 }
-              }
-            } catch (error) {
-              console.error('Error sending PDF:', error);
-              if (typeof Modal !== 'undefined') {
-                Modal.error('Error', 'Error sending schedule PDF');
-              } else {
+              } catch (error) {
+                console.error('Error sending PDF:', error);
                 alert('Error sending schedule PDF');
               }
             }
-          };
-          
-          if (typeof Modal !== 'undefined') {
-            Modal.confirm('Send Schedule PDF', confirmMessage, sendEmail);
-          } else {
-            if (confirm(confirmMessage)) {
-              await sendEmail();
-            }
           }
         }
-        
-        // Make function globally available
-        globalThis.sendSchedulePDF = sendSchedulePDF;
       </script>
     </body>
     </html>
