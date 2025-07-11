@@ -259,10 +259,10 @@ export function renderVolunteerShiftsTemplate(data: VolunteerShiftsPageData): st
                     </div>
                   </div>
                   <div class="shift-actions">
-                    <button class="btn btn-sm btn-danger" onclick="removeShift(${shift.id}, '${shift.role}', '${shift.show_name}')">
+                    <button class="btn btn-sm btn-danger" onclick="removeShift(${shift.id}, '${shift.role.replace(/'/g, "\\'")}', '${shift.show_name.replace(/'/g, "\\'")}')">
                       Remove
                     </button>
-                    <button class="btn btn-sm btn-warning" onclick="swapShift(${shift.id}, '${shift.role}', '${shift.show_name}')">
+                    <button class="btn btn-sm btn-warning" onclick="swapShift(${shift.id}, '${shift.role.replace(/'/g, "\\'")}', '${shift.show_name.replace(/'/g, "\\'")}')">
                       Swap
                     </button>
                   </div>
@@ -281,13 +281,13 @@ export function renderVolunteerShiftsTemplate(data: VolunteerShiftsPageData): st
         const volunteerName = "${volunteer.name.replace(/"/g, '\\"')}";
         const allShifts = ${JSON.stringify(assignedShifts)};
         
-  // No timezone filtering or conversion. Display as received.
+        // No timezone filtering or conversion. Display as received.
         
-        // Remove shift function
-        async function removeShift(shiftId, role, showName) {
+        // Remove shift function - make it globally accessible
+        window.removeShift = async function(shiftId, role, showName) {
           const confirmed = await Modal.confirm(
             'Remove Shift Assignment',
-            \`Are you sure you want to remove <strong>\${volunteerName}</strong> from the <strong>\${role}</strong> shift for <strong>\${showName}</strong>?\`,
+            'Are you sure you want to remove <strong>' + volunteerName + '</strong> from the <strong>' + role + '</strong> shift for <strong>' + showName + '</strong>?',
             () => true,
             () => false
           );
@@ -295,7 +295,7 @@ export function renderVolunteerShiftsTemplate(data: VolunteerShiftsPageData): st
           if (!confirmed) return;
           
           try {
-            const response = await fetch(\`/admin/api/volunteers/\${volunteerId}/shifts/\${shiftId}\`, {
+            const response = await fetch('/admin/api/volunteers/' + volunteerId + '/shifts/' + shiftId, {
               method: 'DELETE',
               credentials: 'include'
             });
@@ -313,11 +313,11 @@ export function renderVolunteerShiftsTemplate(data: VolunteerShiftsPageData): st
           }
         }
         
-        // Swap shift function - swap with another role on the same performance
-        async function swapShift(shiftId, role, showName) {
+        // Swap shift function - swap with another role on the same performance - make it globally accessible
+        window.swapShift = async function(shiftId, role, showName) {
           try {
             // First, get list of other roles available for the same performance
-            const response = await fetch(\`/admin/api/shifts/\${shiftId}/available-roles\`, {
+            const response = await fetch('/admin/api/shifts/' + shiftId + '/available-roles', {
               credentials: 'include'
             });
             
@@ -335,29 +335,28 @@ export function renderVolunteerShiftsTemplate(data: VolunteerShiftsPageData): st
             
             // Create role selection modal content
             const roleOptions = availableRoles.map(roleShift => 
-              \`<option value="\${roleShift.id}">\${roleShift.role}</option>\`
+              '<option value="' + roleShift.id + '">' + roleShift.role + '</option>'
             ).join('');
             
-            const modalContent = \`
-              <p>Select a role to swap to for <strong>\${showName}</strong>:</p>
-              <p>Current role: <strong>\${role}</strong></p>
-              <select id="swapRoleSelect" class="form-control" style="width: 100%; margin: 1rem 0;">
-                <option value="">Select a role...</option>
-                \${roleOptions}
-              </select>
-            \`;
+            const modalContent = 
+              '<p>Select a role to swap to for <strong>' + showName + '</strong>:</p>' +
+              '<p>Current role: <strong>' + role + '</strong></p>' +
+              '<select id="swapRoleSelect" class="form-control" style="width: 100%; margin: 1rem 0;">' +
+                '<option value="">Select a role...</option>' +
+                roleOptions +
+              '</select>';
             
             Modal.confirm(
               'Swap to Different Role',
               modalContent,
-              async () => {
+              () => {
                 const newShiftId = document.getElementById('swapRoleSelect').value;
                 if (!newShiftId) {
                   Modal.error('Error', 'Please select a role to swap to');
                   return;
                 }
                 
-                await performRoleSwap(shiftId, newShiftId, role, showName);
+                window.performRoleSwap(shiftId, newShiftId, role, showName);
               }
             );
             
@@ -367,11 +366,11 @@ export function renderVolunteerShiftsTemplate(data: VolunteerShiftsPageData): st
           }
         }
         
-        // Perform the actual role swap
-        async function performRoleSwap(currentShiftId, newShiftId, currentRole, showName) {
+        // Perform the actual role swap - make it globally accessible
+        window.performRoleSwap = async function(currentShiftId, newShiftId, currentRole, showName) {
           try {
             // Remove from current role
-            let response = await fetch(\`/admin/api/volunteers/\${volunteerId}/shifts/\${currentShiftId}\`, {
+            let response = await fetch('/admin/api/volunteers/' + volunteerId + '/shifts/' + currentShiftId, {
               method: 'DELETE',
               credentials: 'include'
             });
