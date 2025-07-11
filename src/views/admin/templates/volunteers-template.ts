@@ -361,7 +361,7 @@ export function renderVolunteersTemplate(data: VolunteersPageData): string {
             
             // Show success message
             if (typeof Modal !== 'undefined') {
-              Modal.success('Success', \`Login \${approved ? 'enabled' : 'disabled'} for \${volunteerName}\`);
+              Modal.success('Success', \`\${volunteerName} \${approved ? 'enabled' : 'disabled'}\`);
             }
           } else {
             // Revert the toggle on error
@@ -451,13 +451,18 @@ export function renderVolunteersTemplate(data: VolunteersPageData): string {
                   className: 'modal-btn-primary',
                   action: 'confirm',
                   handler: async () => {
-                    // Capture the variables at modal confirmation time
+                    // Capture the variables at modal confirmation time to ensure they're current
                     const currentVolunteerId = volunteerId;
                     const currentVolunteerEmail = volunteerEmail;
                     const currentVolunteerName = volunteerName;
                     
                     try {
-                      console.log('Modal confirmed, sending to:', { currentVolunteerId, currentVolunteerName, currentVolunteerEmail });
+                      console.log('Modal confirmed, sending to:', { 
+                        currentVolunteerId, 
+                        currentVolunteerName, 
+                        currentVolunteerEmail,
+                        originalArgs: { volunteerId, volunteerName, volunteerEmail }
+                      });
                       
                       const response = await fetch(\`/admin/api/volunteers/\${currentVolunteerId}/email-schedule-pdf\`, {
                         method: 'POST',
@@ -466,6 +471,7 @@ export function renderVolunteersTemplate(data: VolunteersPageData): string {
                       
                       if (response.ok) {
                         const result = await response.json();
+                        console.log('PDF send response:', result);
                         const message = result.hasShifts 
                           ? \`Schedule PDF sent to \${currentVolunteerEmail}! They have \${result.shiftsCount} upcoming shifts.\`
                           : \`Schedule PDF sent to \${currentVolunteerEmail}! They currently have no assigned shifts for future dates.\`;
@@ -494,6 +500,7 @@ export function renderVolunteersTemplate(data: VolunteersPageData): string {
                 
                 if (response.ok) {
                   const result = await response.json();
+                  console.log('PDF send response (fallback):', result);
                   const message = result.hasShifts 
                     ? \`Schedule PDF sent to \${volunteerEmail}! They have \${result.shiftsCount} upcoming shifts.\`
                     : \`Schedule PDF sent to \${volunteerEmail}! They currently have no assigned shifts for future dates.\`;
