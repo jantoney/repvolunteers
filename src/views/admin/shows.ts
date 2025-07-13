@@ -38,10 +38,6 @@ export function renderShowsTemplate(data: ShowsPageData): string {
       ${getAdminStyles()}      <style>
         .expandable-row { display: none; }
         .expandable-row.expanded { display: table-row; }
-        .expandable-row td { background: #f8f9fa; border-left: 3px solid #007bff; }
-        .expand-btn { background: none; border: none; color: #007bff; cursor: pointer; padding: 0; font-size: 0.875rem; }
-        .expand-btn:hover { text-decoration: underline; }
-        
         /* Traffic light indicator styles */
         .traffic-light {
           display: inline-block;
@@ -67,13 +63,11 @@ export function renderShowsTemplate(data: ShowsPageData): string {
           background-color: #6c757d;
           border-color: #545b62;
         }
-        
         .shift-stats {
           font-size: 0.875rem;
           color: #6c757d;
           margin-left: 4px;
         }
-        
         .performance-link {
           color: #007bff;
           text-decoration: none;
@@ -172,124 +166,7 @@ export function renderShowsTemplate(data: ShowsPageData): string {
       <script src="/src/utils/modal.js"></script>
       <script src="/src/utils/timezone-client.js"></script>
       ${getAdminScripts()}
-      <script>
-        // Global variable for tracking expanded shows
-        var expandedShows = new Set();
-        
-        // Display and update current Adelaide time
-        function updateAdelaideTime() {
-          const timeElement = document.getElementById('currentAdelaideTime');
-          if (timeElement) {
-            const adelaideTZ = DateTimeFormat.ADELAIDE_TIMEZONE;
-            const now = new Date();
-            const adelaideTime = DateTimeFormat.formatDateTime(now);
-          }
-        }
-        
-        // Update time immediately and then every minute
-        updateAdelaideTime();
-        setInterval(updateAdelaideTime, 60000);
-        
-        // Global function for toggling show dates
-        window.toggleDates = async function(showId) {
-          const row = document.getElementById(\`dates-\${showId}\`);
-          const content = document.getElementById(\`dates-content-\${showId}\`);
-          
-          if (expandedShows.has(showId)) {
-            row.classList.remove('expanded');
-            expandedShows.delete(showId);
-          } else {
-            row.classList.add('expanded');
-            expandedShows.add(showId);
-            
-            if (content.textContent === 'Loading dates...') {
-              try {
-                const response = await fetch(\`/admin/api/shows/\${showId}/dates\`, {
-                  credentials: 'include'
-                });
-                
-                if (response.ok) {
-                  const dates = await response.json();
-                  
-                  if (dates.length === 0) {
-                    content.innerHTML = '<em>No performance dates set</em>';
-                  } else {                    content.innerHTML = \`
-                      <table style="width: 100%; margin: 0;">
-                        <thead>
-                          <tr style="background: none;">
-                            <th style="padding: 0.5rem; border: none;">Date</th>
-                            <th style="padding: 0.5rem; border: none;">Show Time</th>
-                            <th style="padding: 0.5rem; border: none;">Shifts</th>
-                            <th style="padding: 0.5rem; border: none;">Actions</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          \${dates.map(date => {
-                            // Calculate shift status for this performance
-                            const fillPercentage = date.total_shifts > 0 ? (date.filled_shifts / date.total_shifts) * 100 : 0;
-                            let trafficColor = 'grey';
-                            if (date.total_shifts > 0) {
-                              if (fillPercentage >= 80) trafficColor = 'green';
-                              else if (fillPercentage >= 50) trafficColor = 'yellow';
-                              else trafficColor = 'red';
-                            }
-                            
-                            return \`
-                              <tr>
-                                <td style="padding: 0.5rem; border: none;">\${DateTimeFormat.formatDate(new Date(date.start_time))}</td>
-                                <td style="padding: 0.5rem; border: none;">\${DateTimeFormat.formatShowTimeRange(new Date(date.start_time), new Date(date.end_time))}</td>
-                                <td style="padding: 0.5rem; border: none;">
-                                  <span class="traffic-light \${trafficColor}" style="width: 16px; height: 16px; margin-right: 6px;" 
-                                        title="\${date.total_shifts > 0 ? date.filled_shifts + '/' + date.total_shifts + ' filled' : 'No shifts'}"></span>
-                                  \${date.total_shifts > 0 ? date.filled_shifts + '/' + date.total_shifts : 'No shifts'}
-                                </td>
-                                <td style="padding: 0.5rem; border: none;">
-                                  \${date.total_shifts > 0 ? 
-                                    \`<a href="/admin/shifts?shows=\${showId}&date=\${DateTimeFormat.formatDateForInput(new Date(date.start_time))}" class="performance-link">View Shifts</a>\` : 
-                                    '<span style="color: #6c757d;">No shifts</span>'
-                                  }
-                                </td>
-                              </tr>
-                            \`;
-                          }).join('')}
-                        </tbody>
-                      </table>
-                    \`;
-                  }
-                } else {
-                  content.innerHTML = '<em>Error loading dates</em>';
-                }
-              } catch (error) {
-                console.error('Error:', error);
-                content.innerHTML = '<em>Error loading dates</em>';
-              }
-            }
-          }
-        }
-        
-        // Global function for deleting shows
-        window.deleteShow = async function(id, name) {
-          if (!confirm(\`Are you sure you want to delete the show "\${name}"? This will also delete all associated performance dates and shifts.\`)) {
-            return;
-          }
-          
-          try {
-            const response = await fetch(\`/admin/api/shows/\${id}\`, {
-              method: 'DELETE',
-              credentials: 'include'
-            });
-            
-            if (response.ok) {
-              location.reload();
-            } else {
-              Modal.error('Error', 'Failed to delete show');
-            }
-          } catch (error) {
-            console.error('Error:', error);
-            Modal.error('Error', 'Error deleting show');
-          }
-        }
-      </script>
+      <script src="/src/views/admin/shows-page.js"></script>
     </body>
     </html>
   `;

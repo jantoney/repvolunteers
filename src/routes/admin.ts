@@ -29,7 +29,11 @@ router.get("/api/shows", adminController.listShows);
 router.post("/api/shows", adminController.createShow);
 router.put("/api/shows/:id", adminController.updateShow);
 router.delete("/api/shows/:id", adminController.deleteShow);
+
 router.get("/api/shows/:showId/dates", adminController.listShowDates);
+// Running sheet PDF endpoints
+router.get("/api/shows/:showId/run-sheet/:date", adminController.downloadRunSheetPDF); // Legacy endpoint
+router.get("/api/show-dates/:showDateId/run-sheet", adminController.downloadRunSheetPDFByShowDate); // New specific endpoint
 
 // Show dates API endpoints
 router.post("/api/show-dates", adminController.createShowDate);

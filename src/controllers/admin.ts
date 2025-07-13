@@ -8,6 +8,7 @@ import {
 import { getAuth } from "../auth.ts";
 import { generateShiftRemovalPDF as generatePDF, getMimeType, getFileExtension, type ShiftData, type VolunteerData } from "../utils/pdf-generator.ts";
 
+
 // Import view functions from separated files
 export {
   showLoginForm,
@@ -66,8 +67,273 @@ export async function logout(ctx: RouterContext<string>) {
   }
 }
 
+// Generate and download running sheet PDF for a show/date
+export async function downloadRunSheetPDF(ctx: RouterContext<string>) {
+  const showId = ctx.params.showId;
+  const date = ctx.params.date;
+  const pool = getPool();
+  const client = await pool.connect();
+  try {
+    // Get show and performance info
+    const showRes = await client.queryObject<{ name: string }>("SELECT name FROM shows WHERE id = $1", [showId]);
+    if (showRes.rows.length === 0) {
+      ctx.throw(404, "Show not found");
+    }
+    const showName = showRes.rows[0].name;
+
+    // Get show date info (with Adelaide timezone conversion)
+    const perfRes = await client.queryObject<{ 
+      id: number; 
+      start_time: string; 
+      end_time: string;
+      performance_start: string;
+      performance_end: string;
+    }>(
+      `SELECT id, start_time, end_time,
+              TO_CHAR(start_time AT TIME ZONE 'Australia/Adelaide', 'HH24:MI') as performance_start,
+              TO_CHAR(end_time AT TIME ZONE 'Australia/Adelaide', 'HH24:MI') as performance_end
+       FROM show_dates 
+       WHERE show_id = $1 AND TO_CHAR(start_time AT TIME ZONE 'Australia/Adelaide', 'YYYY-MM-DD') = $2`,
+      [showId, date]
+    );
+    if (perfRes.rows.length === 0) {
+      ctx.throw(404, "Performance date not found");
+    }
+    const perf = perfRes.rows[0];
+    const performanceTime = `${perf.performance_start} - ${perf.performance_end}`;
+
+    // Get all shifts for this performance (with Adelaide timezone conversion)
+    const shiftsRes = await client.queryObject<{
+      id: number;
+      role: string;
+      arrive_time: string;
+      depart_time: string;
+    }>(
+      `SELECT id, role, 
+              TO_CHAR(arrive_time AT TIME ZONE 'Australia/Adelaide', 'HH24:MI') as arrive_time,
+              TO_CHAR(depart_time AT TIME ZONE 'Australia/Adelaide', 'HH24:MI') as depart_time
+       FROM shifts 
+       WHERE show_date_id = $1 
+       ORDER BY arrive_time, role`,
+      [perf.id]
+    );
+
+    // Get all participants assigned to shifts for this performance (with Adelaide timezone conversion)
+    const participantsRes = await client.queryObject<{
+      name: string;
+      role: string;
+      arrive_time: string;
+      depart_time: string;
+    }>(
+      `SELECT p.name, s.role, 
+              TO_CHAR(s.arrive_time AT TIME ZONE 'Australia/Adelaide', 'HH24:MI') as arrive_time,
+              TO_CHAR(s.depart_time AT TIME ZONE 'Australia/Adelaide', 'HH24:MI') as depart_time
+       FROM participant_shifts vs
+       JOIN participants p ON p.id = vs.participant_id
+       JOIN shifts s ON s.id = vs.shift_id
+       WHERE s.show_date_id = $1
+       ORDER BY p.name, s.arrive_time, s.role`,
+      [perf.id]
+    );
+
+    // Find unfilled shifts for current performance (not used anymore, but kept for potential future use)
+    const _unfilledShifts = shiftsRes.rows.filter(shift => {
+      // If no participant assigned to this role/arrive/depart combination
+      return !participantsRes.rows.some(p => 
+        p.role === shift.role && 
+        p.arrive_time === shift.arrive_time && 
+        p.depart_time === shift.depart_time
+      );
+    });
+
+    // Format participants (times are already in Adelaide timezone from SQL)
+    const participants = participantsRes.rows.map(p => ({
+      name: p.name,
+      role: p.role,
+      arriveTime: p.arrive_time,
+      departTime: p.depart_time
+    }));
+
+    // Get unfilled shifts for the next 3 weeks for this show (including current performance)
+    const unfilledShiftsRes = await client.queryObject<{
+      date: string;
+      role: string;
+      arrive_time: string;
+      depart_time: string;
+    }>(
+      `SELECT TO_CHAR(sd.start_time AT TIME ZONE 'Australia/Adelaide', 'YYYY-MM-DD') as date,
+              s.role,
+              TO_CHAR(s.arrive_time AT TIME ZONE 'Australia/Adelaide', 'HH24:MI') as arrive_time,
+              TO_CHAR(s.depart_time AT TIME ZONE 'Australia/Adelaide', 'HH24:MI') as depart_time
+       FROM shifts s
+       JOIN show_dates sd ON sd.id = s.show_date_id
+       LEFT JOIN participant_shifts ps ON ps.shift_id = s.id
+       WHERE sd.show_id = $1 
+         AND sd.start_time AT TIME ZONE 'Australia/Adelaide' >= $2::date
+         AND sd.start_time AT TIME ZONE 'Australia/Adelaide' <= $2::date + INTERVAL '3 weeks'
+       GROUP BY sd.start_time, s.role, s.arrive_time, s.depart_time
+       HAVING COUNT(ps.participant_id) = 0
+       ORDER BY sd.start_time, s.arrive_time`,
+      [showId, date]
+    );
+
+    // Format unfilled shifts (times are already in Adelaide timezone from SQL)
+    const unfilled = unfilledShiftsRes.rows.map(s => ({
+      date: s.date,
+      role: s.role,
+      arriveTime: s.arrive_time,
+      departTime: s.depart_time
+    }));
+
+    // Generate PDF using the updated PDF generator
+    const { generateRunSheetPDF } = await import("../utils/run-sheet-pdf-generator.ts");
+    const pdfBuffer = generateRunSheetPDF({
+      showName,
+      date,
+      performanceTime,
+      participants,
+      unfilledShifts: unfilled
+    });
+
+    const filename = `run-sheet-${showId}-${date}.pdf`;
+
+    ctx.response.status = 200;
+    ctx.response.headers.set("Content-Type", "application/pdf");
+    ctx.response.headers.set("Content-Disposition", `inline; filename="${filename}"`);
+    ctx.response.body = pdfBuffer;
+  } finally {
+    client.release();
+  }
+}
+
+// Generate and download running sheet PDF for a specific show date (performance)
+export async function downloadRunSheetPDFByShowDate(ctx: RouterContext<string>) {
+  const showDateId = ctx.params.showDateId;
+  const pool = getPool();
+  const client = await pool.connect();
+  try {
+    // Get show date and show info in one query
+    const showDateRes = await client.queryObject<{ 
+      show_id: number;
+      show_name: string;
+      date: string;
+      performance_start: string;
+      performance_end: string;
+    }>(
+      `SELECT sd.show_id, s.name as show_name,
+              TO_CHAR(sd.start_time AT TIME ZONE 'Australia/Adelaide', 'YYYY-MM-DD') as date,
+              TO_CHAR(sd.start_time AT TIME ZONE 'Australia/Adelaide', 'HH24:MI') as performance_start,
+              TO_CHAR(sd.end_time AT TIME ZONE 'Australia/Adelaide', 'HH24:MI') as performance_end
+       FROM show_dates sd
+       JOIN shows s ON s.id = sd.show_id
+       WHERE sd.id = $1`,
+      [showDateId]
+    );
+    
+    if (showDateRes.rows.length === 0) {
+      ctx.throw(404, "Performance not found");
+    }
+    
+    const showDate = showDateRes.rows[0];
+    const performanceTime = `${showDate.performance_start} - ${showDate.performance_end}`;
+
+    // Get all shifts for this specific performance (for reference, but not directly used)
+    const _shiftsRes = await client.queryObject<{
+      id: number;
+      role: string;
+      arrive_time: string;
+      depart_time: string;
+    }>(
+      `SELECT id, role, 
+              TO_CHAR(arrive_time AT TIME ZONE 'Australia/Adelaide', 'HH24:MI') as arrive_time,
+              TO_CHAR(depart_time AT TIME ZONE 'Australia/Adelaide', 'HH24:MI') as depart_time
+       FROM shifts 
+       WHERE show_date_id = $1 
+       ORDER BY arrive_time, role`,
+      [showDateId]
+    );
+
+    // Get all participants assigned to shifts for this specific performance
+    const participantsRes = await client.queryObject<{
+      name: string;
+      role: string;
+      arrive_time: string;
+      depart_time: string;
+    }>(
+      `SELECT p.name, s.role, 
+              TO_CHAR(s.arrive_time AT TIME ZONE 'Australia/Adelaide', 'HH24:MI') as arrive_time,
+              TO_CHAR(s.depart_time AT TIME ZONE 'Australia/Adelaide', 'HH24:MI') as depart_time
+       FROM participant_shifts vs
+       JOIN participants p ON p.id = vs.participant_id
+       JOIN shifts s ON s.id = vs.shift_id
+       WHERE s.show_date_id = $1
+       ORDER BY p.name, s.arrive_time, s.role`,
+      [showDateId]
+    );
+
+    // Format participants (times are already in Adelaide timezone from SQL)
+    const participants = participantsRes.rows.map(p => ({
+      name: p.name,
+      role: p.role,
+      arriveTime: p.arrive_time,
+      departTime: p.depart_time
+    }));
+
+    // Get unfilled shifts for the next 3 weeks from this performance date onwards
+    const unfilledShiftsRes = await client.queryObject<{
+      date: string;
+      role: string;
+      arrive_time: string;
+      depart_time: string;
+    }>(
+      `SELECT TO_CHAR(sd.start_time AT TIME ZONE 'Australia/Adelaide', 'YYYY-MM-DD') as date,
+              s.role,
+              TO_CHAR(s.arrive_time AT TIME ZONE 'Australia/Adelaide', 'HH24:MI') as arrive_time,
+              TO_CHAR(s.depart_time AT TIME ZONE 'Australia/Adelaide', 'HH24:MI') as depart_time
+       FROM shifts s
+       JOIN show_dates sd ON sd.id = s.show_date_id
+       LEFT JOIN participant_shifts ps ON ps.shift_id = s.id
+       WHERE sd.show_id = $1 
+         AND sd.start_time AT TIME ZONE 'Australia/Adelaide' >= $2::date
+         AND sd.start_time AT TIME ZONE 'Australia/Adelaide' <= $2::date + INTERVAL '3 weeks'
+       GROUP BY sd.start_time, s.role, s.arrive_time, s.depart_time
+       HAVING COUNT(ps.participant_id) = 0
+       ORDER BY sd.start_time, s.arrive_time`,
+      [showDate.show_id, showDate.date]
+    );
+
+    // Format unfilled shifts (times are already in Adelaide timezone from SQL)
+    const unfilled = unfilledShiftsRes.rows.map(s => ({
+      date: s.date,
+      role: s.role,
+      arriveTime: s.arrive_time,
+      departTime: s.depart_time
+    }));
+
+    // Generate PDF using the updated PDF generator
+    const { generateRunSheetPDF } = await import("../utils/run-sheet-pdf-generator.ts");
+    const pdfBuffer = generateRunSheetPDF({
+      showName: showDate.show_name,
+      date: showDate.date,
+      performanceTime,
+      participants,
+      unfilledShifts: unfilled
+    });
+
+    const filename = `run-sheet-${showDate.show_id}-${showDateId}-${showDate.date}.pdf`;
+
+    ctx.response.status = 200;
+    ctx.response.headers.set("Content-Type", "application/pdf");
+    ctx.response.headers.set("Content-Disposition", `inline; filename="${filename}"`);
+    ctx.response.body = pdfBuffer;
+  } finally {
+    client.release();
+  }
+}
+
 // API Functions for Shows
 export async function listShows(ctx: RouterContext<string>) {
+
   const pool = getPool();
   const client = await pool.connect();
   try {

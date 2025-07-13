@@ -128,6 +128,56 @@ export function getFileExtension(): string {
   return "txt";
 }
 
+/**
+ * Generates a running sheet report for a show performance
+ */
+export function generateRunSheetPDF(data: {
+  showName: string;
+  date: string;
+  performanceTime: string;
+  participants: Array<{
+    name: string;
+    arriveTime: string;
+    departTime: string;
+    role: string;
+  }>;
+  unfilledShifts: Array<{
+    role: string;
+    arriveTime: string;
+    departTime: string;
+  }>;
+}): Uint8Array {
+  const currentDate = new Date().toLocaleDateString('en-AU', {
+    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+  });
+  const currentTime = new Date().toLocaleTimeString('en-AU', {
+    hour: '2-digit', minute: '2-digit'
+  });
+
+  let content = `THEATRE SHIFTS - PERFORMANCE RUNNING SHEET\n==========================================\n\nGenerated: ${currentDate} at ${currentTime}\n\nSHOW INFORMATION\n================\nShow: ${data.showName}\nDate: ${data.date}\nPerformance Time: ${data.performanceTime}\n\nVOLUNTEERS\n==========\n`;
+
+  if (data.participants.length === 0) {
+    content += 'No volunteers assigned for this performance.\n';
+  } else {
+    data.participants.forEach((p, idx) => {
+      content += `${idx + 1}. Name: ${p.name}\n   Role: ${p.role}\n   Arrive: ${p.arriveTime}\n   Depart: ${p.departTime}\n`;
+    });
+  }
+
+  content += `\nUNFILLED SHIFTS\n===============\n`;
+  if (data.unfilledShifts.length === 0) {
+    content += 'All shifts are filled.\n';
+  } else {
+    data.unfilledShifts.forEach((s, idx) => {
+      content += `${idx + 1}. Role: ${s.role}\n   Arrive: ${s.arriveTime}\n   Depart: ${s.departTime}\n   Date: ${s.date}\n`;
+    });
+  }
+
+  content += `\nNote: No participant contact details are included in this report.\n\nTheatre Shifts Management System\nReport Generated: ${new Date().toISOString()}\n`;
+
+  return new TextEncoder().encode(content);
+}
+
 // In a production environment, you might want to use a proper PDF library
 // such as jsPDF for client-side generation or Puppeteer for server-side generation
 // For now, this provides a readable text-based report that can be easily downloaded
