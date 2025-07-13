@@ -582,12 +582,12 @@ export function generateRunSheetPDF(data: RunSheetData): Uint8Array {
   }
 
   // Footer
-  if (currentY > pageHeight - 25) {
+  if (currentY > pageHeight - 15) {
     doc.addPage('landscape');
     currentY = margin;
   }
   
-  currentY = pageHeight - 15;
+  currentY = pageHeight - 10;
   doc.setFontSize(8);
   doc.setFont("helvetica", "italic");
   doc.text("Theatre Shifts Management System", margin, currentY);
