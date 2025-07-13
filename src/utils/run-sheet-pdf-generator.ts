@@ -93,6 +93,68 @@ function truncateText(text: string, maxLength: number): string {
   return text.substring(0, maxLength - 3) + '...';
 }
 
+// Helper function to draw a warning sign (yellow triangle with exclamation mark)
+function drawWarningSign(doc: jsPDF, x: number, y: number, size: number = 20) {
+  const halfSize = size / 2;
+
+  // Triangle coordinates
+  const x1 = x;
+  const y1 = y - halfSize;
+
+  const x2 = x - halfSize * Math.sin(Math.PI / 3);
+  const y2 = y + halfSize / 2;
+
+  const x3 = x + halfSize * Math.sin(Math.PI / 3);
+  const y3 = y + halfSize / 2;
+
+  // Draw triangle (yellow fill with black border)
+  doc.setFillColor(255, 255, 0); // Yellow
+  doc.setDrawColor(0, 0, 0);     // Black
+  doc.triangle(x1, y1, x2, y2, x3, y3, 'FD');
+
+}
+
+// Helper function to check for overlapping shifts for the same person
+function detectOverlappingShifts(participants: RunSheetParticipant[]): Set<string> {
+  const overlappingPeople = new Set<string>();
+  
+  // Group participants by name
+  const participantsByName = new Map<string, RunSheetParticipant[]>();
+  participants.forEach(p => {
+    if (!participantsByName.has(p.name)) {
+      participantsByName.set(p.name, []);
+    }
+    participantsByName.get(p.name)!.push(p);
+  });
+  
+  // Check each person for overlapping shifts
+  participantsByName.forEach((shifts, name) => {
+    if (shifts.length > 1) {
+      // Check each pair of shifts for this person
+      for (let i = 0; i < shifts.length; i++) {
+        for (let j = i + 1; j < shifts.length; j++) {
+          const shift1 = shifts[i];
+          const shift2 = shifts[j];
+          
+          const start1 = timeToMinutes(shift1.arriveTime);
+          const end1 = timeToMinutes(shift1.departTime);
+          const start2 = timeToMinutes(shift2.arriveTime);
+          const end2 = timeToMinutes(shift2.departTime);
+          
+          // Check for overlap: shifts overlap if one starts before the other ends
+          if ((start1 < end2 && end1 > start2)) {
+            overlappingPeople.add(name);
+            break;
+          }
+        }
+        if (overlappingPeople.has(name)) break;
+      }
+    }
+  });
+  
+  return overlappingPeople;
+}
+
 /**
  * Generates a PDF buffer for the performance run sheet
  */
@@ -182,6 +244,9 @@ export function generateRunSheetPDF(data: RunSheetData): Uint8Array {
     doc.setFont("helvetica", "normal");
     const sortedParticipants = [...data.participants].sort((a, b) => a.name.localeCompare(b.name));
     
+    // Detect people with overlapping shifts
+    const overlappingPeople = detectOverlappingShifts(data.participants);
+    
     // Draw light gray vertical lines for time columns
     doc.setDrawColor(200, 200, 200); // Light gray
     doc.setLineWidth(0.2);
@@ -235,6 +300,23 @@ export function generateRunSheetPDF(data: RunSheetData): Uint8Array {
       });
       
       doc.text(`Performance: ${data.performanceTime}`, performanceLabelX, labelY);
+      
+      // Add legend for warning symbol if there are overlapping shifts (on the left, same line as performance)
+      if (overlappingPeople.size > 0) {
+        // Draw the same warning symbol for the legend
+        const legendX = margin + 2;
+        const legendY = labelY - 1;
+        const size = 4;
+        
+        drawWarningSign(doc, legendX, legendY, size);
+        
+        // Reset colors and add text
+        doc.setDrawColor(0, 0, 0);
+        doc.setFillColor(0, 0, 0);
+        doc.setTextColor(0, 0, 0);
+        doc.setFont("helvetica", "italic");
+        doc.text(" = Overlapping shifts", margin + 5, labelY);
+      }
     }
     
     sortedParticipants.forEach((participant, rowIndex) => {
@@ -262,7 +344,25 @@ export function generateRunSheetPDF(data: RunSheetData): Uint8Array {
 
       // Name and role (truncated)
       doc.setFont("helvetica", "normal");
-      doc.text(truncateText(participant.name, 20), margin, actualRowY);
+      
+      // Check if this person has overlapping shifts and add warning symbol
+      const hasOverlap = overlappingPeople.has(participant.name);
+      
+      if (hasOverlap) {
+        // Draw warning symbol using the custom function
+        const warningX = margin - 3;
+        const warningY = actualRowY - 1;
+        const size = 4;
+        
+        drawWarningSign(doc, warningX, warningY, size);
+        
+        // Reset colors after drawing
+        doc.setDrawColor(0, 0, 0);
+        doc.setFillColor(0, 0, 0);
+        doc.setTextColor(0, 0, 0);
+      }
+      
+      doc.text(truncateText(participant.name, 20), margin, actualRowY); // Names always start at margin
       doc.text(truncateText(participant.role, 30), margin + nameColWidth, actualRowY);
 
       // Highlight time slots when person is working
@@ -300,7 +400,7 @@ export function generateRunSheetPDF(data: RunSheetData): Uint8Array {
       }
     });
 
-    currentY += (sortedParticipants.length * 8) + 15; // Extra space for performance label
+    currentY += (sortedParticipants.length * 8) + 15; // Reduced space since legend is on same line as performance
   }
 
   // Unfilled Shifts section - compact format with dates in bold
