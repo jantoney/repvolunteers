@@ -185,6 +185,17 @@ export async function downloadRunSheetPDF(ctx: RouterContext<string>) {
       departTime: s.depart_time
     }));
 
+    // Get intervals for this show
+    const intervalsRes = await client.queryObject<{
+      start_minutes: number;
+      duration_minutes: number;
+    }>(
+      `SELECT start_minutes, duration_minutes FROM show_intervals WHERE show_id = $1 ORDER BY start_minutes`,
+      [showId]
+    );
+
+    const intervals = intervalsRes.rows;
+
     // Generate PDF using the updated PDF generator
     const { generateRunSheetPDF } = await import("../utils/run-sheet-pdf-generator.ts");
     const pdfBuffer = generateRunSheetPDF({
@@ -192,7 +203,8 @@ export async function downloadRunSheetPDF(ctx: RouterContext<string>) {
       date,
       performanceTime,
       participants,
-      unfilledShifts: unfilled
+      unfilledShifts: unfilled,
+      intervals
     });
 
     const filename = `run-sheet-${showId}-${date}.pdf`;
@@ -310,6 +322,17 @@ export async function downloadRunSheetPDFByShowDate(ctx: RouterContext<string>) 
       departTime: s.depart_time
     }));
 
+    // Get intervals for this show
+    const intervalsRes = await client.queryObject<{
+      start_minutes: number;
+      duration_minutes: number;
+    }>(
+      `SELECT start_minutes, duration_minutes FROM show_intervals WHERE show_id = $1 ORDER BY start_minutes`,
+      [showDate.show_id]
+    );
+
+    const intervals = intervalsRes.rows;
+
     // Generate PDF using the updated PDF generator
     const { generateRunSheetPDF } = await import("../utils/run-sheet-pdf-generator.ts");
     const pdfBuffer = generateRunSheetPDF({
@@ -317,7 +340,8 @@ export async function downloadRunSheetPDFByShowDate(ctx: RouterContext<string>) 
       date: showDate.date,
       performanceTime,
       participants,
-      unfilledShifts: unfilled
+      unfilledShifts: unfilled,
+      intervals
     });
 
     const filename = `run-sheet-${showDate.show_id}-${showDateId}-${showDate.date}.pdf`;
@@ -628,6 +652,69 @@ export async function deleteShowDate(ctx: RouterContext<string>) {
   const client = await pool.connect();
   try {
     await client.queryObject("DELETE FROM show_dates WHERE id=$1", [id]);
+    ctx.response.status = 204;
+  } finally {
+    client.release();
+  }
+}
+
+// API Functions for Show Intervals
+export async function listShowIntervals(ctx: RouterContext<string>) {
+  const showId = ctx.params.showId;
+  const pool = getPool();
+  const client = await pool.connect();
+  try {
+    const result = await client.queryObject(
+      "SELECT id, start_minutes, duration_minutes FROM show_intervals WHERE show_id = $1 ORDER BY start_minutes",
+      [showId]
+    );
+    ctx.response.body = result.rows;
+  } finally {
+    client.release();
+  }
+}
+
+export async function createShowInterval(ctx: RouterContext<string>) {
+  const showId = ctx.params.showId;
+  const value = await ctx.request.body.json();
+  const { start_minutes, duration_minutes } = value;
+  const pool = getPool();
+  const client = await pool.connect();
+  try {
+    const result = await client.queryObject<{ id: number }>(
+      "INSERT INTO show_intervals (show_id, start_minutes, duration_minutes) VALUES ($1, $2, $3) RETURNING id",
+      [showId, start_minutes, duration_minutes]
+    );
+    ctx.response.status = 201;
+    ctx.response.body = { id: result.rows[0].id };
+  } finally {
+    client.release();
+  }
+}
+
+export async function updateShowInterval(ctx: RouterContext<string>) {
+  const id = ctx.params.id;
+  const value = await ctx.request.body.json();
+  const { start_minutes, duration_minutes } = value;
+  const pool = getPool();
+  const client = await pool.connect();
+  try {
+    await client.queryObject(
+      "UPDATE show_intervals SET start_minutes = $1, duration_minutes = $2 WHERE id = $3",
+      [start_minutes, duration_minutes, id]
+    );
+    ctx.response.status = 200;
+  } finally {
+    client.release();
+  }
+}
+
+export async function deleteShowInterval(ctx: RouterContext<string>) {
+  const id = ctx.params.id;
+  const pool = getPool();
+  const client = await pool.connect();
+  try {
+    await client.queryObject("DELETE FROM show_intervals WHERE id = $1", [id]);
     ctx.response.status = 204;
   } finally {
     client.release();

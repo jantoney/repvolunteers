@@ -169,7 +169,7 @@ export function generateRunSheetPDF(data: {
     content += 'All shifts are filled.\n';
   } else {
     data.unfilledShifts.forEach((s, idx) => {
-      content += `${idx + 1}. Role: ${s.role}\n   Arrive: ${s.arriveTime}\n   Depart: ${s.departTime}\n   Date: ${s.date}\n`;
+      content += `${idx + 1}. Role: ${s.role}\n   Arrive: ${s.arriveTime}\n   Depart: ${s.departTime}\n`;
     });
   }
 

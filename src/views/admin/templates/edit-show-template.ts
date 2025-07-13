@@ -39,12 +39,34 @@ export function renderEditShowTemplate(data: EditShowPageData): string {
         .time-group { display: flex; gap: 1rem; }
         .time-group .form-group { flex: 1; }
         .show-dates { margin-top: 2rem; }
+        .show-intervals { margin-top: 2rem; }
         .show-date-item { 
           border: 1px solid #ddd; 
           border-radius: 4px; 
           padding: 1rem; 
           margin-bottom: 1rem; 
           background: #f8f9fa;
+        }
+        .interval-item {
+          border: 1px solid #ddd; 
+          border-radius: 4px; 
+          padding: 1rem; 
+          margin-bottom: 1rem; 
+          background: #f0f8ff;
+        }
+        .interval-header {
+          display: flex; 
+          justify-content: space-between; 
+          align-items: center; 
+          margin-bottom: 0.5rem;
+        }
+        .interval-form {
+          display: flex;
+          gap: 1rem;
+          align-items: end;
+        }
+        .interval-form .form-group {
+          flex: 1;
         }
         .show-date-header { 
           display: flex; 
@@ -54,6 +76,8 @@ export function renderEditShowTemplate(data: EditShowPageData): string {
         }
         .success { background: #d4edda; border: 1px solid #c3e6cb; color: #155724; padding: 1rem; border-radius: 4px; margin-bottom: 1rem; display: none; }
         .error { background: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; padding: 1rem; border-radius: 4px; margin-bottom: 1rem; display: none; }
+        .help-text { color: #6c757d; font-size: 0.9rem; margin-bottom: 1rem; }
+        .form-text { color: #6c757d; font-size: 0.8rem; }
       </style>
     </head>
     <body>
@@ -118,6 +142,32 @@ export function renderEditShowTemplate(data: EditShowPageData): string {
                 </div>
               </div>
               <button type="button" class="btn btn-primary" onclick="addNewDate()">Add Performance</button>
+            </div>
+          </div>
+
+          <div class="show-intervals">
+            <h2>Show Intervals</h2>
+            <p class="help-text">Intervals are recorded as time offsets from the start of each performance, and will appear on run sheets.</p>
+            
+            <div id="intervalsList">
+              <!-- Intervals will be loaded dynamically -->
+            </div>
+
+            <div class="form-section">
+              <h3>Add New Interval</h3>
+              <div class="interval-form">
+                <div class="form-group">
+                  <label for="intervalStart">Start Time (minutes from performance start):</label>
+                  <input type="number" id="intervalStart" min="0" max="300" placeholder="e.g. 60 for 1 hour into show">
+                  <small class="form-text text-muted">Enter the number of minutes from the start of the performance when the interval begins</small>
+                </div>
+                <div class="form-group">
+                  <label for="intervalDuration">Duration (minutes):</label>
+                  <input type="number" id="intervalDuration" min="1" max="60" placeholder="e.g. 20">
+                  <small class="form-text text-muted">How long the interval lasts in minutes</small>
+                </div>
+              </div>
+              <button type="button" class="btn btn-primary" onclick="addNewInterval()">Add Interval</button>
             </div>
           </div>
         </div>

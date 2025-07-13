@@ -19,12 +19,18 @@ interface RunSheetUnfilledShift {
   date: string;
 }
 
+interface RunSheetInterval {
+  start_minutes: number;
+  duration_minutes: number;
+}
+
 interface RunSheetData {
   showName: string;
   date: string;
   performanceTime: string;
   participants: RunSheetParticipant[];
   unfilledShifts: RunSheetUnfilledShift[];
+  intervals: RunSheetInterval[];
 }
 
 // Helper functions for date/time formatting (Adelaide timezone)
@@ -282,6 +288,75 @@ export function generateRunSheetPDF(data: RunSheetData): Uint8Array {
         }
       });
       
+      // Draw interval bars as darker vertical lines over the performance block
+      if (data.intervals && data.intervals.length > 0) {
+        data.intervals.forEach(interval => {
+          const intervalStartMinutes = performanceStartMinutes + interval.start_minutes;
+          const intervalEndMinutes = intervalStartMinutes + interval.duration_minutes;
+          
+          // Track if we've drawn the label for this interval
+          let labelDrawn = false;
+          let firstBarX = 0;
+          let totalBarWidth = 0;
+          
+          timeSlots.forEach((time, index) => {
+            const timeMinutes = timeToMinutes(time);
+            
+            // Check if this time slot overlaps with the interval
+            const slotStart = timeMinutes;
+            const slotEnd = timeMinutes + 15; // 15-minute slots
+            const overlapStart = Math.max(slotStart, intervalStartMinutes);
+            const overlapEnd = Math.min(slotEnd, intervalEndMinutes);
+            const overlapDuration = Math.max(0, overlapEnd - overlapStart);
+            
+            // If there's any overlap, draw proportional bar
+            if (overlapDuration > 0) {
+              const baseX = margin + nameColWidth + roleColWidth + (index * timeColWidth);
+              
+              // Calculate proportional positioning within the column
+              const overlapStartOffset = Math.max(0, intervalStartMinutes - slotStart);
+              const overlapEndOffset = Math.min(15, intervalEndMinutes - slotStart);
+              
+              // Convert time offsets to pixel offsets within the column
+              const startPixelOffset = (overlapStartOffset / 15) * timeColWidth;
+              const endPixelOffset = (overlapEndOffset / 15) * timeColWidth;
+              const barWidth = endPixelOffset - startPixelOffset;
+              
+              const barX = baseX + startPixelOffset;
+              
+              // Track the first bar position and total width for label placement
+              if (firstBarX === 0) {
+                firstBarX = barX;
+                totalBarWidth = barWidth;
+              } else {
+                // Extend the total width to include this bar
+                totalBarWidth = (barX + barWidth) - firstBarX;
+              }
+              
+              // Draw darker vertical bar for interval (proportional width)
+              doc.setFillColor(100, 100, 100); // Dark gray
+              doc.rect(barX, currentY - 6, barWidth, (sortedParticipants.length * 8) + 6, 'F');
+            }
+          });
+          
+          // Draw the "INTERVAL" label once per interval at the bottom center
+          if (!labelDrawn && totalBarWidth > 3) {
+            doc.setFontSize(5); // Smaller font size
+            doc.setTextColor(255, 255, 255); // White text
+            doc.setFont("helvetica", "bold");
+            const text = "INTERVAL";
+            const textWidth = doc.getTextWidth(text);
+            // Position text at the bottom of the bar
+            const textY = currentY + (sortedParticipants.length * 8) - 1;
+            const centerX = firstBarX + (totalBarWidth / 2) - (textWidth / 2);
+            doc.text(text, centerX, textY);
+            doc.setTextColor(0, 0, 0); // Reset to black
+            doc.setFont("helvetica", "normal");
+            labelDrawn = true;
+          }
+        });
+      }
+      
       // Add label below the highlighted area to explain what it represents
       const labelY = currentY + (sortedParticipants.length * 8) + 5;
       doc.setFontSize(8);
@@ -300,6 +375,28 @@ export function generateRunSheetPDF(data: RunSheetData): Uint8Array {
       });
       
       doc.text(`Performance: ${data.performanceTime}`, performanceLabelX, labelY);
+      
+      // Add interval information below the performance label
+      if (data.intervals && data.intervals.length > 0) {
+        const intervalY = labelY + 4;
+        doc.setFontSize(8);
+        doc.setFont("helvetica", "italic");
+        
+        const intervalTexts = data.intervals.map(interval => {
+          const startHours = Math.floor((performanceStartMinutes + interval.start_minutes) / 60);
+          const startMins = (performanceStartMinutes + interval.start_minutes) % 60;
+          const endMinutes = performanceStartMinutes + interval.start_minutes + interval.duration_minutes;
+          const endHours = Math.floor(endMinutes / 60);
+          const endMinsDisplay = endMinutes % 60;
+          
+          const startTime = `${startHours.toString().padStart(2, '0')}:${startMins.toString().padStart(2, '0')}`;
+          const endTime = `${endHours.toString().padStart(2, '0')}:${endMinsDisplay.toString().padStart(2, '0')}`;
+          
+          return `${startTime}-${endTime}`;
+        });
+        
+        doc.text(`Intervals: ${intervalTexts.join(', ')}`, performanceLabelX, intervalY);
+      }
       
       // Add legend for warning symbol if there are overlapping shifts (on the left, same line as performance)
       if (overlappingPeople.size > 0) {
@@ -413,7 +510,7 @@ export function generateRunSheetPDF(data: RunSheetData): Uint8Array {
 
     doc.setFontSize(12);
     doc.setFont("helvetica", "bold");
-    doc.text("UNFILLED SHIFTS", margin, currentY);
+    doc.text("FUTURE UNFILLED SHIFTS", margin, currentY);
     currentY += 8;
 
     // Group unfilled shifts by date

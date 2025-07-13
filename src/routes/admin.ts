@@ -40,6 +40,12 @@ router.post("/api/show-dates", adminController.createShowDate);
 router.put("/api/show-dates/:id", adminController.updateShowDate);
 router.delete("/api/show-dates/:id", adminController.deleteShowDate);
 
+// Show intervals API endpoints
+router.get("/api/shows/:showId/intervals", adminController.listShowIntervals);
+router.post("/api/shows/:showId/intervals", adminController.createShowInterval);
+router.put("/api/intervals/:id", adminController.updateShowInterval);
+router.delete("/api/intervals/:id", adminController.deleteShowInterval);
+
 // Volunteers management pages
 router.get("/volunteers", adminController.showVolunteersPage);
 router.get("/volunteers/:id/shifts", adminController.showVolunteerShiftsPage);

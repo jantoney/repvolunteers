@@ -6,7 +6,7 @@ import authRouter from "./auth.ts";
 
 const router = new Router();
 
-// Serve JavaScript files from utils and admin directories
+// Serve JavaScript and CSS files from utils and admin directories
 router.get("/src/utils/:filename", async (ctx) => {
   const filename = ctx.params.filename;
   if (filename && filename.endsWith('.js')) {
@@ -24,7 +24,7 @@ router.get("/src/utils/:filename", async (ctx) => {
 
 router.get("/src/views/admin/:filename", async (ctx) => {
   const filename = ctx.params.filename;
-  if (filename && filename.endsWith('.js')) {
+  if (filename && (filename.endsWith('.js') || filename.endsWith('.css'))) {
     try {
       await send(ctx, `src/views/admin/${filename}`, {
         root: Deno.cwd(),

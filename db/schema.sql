@@ -90,3 +90,12 @@ CREATE TABLE IF NOT EXISTS verification (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Show intervals table to track interval times within performances
+CREATE TABLE IF NOT EXISTS show_intervals (
+  id SERIAL PRIMARY KEY,
+  show_id INTEGER REFERENCES shows(id) ON DELETE CASCADE,
+  start_minutes INTEGER NOT NULL, -- Minutes from start of performance
+  duration_minutes INTEGER NOT NULL, -- Length of interval in minutes
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);

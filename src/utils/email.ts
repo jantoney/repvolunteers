@@ -418,6 +418,6 @@ Shifts Count: ${data.shifts.length}
 /**
  * Creates the complete login URL for a volunteer
  */
-export function createVolunteerLoginUrl(baseUrl: string, volunteerId: number): string {
+export function createVolunteerLoginUrl(baseUrl: string, volunteerId: string): string {
   return `${baseUrl}/volunteer/signup/${volunteerId}`;
 }

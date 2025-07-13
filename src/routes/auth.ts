@@ -187,7 +187,7 @@ router.post("/send-link", async (ctx) => {
         return;
       }
 
-      const volunteer = result.rows[0] as { id: number; name: string; email: string };
+      const volunteer = result.rows[0] as { id: string; name: string; email: string };
       
       // Import and use the email utility
       const { sendVolunteerLoginEmail, createVolunteerLoginUrl } = await import("../utils/email.ts");
