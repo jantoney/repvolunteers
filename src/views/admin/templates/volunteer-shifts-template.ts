@@ -259,10 +259,18 @@ export function renderVolunteerShiftsTemplate(data: VolunteerShiftsPageData): st
                     </div>
                   </div>
                   <div class="shift-actions">
-                    <button class="btn btn-sm btn-danger" onclick="removeShift(${shift.id}, '${shift.role.replace(/'/g, "\\'")}', '${shift.show_name.replace(/'/g, "\\'")}')">
+                    <button class="btn btn-sm btn-danger" 
+                            data-shift-id="${shift.id}" 
+                            data-role="${shift.role}" 
+                            data-show-name="${shift.show_name}"
+                            onclick="removeShift(this)">
                       Remove
                     </button>
-                    <button class="btn btn-sm btn-warning" onclick="swapShift(${shift.id}, '${shift.role.replace(/'/g, "\\'")}', '${shift.show_name.replace(/'/g, "\\'")}')">
+                    <button class="btn btn-sm btn-warning" 
+                            data-shift-id="${shift.id}" 
+                            data-role="${shift.role}" 
+                            data-show-name="${shift.show_name}"
+                            onclick="swapShift(this)">
                       Swap
                     </button>
                   </div>
@@ -276,142 +284,11 @@ export function renderVolunteerShiftsTemplate(data: VolunteerShiftsPageData): st
       <script src="/src/utils/modal.js"></script>
       <script src="/src/utils/timezone-client.js"></script>
       ${getAdminScripts()}
+      <script src="/src/views/admin/volunteer-shifts.js"></script>
       <script>
-        const volunteerId = ${volunteer.id};
-        const volunteerName = "${volunteer.name.replace(/"/g, '\\"')}";
-        const allShifts = ${JSON.stringify(assignedShifts)};
-        
-        // No timezone filtering or conversion. Display as received.
-        
-        // Remove shift function - make it globally accessible
-        window.removeShift = async function(shiftId, role, showName) {
-          const confirmed = await Modal.confirm(
-            'Remove Shift Assignment',
-            'Are you sure you want to remove <strong>' + volunteerName + '</strong> from the <strong>' + role + '</strong> shift for <strong>' + showName + '</strong>?',
-            () => true,
-            () => false
-          );
-          
-          if (!confirmed) return;
-          
-          try {
-            const response = await fetch('/admin/api/volunteers/' + volunteerId + '/shifts/' + shiftId, {
-              method: 'DELETE',
-              credentials: 'include'
-            });
-            
-            if (response.ok) {
-              Modal.success('Success', 'Shift assignment removed successfully');
-              setTimeout(() => window.location.reload(), 1500);
-            } else {
-              const error = await response.text();
-              Modal.error('Error', 'Failed to remove shift assignment: ' + error);
-            }
-          } catch (error) {
-            console.error('Error removing shift:', error);
-            Modal.error('Error', 'Failed to remove shift assignment');
-          }
-        }
-        
-        // Swap shift function - swap with another role on the same performance - make it globally accessible
-        window.swapShift = async function(shiftId, role, showName) {
-          try {
-            // First, get list of other roles available for the same performance
-            const response = await fetch('/admin/api/shifts/' + shiftId + '/available-roles', {
-              credentials: 'include'
-            });
-            
-            if (!response.ok) {
-              Modal.error('Error', 'Failed to load available roles for swap');
-              return;
-            }
-            
-            const availableRoles = await response.json();
-            
-            if (availableRoles.length === 0) {
-              Modal.alert('No Available Roles', 'There are no other available roles for this performance that you can swap to.');
-              return;
-            }
-            
-            // Create role selection modal content
-            const roleOptions = availableRoles.map(roleShift => 
-              '<option value="' + roleShift.id + '">' + roleShift.role + '</option>'
-            ).join('');
-            
-            const modalContent = 
-              '<p>Select a role to swap to for <strong>' + showName + '</strong>:</p>' +
-              '<p>Current role: <strong>' + role + '</strong></p>' +
-              '<select id="swapRoleSelect" class="form-control" style="width: 100%; margin: 1rem 0;">' +
-                '<option value="">Select a role...</option>' +
-                roleOptions +
-              '</select>';
-            
-            Modal.confirm(
-              'Swap to Different Role',
-              modalContent,
-              () => {
-                const newShiftId = document.getElementById('swapRoleSelect').value;
-                if (!newShiftId) {
-                  Modal.error('Error', 'Please select a role to swap to');
-                  return;
-                }
-                
-                window.performRoleSwap(shiftId, newShiftId, role, showName);
-              }
-            );
-            
-          } catch (error) {
-            console.error('Error initiating role swap:', error);
-            Modal.error('Error', 'Failed to initiate role swap');
-          }
-        }
-        
-        // Perform the actual role swap - make it globally accessible
-        window.performRoleSwap = async function(currentShiftId, newShiftId, currentRole, showName) {
-          try {
-            // Remove from current role
-            let response = await fetch('/admin/api/volunteers/' + volunteerId + '/shifts/' + currentShiftId, {
-              method: 'DELETE',
-              credentials: 'include'
-            });
-            
-            if (!response.ok) {
-              Modal.error('Error', 'Failed to remove current assignment');
-              return;
-            }
-            
-            // Assign to new role
-            response = await fetch('/admin/api/volunteer-shifts', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ 
-                volunteerId: volunteerId, 
-                shiftId: newShiftId 
-              }),
-              credentials: 'include'
-            });
-            
-            if (response.ok) {
-              Modal.success('Success', 'Role swapped successfully');
-              setTimeout(() => window.location.reload(), 1500);
-            } else {
-              // Try to reassign original role if new assignment failed
-              await fetch('/admin/api/volunteer-shifts', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
-                  volunteerId: volunteerId, 
-                  shiftId: currentShiftId 
-                }),
-                credentials: 'include'
-              });
-              
-              Modal.error('Error', 'Failed to assign new role. Original assignment restored.');
-            }
-          } catch (error) {
-            console.error('Error performing role swap:', error);
-            Modal.error('Error', 'Failed to complete role swap');
-          }
+        // Initialize the volunteer shifts functionality with data
+        if (typeof initVolunteerShifts === 'function') {
+          initVolunteerShifts(${volunteer.id}, ${JSON.stringify(volunteer.name)}, ${JSON.stringify(assignedShifts)});
         }
       </script>
     </body>
