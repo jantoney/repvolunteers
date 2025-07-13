@@ -203,14 +203,14 @@ export function generateRunSheetPDF(data: RunSheetData): Uint8Array {
     latestTime = 17 * 60;  // 5:00 PM
   }
 
-  // Add buffer and limit to maximum 1 hour either side
-  const bufferHours = 1;
-  const earliestHour = Math.floor(earliestTime / 60);
-  const latestHour = Math.ceil(latestTime / 60);
+  // Add buffer and limit to maximum 30 minutes either side
+  const bufferMinutes = 30;
+  const earliestHour = Math.floor((earliestTime - bufferMinutes) / 60);
+  const latestHour = Math.ceil((latestTime + bufferMinutes) / 60);
   
   // Apply buffer but limit to reasonable bounds
-  const actualStartHour = Math.max(6, earliestHour - bufferHours); // Not before 6 AM
-  const actualEndHour = Math.min(24, latestHour + bufferHours); // Not after midnight
+  const actualStartHour = Math.max(6, earliestHour); // Not before 6 AM
+  const actualEndHour = Math.min(24, latestHour); // Not after midnight
 
   // Generate time slots in 15-minute intervals
   const timeSlots = generateTimeSlots(actualStartHour, actualEndHour);
@@ -579,14 +579,6 @@ export function generateRunSheetPDF(data: RunSheetData): Uint8Array {
         currentY += 5;
       }
     });
-  } else {
-    if (currentY > pageHeight - 30) {
-      doc.addPage('landscape');
-      currentY = margin;
-    }
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "italic");
-    doc.text("All shifts are filled.", margin, currentY);
   }
 
   // Footer
