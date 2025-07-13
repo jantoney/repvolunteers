@@ -35,22 +35,11 @@ export function renderVolunteersTemplate(data: VolunteersPageData): string {
           display: flex; 
           align-items: center; 
           gap: 0.5rem; 
-          max-width: 300px; 
         }
         .signup-url { 
-          font-family: monospace; 
-          background: #f8f9fa; 
-          padding: 0.5rem; 
-          border-radius: 4px; 
-          font-size: 0.875rem; 
-          border: 1px solid #dee2e6; 
-          flex: 1; 
-          min-width: 0; 
-          overflow: hidden; 
-          text-overflow: ellipsis; 
-          white-space: nowrap;
+          display: none; /* Hide the input box */
         }
-        .copy-btn {
+        .copy-btn, .open-btn {
           background: #28a745;
           color: white;
           border: none;
@@ -61,11 +50,17 @@ export function renderVolunteersTemplate(data: VolunteersPageData): string {
           transition: background-color 0.2s;
           white-space: nowrap;
         }
-        .copy-btn:hover {
+        .copy-btn:hover, .open-btn:hover {
           background: #218838;
         }
         .copy-btn.copied {
           background: #17a2b8;
+        }
+        .open-btn {
+          background: #007bff;
+        }
+        .open-btn:hover {
+          background: #0056b3;
         }
         
         /* Toggle switch styles */
@@ -123,6 +118,26 @@ export function renderVolunteersTemplate(data: VolunteersPageData): string {
         .approval-status.pending {
           color: #dc3545;
         }
+        
+        /* Modal button styles */
+        .modal-btn-secondary {
+          background-color: #6c757d !important;
+          border-color: #6c757d !important;
+          color: white !important;
+        }
+        .modal-btn-secondary:hover {
+          background-color: #5a6268 !important;
+          border-color: #545b62 !important;
+        }
+        .modal-btn-danger {
+          background-color: #dc3545 !important;
+          border-color: #dc3545 !important;
+          color: white !important;
+        }
+        .modal-btn-danger:hover {
+          background-color: #c82333 !important;
+          border-color: #bd2130 !important;
+        }
       </style>
     </head>
     <body>
@@ -141,7 +156,6 @@ export function renderVolunteersTemplate(data: VolunteersPageData): string {
           <table class="table">
             <thead>
               <tr>
-                <th>ID</th>
                 <th>Name</th>
                 <th>Email</th>
                 <th>Phone</th>
@@ -153,7 +167,6 @@ export function renderVolunteersTemplate(data: VolunteersPageData): string {
             <tbody>
               ${volunteers.map(volunteer => `
                 <tr>
-                  <td>${volunteer.id}</td>
                   <td><strong>${volunteer.name}</strong></td>
                   <td>${volunteer.email || 'N/A'}</td>
                   <td>${volunteer.phone || 'N/A'}</td>
@@ -164,13 +177,13 @@ export function renderVolunteersTemplate(data: VolunteersPageData): string {
                                onchange="toggleApproval('${volunteer.id}', this.checked, '${volunteer.name.replace(/'/g, "\\'").replace(/"/g, '\\"').replace(/\\/g, '\\\\')}')">
                         <span class="slider"></span>
                       </label>
-                      <span class="approval-status ${volunteer.approved ? 'approved' : 'pending'}">${volunteer.approved ? 'Enabled' : 'Disabled'}</span>
                     </div>
                   </td>
                   <td>
                     <div class="signup-url-container">
                       <input type="text" class="signup-url" value="/volunteer/signup/${volunteer.id}" readonly id="url-${volunteer.id}" data-full-url="">
                       <button class="copy-btn" onclick="copySignupUrl('${volunteer.id}')" id="copy-btn-${volunteer.id}">Copy</button>
+                      <button class="open-btn" onclick="openSignupUrl('${volunteer.id}')" id="open-btn-${volunteer.id}">Open</button>
                     </div>
                   </td>
                   <td>
@@ -223,31 +236,27 @@ export function renderVolunteersTemplate(data: VolunteersPageData): string {
         
         async function copySignupUrl(volunteerId) {
           const input = document.getElementById(\`url-\${volunteerId}\`);
-          const button = document.getElementById(\`copy-btn-\${volunteerId}\`);
           const fullUrl = input.getAttribute('data-full-url') || input.value;
           
           try {
             await navigator.clipboard.writeText(fullUrl);
-            const originalText = button.textContent;
-            button.textContent = 'Copied!';
-            button.classList.add('copied');
-            
-            setTimeout(() => {
-              button.textContent = originalText;
-              button.classList.remove('copied');
-            }, 2000);
+            if (typeof Toast !== 'undefined') {
+              Toast.success('Signup URL copied to clipboard!', 2000);
+            }
           } catch (err) {
             // Fallback for older browsers
             input.select();
             document.execCommand('copy');
-            button.textContent = 'Copied!';
-            button.classList.add('copied');
-            
-            setTimeout(() => {
-              button.textContent = 'Copy';
-              button.classList.remove('copied');
-            }, 2000);
+            if (typeof Toast !== 'undefined') {
+              Toast.success('Signup URL copied to clipboard!', 2000);
+            }
           }
+        }
+        
+        function openSignupUrl(volunteerId) {
+          const input = document.getElementById(\`url-\${volunteerId}\`);
+          const fullUrl = input.getAttribute('data-full-url') || globalThis.location.origin + input.value;
+          globalThis.open(fullUrl, '_blank');
         }
         
         // Toggle approval status
@@ -273,34 +282,66 @@ export function renderVolunteersTemplate(data: VolunteersPageData): string {
                   const modalContent = \`
                     <p><strong>\${volunteerName}</strong> has \${shifts.length} outstanding shift\${shifts.length > 1 ? 's' : ''}:</p>
                     <ul style="margin: 1rem 0; padding-left: 1.5rem;">\${shiftsList}</ul>
-                    <p><strong>Warning:</strong> Disabling login will remove them from these shifts and generate a PDF report for your records.</p>
-                    <p>Do you want to continue?</p>
+                    <p>What would you like to do with their shifts?</p>
                   \`;
                   
-                  // Show confirmation modal
+                  // Show confirmation modal with shift options
                   if (typeof Modal !== 'undefined') {
-                    Modal.confirm(
-                      'Disable Login Access',
-                      modalContent,
-                      async () => {
-                        // User confirmed - proceed with disabling
-                        await proceedWithDisabling(volunteerId, approved, volunteerName, shifts);
-                      },
-                      () => {
-                        // User cancelled - revert the toggle
-                        const checkbox = document.querySelector(\`input[onchange*="toggleApproval(\${volunteerId}"]\`);
-                        if (checkbox) checkbox.checked = true;
-                      }
-                    );
+                    Modal.showModal(\`disable-volunteer-\${volunteerId}\`, {
+                      title: 'Disable Login Access',
+                      body: modalContent,
+                      buttons: [
+                        {
+                          text: 'Cancel',
+                          className: 'modal-btn-outline',
+                          action: 'cancel',
+                          handler: () => {
+                            // User cancelled - revert the toggle
+                            const checkbox = document.querySelector(\`input[onchange*="toggleApproval(\${volunteerId}"]\`);
+                            if (checkbox) checkbox.checked = true;
+                          }
+                        },
+                        {
+                          text: 'Keep Shifts',
+                          className: 'modal-btn-secondary',
+                          action: 'keep-shifts',
+                          handler: async () => {
+                            // Disable but keep shifts
+                            await updateApprovalStatus(volunteerId, approved, volunteerName, false);
+                            // Close the modal
+                            Modal.closeModal(\`disable-volunteer-\${volunteerId}\`);
+                          }
+                        },
+                        {
+                          text: 'Remove Shifts',
+                          className: 'modal-btn-danger',
+                          action: 'remove-shifts',
+                          handler: async () => {
+                            // Disable and remove shifts
+                            await proceedWithDisabling(volunteerId, approved, volunteerName, shifts);
+                            // Close the modal
+                            Modal.closeModal(\`disable-volunteer-\${volunteerId}\`);
+                          }
+                        }
+                      ]
+                    });
                   } else {
                     // Fallback to browser confirm if Modal is not available
                     const shiftSummary = shifts.map(shift => \`\${shift.show_name} - \${shift.role}\`).join(', ');
-                    const message = \`\${volunteerName} has \${shifts.length} outstanding shift(s): \${shiftSummary}. Disabling login will remove them from these shifts. Continue?\`;
-                    if (confirm(message)) {
-                      await proceedWithDisabling(volunteerId, approved, volunteerName, shifts);
+                    const keepShiftsMessage = \`\${volunteerName} has \${shifts.length} outstanding shift(s): \${shiftSummary}.\n\nChoose an option:\n- OK: Keep shifts (disable login only)\n- Cancel: Remove shifts and generate PDF\`;
+                    if (confirm(keepShiftsMessage)) {
+                      // Keep shifts - just disable login
+                      await updateApprovalStatus(volunteerId, approved, volunteerName, false);
                     } else {
-                      const checkbox = document.querySelector(\`input[onchange*="toggleApproval(\${volunteerId}"]\`);
-                      if (checkbox) checkbox.checked = true;
+                      // Remove shifts
+                      const confirmRemoval = confirm('This will remove them from all shifts and generate a PDF report. Continue?');
+                      if (confirmRemoval) {
+                        await proceedWithDisabling(volunteerId, approved, volunteerName, shifts);
+                      } else {
+                        // User cancelled completely - revert the toggle
+                        const checkbox = document.querySelector(\`input[onchange*="toggleApproval(\${volunteerId}"]\`);
+                        if (checkbox) checkbox.checked = true;
+                      }
                     }
                   }
                   return; // Exit early to wait for modal response
@@ -314,8 +355,8 @@ export function renderVolunteersTemplate(data: VolunteersPageData): string {
             console.error('Error updating approval:', error);
             revertToggle(volunteerId, approved);
             
-            if (typeof Modal !== 'undefined') {
-              Modal.error('Error', 'Error updating approval status');
+            if (typeof Toast !== 'undefined') {
+              Toast.error('Error updating approval status');
             } else {
               alert('Error updating approval status');
             }
@@ -328,14 +369,14 @@ export function renderVolunteersTemplate(data: VolunteersPageData): string {
             // Generate and download PDF before proceeding
             await generateShiftRemovalPDF(volunteerId, volunteerName, shifts);
             
-            // Update approval status
-            await updateApprovalStatus(volunteerId, approved, volunteerName);
+            // Update approval status and remove shifts
+            await updateApprovalStatus(volunteerId, approved, volunteerName, true);
           } catch (error) {
             console.error('Error disabling volunteer:', error);
             revertToggle(volunteerId, approved);
             
-            if (typeof Modal !== 'undefined') {
-              Modal.error('Error', 'Error disabling volunteer access');
+            if (typeof Toast !== 'undefined') {
+              Toast.error('Error disabling volunteer access');
             } else {
               alert('Error disabling volunteer access');
             }
@@ -343,32 +384,33 @@ export function renderVolunteersTemplate(data: VolunteersPageData): string {
         }
         
         // Helper function to update approval status
-        async function updateApprovalStatus(volunteerId, approved, volunteerName) {
+        async function updateApprovalStatus(volunteerId, approved, volunteerName, removeShifts = true) {
           const response = await fetch(\`/admin/api/volunteers/\${volunteerId}/approval\`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ approved }),
+            body: JSON.stringify({ approved, removeShifts }),
             credentials: 'include'
           });
           
           if (response.ok) {
-            // Update the status text
-            const statusSpan = document.querySelector(\`input[onchange*="toggleApproval(\${volunteerId}"] + .slider + .approval-status\`);
-            if (statusSpan) {
-              statusSpan.textContent = approved ? 'Enabled' : 'Disabled';
-              statusSpan.className = \`approval-status \${approved ? 'approved' : 'pending'}\`;
-            }
             
             // Show success message
-            if (typeof Modal !== 'undefined') {
-              Modal.success('Success', \`\${volunteerName} \${approved ? 'enabled' : 'disabled'}\`);
+            if (typeof Toast !== 'undefined') {
+              if (approved) {
+                // For enabling, show a brief toast that disappears
+                Toast.success(\`\${volunteerName} enabled\`);
+              } else {
+                // For disabling, show a toast notification
+                const actionText = removeShifts ? 'disabled and removed from shifts' : 'disabled (shifts kept)';
+                Toast.success(\`\${volunteerName} \${actionText}\`);
+              }
             }
           } else {
             // Revert the toggle on error
             revertToggle(volunteerId, approved);
             
-            if (typeof Modal !== 'undefined') {
-              Modal.error('Error', 'Failed to update approval status');
+            if (typeof Toast !== 'undefined') {
+              Toast.error('Failed to update approval status');
             } else {
               alert('Failed to update approval status');
             }
@@ -476,14 +518,14 @@ export function renderVolunteersTemplate(data: VolunteersPageData): string {
                           ? \`Schedule PDF sent to \${currentVolunteerEmail}! They have \${result.shiftsCount} upcoming shifts.\`
                           : \`Schedule PDF sent to \${currentVolunteerEmail}! They currently have no assigned shifts for future dates.\`;
                           
-                        Modal.success('PDF Sent', message);
+                        Toast.success(message, 4000);
                       } else {
                         const error = await response.json();
-                        Modal.error('Error', 'Failed to send PDF: ' + (error.error || 'Unknown error'));
+                        Toast.error('Failed to send PDF: ' + (error.error || 'Unknown error'));
                       }
                     } catch (error) {
                       console.error('Error sending PDF:', error);
-                      Modal.error('Error', 'Error sending schedule PDF');
+                      Toast.error('Error sending schedule PDF');
                     }
                   }
                 }
@@ -505,14 +547,26 @@ export function renderVolunteersTemplate(data: VolunteersPageData): string {
                     ? \`Schedule PDF sent to \${volunteerEmail}! They have \${result.shiftsCount} upcoming shifts.\`
                     : \`Schedule PDF sent to \${volunteerEmail}! They currently have no assigned shifts for future dates.\`;
                     
-                  alert(message);
+                  if (typeof Toast !== 'undefined') {
+                    Toast.success(message, 4000);
+                  } else {
+                    alert(message);
+                  }
                 } else {
                   const error = await response.json();
-                  alert('Failed to send PDF: ' + (error.error || 'Unknown error'));
+                  if (typeof Toast !== 'undefined') {
+                    Toast.error('Failed to send PDF: ' + (error.error || 'Unknown error'));
+                  } else {
+                    alert('Failed to send PDF: ' + (error.error || 'Unknown error'));
+                  }
                 }
               } catch (error) {
                 console.error('Error sending PDF:', error);
-                alert('Error sending schedule PDF');
+                if (typeof Toast !== 'undefined') {
+                  Toast.error('Error sending schedule PDF');
+                } else {
+                  alert('Error sending schedule PDF');
+                }
               }
             }
           }

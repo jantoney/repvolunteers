@@ -44,6 +44,7 @@ export function getAdminNavigation(currentPage: string = '') {
 
 export function getAdminStyles() {
   return `
+    <link rel="stylesheet" href="/src/utils/toast.css">
     <style>
       * {
         margin: 0;
@@ -714,7 +715,9 @@ export function getAdminStyles() {
 }
 
 export function getAdminScripts() {
-  return `    <script>
+  return `
+    <script src="/src/utils/toast.js"></script>
+    <script>
       function toggleMobileMenu() {
         const navMenu = document.getElementById('navMenu');
         navMenu.classList.toggle('active');

@@ -1540,7 +1540,7 @@ export async function getServerTime(ctx: RouterContext<string>) {
 // API Functions for Volunteer Approval
 export async function toggleVolunteerApproval(ctx: RouterContext<string>) {
   const id = ctx.params.id;
-  const { approved } = await ctx.request.body.json();
+  const { approved, removeShifts = true } = await ctx.request.body.json();
   const pool = getPool();
   const client = await pool.connect();
 
@@ -1553,8 +1553,8 @@ export async function toggleVolunteerApproval(ctx: RouterContext<string>) {
       [approved, id]
     );
 
-    // If disabling, remove from all shifts
-    if (!approved) {
+    // If disabling and removeShifts is true, remove from all shifts
+    if (!approved && removeShifts) {
       await client.queryObject(
         "DELETE FROM participant_shifts WHERE participant_id = $1",
         [id]
