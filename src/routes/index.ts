@@ -297,11 +297,73 @@ router.get("/", (ctx) => {
             gap: 1rem;
           }
         }
+        
+        /* Force Mode Notification Banner */
+        .force-mode-banner {
+          background: linear-gradient(135deg, #ff6b35, #f9ca24);
+          border: 2px solid #ff6b35;
+          border-radius: 8px;
+          margin: 1rem 0;
+          box-shadow: 0 4px 6px rgba(255, 107, 53, 0.2);
+          animation: pulse-orange 2s infinite;
+        }
+        .force-mode-content {
+          display: flex;
+          align-items: center;
+          padding: 1rem 1.5rem;
+          gap: 1rem;
+        }
+        .force-mode-icon {
+          font-size: 1.5rem;
+          filter: drop-shadow(1px 1px 2px rgba(0,0,0,0.3));
+        }
+        .force-mode-text {
+          flex: 1;
+          color: #2c2c2c;
+          font-weight: 600;
+          text-shadow: 1px 1px 2px rgba(255,255,255,0.5);
+          font-size: 0.95rem;
+        }
+        .force-mode-disable {
+          background: rgba(255,255,255,0.9);
+          border: 2px solid #2c2c2c;
+          color: #2c2c2c;
+          padding: 0.5rem 1rem;
+          border-radius: 6px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.3s ease;
+          font-size: 0.85rem;
+        }
+        .force-mode-disable:hover {
+          background: #fff;
+          transform: translateY(-1px);
+          box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        @keyframes pulse-orange {
+          0%, 100% { 
+            box-shadow: 0 4px 6px rgba(255, 107, 53, 0.2);
+          }
+          50% { 
+            box-shadow: 0 6px 12px rgba(255, 107, 53, 0.4);
+          }
+        }
       </style>
     </head>
     <body>      <div class="container">
         <h1>🎭 Theatre Shifts</h1>
         <p class="subtitle">Shift management system for productions</p>
+        
+        <!-- Force Mode Notification Banner -->
+        <div id="forceModeNotification" class="force-mode-banner" style="display: none;">
+          <div class="force-mode-content">
+            <span class="force-mode-icon">⚠️</span>
+            <span class="force-mode-text">
+              <strong>FORCE PRODUCTION MODE ACTIVE</strong> - Emails will be sent even in development mode
+            </span>
+            <button id="disableForceModeBtn" class="force-mode-disable">Remove ?force=true</button>
+          </div>
+        </div>
         
         <div id="recentAccessSection" class="section hidden">
           <h2>Your Recent Access</h2>
@@ -374,12 +436,47 @@ router.get("/", (ctx) => {
       <!-- Modal and PWA scripts -->
       <script src="/src/utils/modal.js"></script>
       <script>
+        // Utility function to check for force parameter and modify API URLs
+        function getAPIURL(baseUrl) {
+          const urlParams = new URLSearchParams(window.location.search);
+          const forceParam = urlParams.get('force');
+          if (forceParam === 'true') {
+            return baseUrl + '?force=true';
+          }
+          return baseUrl;
+        }
+        
+        // Check and show force mode notification
+        function checkForceMode() {
+          const urlParams = new URLSearchParams(window.location.search);
+          const forceParam = urlParams.get('force');
+          const notification = document.getElementById('forceModeNotification');
+          
+          if (forceParam === 'true' && notification) {
+            notification.style.display = 'block';
+            
+            // Add click handler for disable button
+            const disableBtn = document.getElementById('disableForceModeBtn');
+            if (disableBtn) {
+              disableBtn.addEventListener('click', function() {
+                // Remove force parameter from URL
+                const newUrl = new URL(window.location);
+                newUrl.searchParams.delete('force');
+                window.location.href = newUrl.toString();
+              });
+            }
+          }
+        }
+        
         // PWA Service Worker Registration
         if ('serviceWorker' in navigator) {
           navigator.serviceWorker.register('/service-worker.js')
             .then(() => console.log('SW registered'))
             .catch(err => console.error('SW registration failed:', err));
         }
+
+        // Check and show force mode notification
+        checkForceMode();
 
         // iOS PWA Install Banner functions (similar to signup page)
         function isIos() {
@@ -503,7 +600,7 @@ router.get("/", (ctx) => {
                   }
                   
                   try {
-                    const response = await fetch('/api/send-link', {
+                    const response = await fetch(getAPIURL('/api/send-link'), {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
                       body: JSON.stringify({ email })

@@ -195,11 +195,12 @@ router.post("/send-link", async (ctx) => {
       const loginUrl = createVolunteerLoginUrl(Deno.env.get('BASE_URL') || ctx.request.url.origin, volunteer.id);
       
       // Send the email using our template
+      const forceProduction = ctx.request.url.searchParams.get('force') === 'true';
       const emailSent = await sendVolunteerLoginEmail({
         volunteerName: volunteer.name,
         volunteerEmail: volunteer.email,
         loginUrl: loginUrl
-      });
+      }, undefined, forceProduction);
       
       if (emailSent) {
         console.log(`Email sent to ${email} with login link: ${loginUrl}`);

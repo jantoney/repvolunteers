@@ -1,1 +1,49 @@
+# Dependencies
 node_modules
+npm-debug.log*
+
+# Development files
+.git
+.gitignore
+README.md
+TOAST_USAGE.md
+LICENSE
+
+# Development scripts
+dev.ps1
+dev.bat
+
+# Docker files (avoid copying other docker files)
+docker-compose*.yml
+Dockerfile*
+.dockerignore
+
+# IDE and editor files
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+*.Zone.Identifier
+
+# Logs
+logs
+*.log
+
+# Environment files (these should be mounted as volumes)
+.env.local
+.env.development
+.env.test
+
+# Temporary files
+tmp/
+temp/

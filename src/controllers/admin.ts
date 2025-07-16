@@ -1720,10 +1720,11 @@ export async function emailVolunteerSchedulePDF(ctx: RouterContext<string>) {
 
     // Send email with PDF attachment
     const currentUserId = ctx.state?.user?.id;
+    const forceProduction = ctx.request.url.searchParams.get('force') === 'true';
     const emailSent = await sendVolunteerScheduleEmail(emailData, {
       content: pdfBuffer,
       filename
-    }, currentUserId);
+    }, currentUserId, forceProduction);
 
     if (emailSent) {
       ctx.response.status = 200;
@@ -1741,6 +1742,84 @@ export async function emailVolunteerSchedulePDF(ctx: RouterContext<string>) {
     console.error("Error sending volunteer schedule PDF:", error);
     ctx.response.status = 500;
     ctx.response.body = { error: "Failed to send schedule PDF" };
+  }
+}
+
+/**
+ * Sends a "It's Show Week" email to a volunteer with their schedule PDF attached - admin only
+ */
+export async function emailShowWeekPDF(ctx: RouterContext<string>) {
+  const volunteerId = ctx.params.id;
+
+  try {
+    const { generateVolunteerPDFData, filterCurrentAndFutureShifts } = await import("../utils/pdf-generator.ts");
+    const { generateServerSidePDF } = await import("../utils/server-pdf-generator.ts");
+    const { sendShowWeekEmail, createVolunteerLoginUrl } = await import("../utils/email.ts");
+
+    // Generate PDF data (pass volunteerId as string, not Number)
+    const pdfData = await generateVolunteerPDFData(volunteerId);
+
+    // Check if volunteer has email
+    if (!pdfData.volunteer.email) {
+      ctx.response.status = 400;
+      ctx.response.body = { error: "Volunteer does not have an email address" };
+      return;
+    }
+
+    // Generate PDF buffer (real PDF)
+    const pdfBuffer = await generateServerSidePDF(pdfData);
+    const filename = `show-week-shifts-${pdfData.volunteer.name.replace(/[^a-zA-Z0-9]/g, '-')}-${new Date().toISOString().split('T')[0]}.pdf`;
+
+    // Prepare email data
+    const currentAndFutureShifts = filterCurrentAndFutureShifts(pdfData.assignedShifts);
+    const hasShifts = currentAndFutureShifts.length > 0;
+    // Improved shift preview formatting: date/time on first line, show/role on second, indented
+    const shifts = currentAndFutureShifts.slice(0, 5).map(shift => {
+      const date = new Date(shift.show_date).toLocaleDateString('en-AU', {
+        weekday: 'short', day: '2-digit', month: 'short', year: 'numeric'
+      });
+      const arriveTime = new Date(shift.arrive_time).toLocaleTimeString('en-AU', {
+        hour: '2-digit', minute: '2-digit', hour12: true
+      });
+      // Second line indented
+      return `${date} ${arriveTime}<br><span style="margin-left:1.5em;display:inline-block;">${shift.show_name} (${shift.role})</span>`;
+    });
+
+    const baseUrl = Deno.env.get('BASE_URL') || `${ctx.request.url.protocol}//${ctx.request.url.host}`;
+    const loginUrl = createVolunteerLoginUrl(baseUrl, pdfData.volunteer.id);
+
+    const emailData = {
+      volunteerName: pdfData.volunteer.name,
+      volunteerEmail: pdfData.volunteer.email,
+      loginUrl,
+      hasShifts,
+      shifts
+    };
+
+    // Send email with PDF attachment
+    const currentUserId = ctx.state?.user?.id;
+    const forceProduction = ctx.request.url.searchParams.get('force') === 'true';
+    const emailSent = await sendShowWeekEmail(emailData, {
+      content: pdfBuffer,
+      filename
+    }, currentUserId, forceProduction);
+
+    if (emailSent) {
+      ctx.response.status = 200;
+      ctx.response.body = {
+        success: true,
+        message: `Show Week email sent to ${pdfData.volunteer.email}`,
+        hasShifts,
+        shiftsCount: currentAndFutureShifts.length
+      };
+    } else {
+      ctx.response.status = 500;
+      ctx.response.body = { error: "Failed to send email" };
+    }
+  } catch (error) {
+    console.error("Error sending Show Week email:", error);
+    ctx.response.status = 500;
+    ctx.response.body = { error: "Failed to send Show Week email" };
   }
 }
 

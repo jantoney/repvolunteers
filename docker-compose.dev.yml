@@ -1,0 +1,34 @@
+services:
+  theatreapp:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    image: theatre-app:dev
+    env_file: .env
+    ports:
+      - "8044:8044"
+    volumes:
+      # Mount source code for hot reload
+      - ./src:/app/src:ro
+      - ./views:/app/views:ro
+      - ./db:/app/db:ro
+      - ./scripts:/app/scripts:ro
+      - ./deno.json:/app/deno.json:ro
+      - ./deno.lock:/app/deno.lock:ro
+      # Mount other config files that might change
+      - ./manifest.webmanifest:/app/manifest.webmanifest:ro
+      - ./service-worker.js:/app/service-worker.js:ro
+    environment:
+      - DENO_ENV=development
+    networks:
+      - backend
+    # Don't restart automatically in dev mode
+    restart: "no"
+    # Add development-specific labels
+    labels:
+      - "dev.environment=development"
+      - "dev.hot-reload=enabled"
+
+networks:
+  backend:
+    external: true

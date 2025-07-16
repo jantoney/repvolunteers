@@ -1,0 +1,20 @@
+FROM denoland/deno:alpine-2.3.4
+
+# Install tzdata and set timezone
+RUN apk add --no-cache tzdata && \
+    cp /usr/share/zoneinfo/Australia/Adelaide /etc/localtime && \
+    echo "Australia/Adelaide" > /etc/timezone
+
+WORKDIR /app
+
+# Copy package files first for better caching
+COPY deno.json deno.lock ./
+
+# Copy source code
+COPY . .
+
+# Cache dependencies
+RUN deno cache src/main.ts
+
+# Use watch mode for development with hot reload
+CMD ["run", "-A", "--watch=src/,views/,db/,scripts/", "src/main.ts"]

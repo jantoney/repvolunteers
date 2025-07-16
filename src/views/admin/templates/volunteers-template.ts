@@ -138,6 +138,55 @@ export function renderVolunteersTemplate(data: VolunteersPageData): string {
           background-color: #c82333 !important;
           border-color: #bd2130 !important;
         }
+        
+        /* Force Mode Notification Banner */
+        .force-mode-banner {
+          background: linear-gradient(135deg, #ff6b35, #f9ca24);
+          border: 2px solid #ff6b35;
+          border-radius: 8px;
+          margin: 1rem 0;
+          box-shadow: 0 4px 6px rgba(255, 107, 53, 0.2);
+          animation: pulse-orange 2s infinite;
+        }
+        .force-mode-content {
+          display: flex;
+          align-items: center;
+          padding: 1rem 1.5rem;
+          gap: 1rem;
+        }
+        .force-mode-icon {
+          font-size: 1.5rem;
+          filter: drop-shadow(1px 1px 2px rgba(0,0,0,0.3));
+        }
+        .force-mode-text {
+          flex: 1;
+          color: #2c2c2c;
+          font-weight: 600;
+          text-shadow: 1px 1px 2px rgba(255,255,255,0.5);
+        }
+        .force-mode-disable {
+          background: rgba(255,255,255,0.9);
+          border: 2px solid #2c2c2c;
+          color: #2c2c2c;
+          padding: 0.5rem 1rem;
+          border-radius: 6px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.3s ease;
+        }
+        .force-mode-disable:hover {
+          background: #fff;
+          transform: translateY(-1px);
+          box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        @keyframes pulse-orange {
+          0%, 100% { 
+            box-shadow: 0 4px 6px rgba(255, 107, 53, 0.2);
+          }
+          50% { 
+            box-shadow: 0 6px 12px rgba(255, 107, 53, 0.4);
+          }
+        }
       </style>
     </head>
     <body>
@@ -149,6 +198,17 @@ export function renderVolunteersTemplate(data: VolunteersPageData): string {
           <h1 class="page-title">Manage Participants</h1>
           <div class="page-actions">
             <a href="/admin/volunteers/new" class="btn btn-primary">Add New Participant</a>
+          </div>
+        </div>
+
+        <!-- Force Mode Notification Banner -->
+        <div id="forceModeNotification" class="force-mode-banner" style="display: none;">
+          <div class="force-mode-content">
+            <span class="force-mode-icon">⚠️</span>
+            <span class="force-mode-text">
+              <strong>FORCE PRODUCTION MODE ACTIVE</strong> - Emails will be sent even in development mode
+            </span>
+            <button id="disableForceModeBtn" class="force-mode-disable">Remove ?force=true</button>
           </div>
         </div>
 
@@ -191,6 +251,7 @@ export function renderVolunteersTemplate(data: VolunteersPageData): string {
                       <a href="/admin/volunteers/${volunteer.id}/shifts" class="btn btn-sm btn-info">Shifts</a>
                       <a href="/admin/volunteers/${volunteer.id}/edit" class="btn btn-sm btn-secondary">Edit</a>
                       <button class="send-pdf-btn btn btn-sm btn-success" data-volunteer-id="${volunteer.id}" data-volunteer-name="${volunteer.name}" data-volunteer-email="${volunteer.email || ''}" ${!volunteer.email ? 'disabled title="No email address"' : ''}>📧 Send PDF</button>
+                      <button class="send-show-week-btn btn btn-sm btn-warning" data-volunteer-id="${volunteer.id}" data-volunteer-name="${volunteer.name}" data-volunteer-email="${volunteer.email || ''}" ${!volunteer.email ? 'disabled title="No email address"' : ''}>🎭 Show Week</button>
                       <button onclick="deleteVolunteer('${volunteer.id}', '${volunteer.name.replace(/'/g, "\\'")}')" class="btn btn-sm btn-danger">Delete</button>
                     </div>
                   </td>
@@ -206,8 +267,42 @@ export function renderVolunteersTemplate(data: VolunteersPageData): string {
       <script src="/src/views/admin/volunteers.js"></script>
       ${getAdminScripts()}
       <script>
+        // Utility function to check for force parameter and modify API URLs
+        function getAPIURL(baseUrl) {
+          const urlParams = new URLSearchParams(window.location.search);
+          const forceParam = urlParams.get('force');
+          if (forceParam === 'true') {
+            return baseUrl + '?force=true';
+          }
+          return baseUrl;
+        }
+        
+        // Check and show force mode notification
+        function checkForceMode() {
+          const urlParams = new URLSearchParams(window.location.search);
+          const forceParam = urlParams.get('force');
+          const notification = document.getElementById('forceModeNotification');
+          
+          if (forceParam === 'true' && notification) {
+            notification.style.display = 'block';
+            
+            // Add click handler for disable button
+            const disableBtn = document.getElementById('disableForceModeBtn');
+            if (disableBtn) {
+              disableBtn.addEventListener('click', function() {
+                // Remove force parameter from URL
+                const newUrl = new URL(window.location);
+                newUrl.searchParams.delete('force');
+                window.location.href = newUrl.toString();
+              });
+            }
+          }
+        }
+        
         // Set full URLs and copy function
         document.addEventListener('DOMContentLoaded', function() {
+          // Check and show force mode notification
+          checkForceMode();
           // Set full URLs for all signup links
           const urlInputs = document.querySelectorAll('.signup-url');
           urlInputs.forEach(input => {
@@ -229,6 +324,22 @@ export function renderVolunteersTemplate(data: VolunteersPageData): string {
               
               if (volunteerId && volunteerName) {
                 sendSchedulePDF(volunteerId, volunteerName, volunteerEmail);
+              }
+            });
+          });
+          
+          // Add event listeners for Show Week buttons
+          const sendShowWeekButtons = document.querySelectorAll('.send-show-week-btn');
+          sendShowWeekButtons.forEach(button => {
+            button.addEventListener('click', function() {
+              const volunteerId = this.getAttribute('data-volunteer-id');
+              const volunteerName = this.getAttribute('data-volunteer-name');
+              const volunteerEmail = this.getAttribute('data-volunteer-email');
+              
+              console.log('Send Show Week clicked:', { volunteerId, volunteerName, volunteerEmail });
+              
+              if (volunteerId && volunteerName) {
+                sendShowWeekEmail(volunteerId, volunteerName, volunteerEmail);
               }
             });
           });
@@ -506,7 +617,7 @@ export function renderVolunteersTemplate(data: VolunteersPageData): string {
                         originalArgs: { volunteerId, volunteerName, volunteerEmail }
                       });
                       
-                      const response = await fetch(\`/admin/api/volunteers/\${currentVolunteerId}/email-schedule-pdf\`, {
+                      const response = await fetch(getAPIURL(\`/admin/api/volunteers/\${currentVolunteerId}/email-schedule-pdf\`), {
                         method: 'POST',
                         credentials: 'include'
                       });
@@ -535,7 +646,7 @@ export function renderVolunteersTemplate(data: VolunteersPageData): string {
             const confirmMessage = \`Send \${volunteerName}'s schedule PDF to \${volunteerEmail}?\`;
             if (confirm(confirmMessage)) {
               try {
-                const response = await fetch(\`/admin/api/volunteers/\${volunteerId}/email-schedule-pdf\`, {
+                const response = await fetch(getAPIURL(\`/admin/api/volunteers/\${volunteerId}/email-schedule-pdf\`), {
                   method: 'POST',
                   credentials: 'include'
                 });
@@ -566,6 +677,131 @@ export function renderVolunteersTemplate(data: VolunteersPageData): string {
                   Toast.error('Error sending schedule PDF');
                 } else {
                   alert('Error sending schedule PDF');
+                }
+              }
+            }
+          }
+        }
+        
+        // Send Show Week email via email
+        async function sendShowWeekEmail(volunteerId, volunteerName, volunteerEmail) {
+          console.log('sendShowWeekEmail called with:', { volunteerId, volunteerName, volunteerEmail });
+          
+          if (!volunteerEmail) {
+            if (typeof Modal !== 'undefined') {
+              Modal.error('Cannot Send Show Week Email', 'This volunteer does not have an email address on file.');
+            } else {
+              alert('Cannot send Show Week email: No email address on file');
+            }
+            return;
+          }
+          
+          // Generate the confirmation message fresh each time
+          console.log('Generating modal with:', { volunteerName, volunteerEmail });
+          
+          if (typeof Modal !== 'undefined') {
+            // Generate unique modal ID to prevent caching issues
+            const uniqueModalId = \`send-show-week-\${Date.now()}-\${Math.random().toString(36).substr(2, 9)}\`;
+            const modalTitle = "Send It's Show Week Email";
+            const modalMessage = \`Send "It's Show Week" email to \${volunteerName} at \${volunteerEmail}?\`;
+            
+            console.log('Modal message will be:', modalMessage);
+            console.log('Using modal ID:', uniqueModalId);
+            
+            // Use showModal with unique ID instead of confirm method
+            Modal.showModal(uniqueModalId, {
+              title: modalTitle,
+              body: \`<p>\${modalMessage}</p>\`,
+              buttons: [
+                {
+                  text: 'Cancel',
+                  className: 'modal-btn-outline',
+                  action: 'cancel',
+                  handler: () => {
+                    console.log('Show Week email cancelled');
+                  }
+                },
+                {
+                  text: 'Send Email',
+                  className: 'modal-btn-primary',
+                  action: 'send',
+                  handler: async () => {
+                    // Close the modal immediately so user can continue working
+                    Modal.closeModal(uniqueModalId);
+                    
+                    // Capture the variables at modal confirmation time to ensure they're current
+                    const currentVolunteerId = volunteerId;
+                    const currentVolunteerEmail = volunteerEmail;
+                    const currentVolunteerName = volunteerName;
+                    
+                    try {
+                      console.log('Modal confirmed, sending to:', { 
+                        currentVolunteerId, 
+                        currentVolunteerName, 
+                        currentVolunteerEmail,
+                        originalArgs: { volunteerId, volunteerName, volunteerEmail }
+                      });
+                      
+                      const response = await fetch(getAPIURL(\`/admin/api/volunteers/\${currentVolunteerId}/email-show-week\`), {
+                        method: 'POST',
+                        credentials: 'include'
+                      });
+                      
+                      if (response.ok) {
+                        const result = await response.json();
+                        console.log('Show Week email send response:', result);
+                        const message = result.hasShifts 
+                          ? \`Show Week email sent to \${currentVolunteerEmail}! They have \${result.shiftsCount} upcoming shifts.\`
+                          : \`Show Week email sent to \${currentVolunteerEmail}! They currently have no assigned shifts for future dates.\`;
+                          
+                        Toast.success(message, 4000);
+                      } else {
+                        const error = await response.json();
+                        Toast.error('Failed to send Show Week email: ' + (error.error || 'Unknown error'));
+                      }
+                    } catch (error) {
+                      console.error('Error sending Show Week email:', error);
+                      Toast.error('Error sending Show Week email');
+                    }
+                  }
+                }
+              ]
+            });
+          } else {
+            const confirmMessage = \`Send "It's Show Week" email to \${volunteerName} at \${volunteerEmail}?\`;
+            if (confirm(confirmMessage)) {
+              try {
+                const response = await fetch(getAPIURL(\`/admin/api/volunteers/\${volunteerId}/email-show-week\`), {
+                  method: 'POST',
+                  credentials: 'include'
+                });
+                
+                if (response.ok) {
+                  const result = await response.json();
+                  console.log('Show Week email send response (fallback):', result);
+                  const message = result.hasShifts 
+                    ? \`Show Week email sent to \${volunteerEmail}! They have \${result.shiftsCount} upcoming shifts.\`
+                    : \`Show Week email sent to \${volunteerEmail}! They currently have no assigned shifts for future dates.\`;
+                    
+                  if (typeof Toast !== 'undefined') {
+                    Toast.success(message, 4000);
+                  } else {
+                    alert(message);
+                  }
+                } else {
+                  const error = await response.json();
+                  if (typeof Toast !== 'undefined') {
+                    Toast.error('Failed to send Show Week email: ' + (error.error || 'Unknown error'));
+                  } else {
+                    alert('Failed to send Show Week email: ' + (error.error || 'Unknown error'));
+                  }
+                }
+              } catch (error) {
+                console.error('Error sending Show Week email:', error);
+                if (typeof Toast !== 'undefined') {
+                  Toast.error('Error sending Show Week email');
+                } else {
+                  alert('Error sending Show Week email');
                 }
               }
             }

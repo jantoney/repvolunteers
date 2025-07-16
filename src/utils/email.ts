@@ -1,10 +1,18 @@
 import { createResendClient, getFromAddress } from './resend-config.ts';
 import { recordSentEmail, CreateEmailRecord, CreateEmailAttachment } from './email-tracking.ts';
 
+export interface ContactInfo {
+  name: string;
+  phone: string;
+  organization?: string;
+  displayFormat?: string;
+}
+
 export interface VolunteerEmailData {
   volunteerName: string;
   volunteerEmail: string;
   loginUrl: string;
+  contactInfo?: ContactInfo;
 }
 
 export interface VolunteerScheduleEmailData {
@@ -13,12 +21,32 @@ export interface VolunteerScheduleEmailData {
   loginUrl: string;
   hasShifts: boolean;
   shifts: string[];
+  contactInfo?: ContactInfo;
+}
+
+export interface ShowWeekEmailData {
+  volunteerName: string;
+  volunteerEmail: string;
+  loginUrl: string;
+  hasShifts: boolean;
+  shifts: string[];
+  contactInfo?: ContactInfo;
 }
 
 /**
  * Renders the volunteer login email template with provided data
  */
 export function renderVolunteerLoginEmail(data: VolunteerEmailData): string {
+  // Generate contact section if contact info is provided
+  const contactSection = data.contactInfo 
+    ? `<p style="font-size:14px;line-height:24px;color:#333;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;margin:20px 0;text-align:center;background:#f8f9fa;padding:15px;border-radius:6px;">
+        <strong>Questions? Contact ${createClickablePhoneNumber(data.contactInfo.name, data.contactInfo.phone, {
+          organization: data.contactInfo.organization,
+          displayFormat: data.contactInfo.displayFormat
+        })}</strong>
+      </p>`
+    : '';
+
   // Use the beautiful template from volunteer-login-email.html
   const template = `<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html dir="ltr" lang="en">
@@ -146,6 +174,7 @@ export function renderVolunteerLoginEmail(data: VolunteerEmailData): string {
                         </tr>
                       </tbody>
                     </table>
+                    {{contactSection}}
                   </td>
                 </tr>
               </tbody>
@@ -167,7 +196,69 @@ export function renderVolunteerLoginEmail(data: VolunteerEmailData): string {
   // Replace placeholders with actual data
   return template
     .replace(/\{\{volunteerName\}\}/g, escapeHtml(data.volunteerName))
-    .replace(/\{\{loginUrl\}\}/g, data.loginUrl);
+    .replace(/\{\{loginUrl\}\}/g, data.loginUrl)
+    .replace(/\{\{contactSection\}\}/g, contactSection);
+}
+
+/**
+ * Creates standard contact information for theatre volunteer coordination
+ */
+export function createTheatreContactInfo(): ContactInfo {
+  return {
+    name: 'Jay - Theatre Volunteer Coordinator',
+    phone: '0434586878',
+    organization: 'Theatre Volunteer Management',
+    displayFormat: '0434 586 878'
+  };
+}
+
+/**
+ * Creates a VCF (vCard) data URI for adding a contact to phone/contacts app
+ */
+function createVcfDataUri(name: string, phone: string, organization?: string): string {
+  // Format phone number for international format if it starts with 0
+  const formattedPhone = phone.startsWith('0') ? `+61${phone.substring(1)}` : phone;
+  
+  const vcfContent = [
+    'BEGIN:VCARD',
+    'VERSION:3.0',
+    `FN:${name}`,
+    organization ? `ORG:${organization}` : '',
+    `TEL;TYPE=CELL:${formattedPhone}`,
+    'END:VCARD'
+  ].filter(Boolean).join('\\n');
+  
+  return `data:text/vcard;charset=utf-8,${encodeURIComponent(vcfContent)}`;
+}
+
+/**
+ * Creates a clickable phone number link with optional contact save functionality
+ */
+function createClickablePhoneNumber(name: string, phone: string, options?: {
+  showAddToContacts?: boolean;
+  organization?: string;
+  displayFormat?: string;
+}): string {
+  const { showAddToContacts = true, organization, displayFormat } = options || {};
+  
+  // Format phone number for tel: link (international format)
+  const telPhone = phone.startsWith('0') ? `+61${phone.substring(1)}` : phone;
+  
+  // Use provided display format or format with spaces for readability
+  const displayPhone = displayFormat || phone.replace(/(\d{4})(\d{3})(\d{3})/, '$1 $2 $3');
+  
+  let html = `<a href="tel:${telPhone}" style="color:#007bff;text-decoration:none;">${displayPhone}</a>`;
+  
+  if (showAddToContacts) {
+    const vcfUri = createVcfDataUri(name, phone, organization);
+    const filename = `${name.toLowerCase().replace(/\s+/g, '-')}-contact.vcf`;
+    
+    html += `<br><small style="color:#666;font-size:12px;">`;
+    html += `<a href="${vcfUri}" download="${filename}" style="color:#007bff;text-decoration:none;">`;
+    html += `📱 Add to contacts</a></small>`;
+  }
+  
+  return html;
 }
 
 /**
@@ -195,20 +286,22 @@ function extractParticipantIdFromUrl(loginUrl: string): string | undefined {
 /**
  * Sends an email to a volunteer with their login link using Resend
  */
-export async function sendVolunteerLoginEmail(data: VolunteerEmailData, sentByUserId?: string): Promise<boolean> {
+export async function sendVolunteerLoginEmail(data: VolunteerEmailData, sentByUserId?: string, forceProduction?: boolean): Promise<boolean> {
   try {
     const htmlContent = renderVolunteerLoginEmail(data);
     const fromAddress = getFromAddress();
     
     // Check if we're in development mode or if Resend is not configured
-    const isDevelopment = Deno.env.get('DENO_ENV') === 'development' || !Deno.env.get('RESEND_API_KEY');
+    // forceProduction parameter can override development mode for testing
+    const isDevelopment = !forceProduction && (Deno.env.get('DENO_ENV') === 'development' || !Deno.env.get('RESEND_API_KEY'));
     
     let resendEmailId: string | undefined;
     
     if (isDevelopment) {
       // Development mode: just log the email
+      const modeNote = forceProduction ? " (Force Production Mode DISABLED - still in development)" : "";
       console.log(`
-=== EMAIL WOULD BE SENT (Development Mode) ===
+=== EMAIL WOULD BE SENT (Development Mode${modeNote}) ===
 To: ${data.volunteerEmail}
 Subject: Your Theatre Shifts Login Link
 HTML Content Length: ${htmlContent.length} characters
@@ -231,7 +324,8 @@ Login URL: ${data.loginUrl}
         });
         
         resendEmailId = emailResult.data?.id;
-        console.log(`✅ Email sent successfully via Resend. ID: ${resendEmailId}`);
+        const forceNote = forceProduction ? " (FORCED from development mode)" : "";
+        console.log(`✅ Email sent successfully via Resend${forceNote}. ID: ${resendEmailId}`);
         
       } catch (resendError) {
         console.error('❌ Failed to send email via Resend:', resendError);
@@ -284,6 +378,16 @@ export interface VolunteerScheduleEmailData {
  * Renders the volunteer schedule email template with provided data
  */
 export function renderVolunteerScheduleEmail(data: VolunteerScheduleEmailData): string {
+  // Generate contact section if contact info is provided
+  const contactSection = data.contactInfo 
+    ? `<div style="font-size:14px;line-height:24px;color:#333;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;margin:20px 0;text-align:center;background:#f8f9fa;padding:15px;border-radius:6px;">
+        <strong>Questions? Contact ${createClickablePhoneNumber(data.contactInfo.name, data.contactInfo.phone, {
+          organization: data.contactInfo.organization,
+          displayFormat: data.contactInfo.displayFormat
+        })}</strong>
+      </div>`
+    : '';
+
   // Generate shifts section based on whether they have shifts
   let shiftsSection = '';
   if (data.hasShifts && data.shifts.length > 0) {
@@ -361,6 +465,7 @@ export function renderVolunteerScheduleEmail(data: VolunteerScheduleEmailData): 
                                 </tr>
                               </tbody>
                             </table>
+                            {{contactSection}}
                           </td>
                         </tr>
                       </tbody>
@@ -385,7 +490,147 @@ export function renderVolunteerScheduleEmail(data: VolunteerScheduleEmailData): 
   return template
     .replace(/\{\{volunteerName\}\}/g, escapeHtml(data.volunteerName))
     .replace(/\{\{loginUrl\}\}/g, data.loginUrl)
-    .replace(/\{\{shiftsSection\}\}/g, shiftsSection);
+    .replace(/\{\{shiftsSection\}\}/g, shiftsSection)
+    .replace(/\{\{contactSection\}\}/g, contactSection);
+}
+
+/**
+ * Renders the "It's Show Week" email template with provided data
+ */
+export function renderShowWeekEmail(data: ShowWeekEmailData): string {
+  // Generate shifts section based on whether they have shifts
+  let shiftsSection = '';
+  if (data.hasShifts && data.shifts.length > 0) {
+    // Do not escape HTML, as shift preview now contains <br> and <span> for formatting
+    const shiftsList = data.shifts.map(shift => `<li style="margin-bottom:5px;">${shift}</li>`).join('');
+    shiftsSection = `
+            <div style="background:#f8f9fa;border-radius:6px;padding:20px;margin:25px 0;">
+              <h3 style="color:#333;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;font-size:16px;font-weight:bold;margin:0 0 10px 0;">
+                🎭 Your Show Week Shifts:
+              </h3>
+              <ul style="color:#555;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;font-size:14px;line-height:20px;margin:0;padding-left:20px;">
+                ${shiftsList}
+              </ul>
+            </div>`;
+  } else {
+    shiftsSection = `
+            <div style="background:#fff3cd;border-radius:6px;padding:20px;margin:25px 0;border-left:4px solid #ffc107;">
+              <p style="color:#856404;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;font-size:14px;margin:0;">
+                🎭 You don't have any shifts assigned for show week. 
+                If you'd like to help out, check the website for available shifts!
+              </p>
+            </div>`;
+  }
+
+  // Generate clickable phone contact section
+  const phoneContactSection = data.contactInfo 
+    ? createClickablePhoneNumber(
+        data.contactInfo.name, 
+        data.contactInfo.phone, 
+        { 
+          organization: data.contactInfo.organization,
+          displayFormat: data.contactInfo.displayFormat 
+        }
+      )
+    : createClickablePhoneNumber('Jay Antoney - Adelaide Rep', '0434586878', { 
+        organization: 'Adelaide Repertory Theatre',
+        displayFormat: '0434 586 878'
+      });
+
+  // Use a simplified template inline
+  const template = `<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html dir="ltr" lang="en">
+  <head>
+    <meta content="text/html; charset=UTF-8" http-equiv="Content-Type" />
+    <meta name="x-apple-disable-message-reformatting" />
+  </head>
+  <body style="background-color:#fff;color:#212121">
+    <div style="display:none;overflow:hidden;line-height:1px;opacity:0;max-height:0;max-width:0" data-skip-in-text="true">
+      It's Show Week! 🎭
+    </div>
+    <table align="center" width="100%" border="0" cellpadding="0" cellspacing="0" role="presentation" style="max-width:37.5em;padding:20px;margin:0 auto;background-color:#eee">
+      <tbody>
+        <tr style="width:100%">
+          <td>
+            <table align="center" width="100%" border="0" cellpadding="0" cellspacing="0" role="presentation" style="background-color:#fff">
+              <tbody>
+                <tr>
+                  <td>
+                    <table align="center" width="100%" border="0" cellpadding="0" cellspacing="0" role="presentation" style="background-color:#007bff;display:flex;padding:20px 0;align-items:center;justify-content:center">
+                      <tbody>
+                        <tr>
+                          <td style="text-align:center;">
+                            <h2 style="color:#fff;margin:0;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;font-size:24px;font-weight:bold;">
+                              🎭 Theatre Shifts
+                            </h2>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                    <table align="center" width="100%" border="0" cellpadding="0" cellspacing="0" role="presentation" style="padding:25px 35px">
+                      <tbody>
+                        <tr>
+                          <td>
+                            <h1 style="color:#333;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;font-size:20px;font-weight:bold;margin-bottom:15px">
+                              Hey {{volunteerName}}, it's Show Week! 🎭✨
+                            </h1>
+                            <p style="font-size:14px;line-height:24px;color:#333;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;margin:24px 0;margin-bottom:14px;margin-top:24px;margin-right:0;margin-left:0">
+                              How exciting! We're so close to showtime and we couldn't do it without amazing volunteers like you. 
+                              Your shift details are attached as a PDF for easy reference.
+                            </p>
+                            <p style="font-size:14px;line-height:24px;color:#333;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;margin:24px 0;margin-bottom:14px;margin-top:24px;margin-right:0;margin-left:0">
+                              <strong>Quick reminder:</strong> Uniform is still neat casual - black, white & navy are all perfectly fine. 
+                              Any other questions, don't hesitate to contact me. Feel free to save my number in your phone just in case you're running late or something pops up.
+                            </p>
+                            <div style="font-size:14px;line-height:24px;color:#333;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;margin:24px 0;margin-bottom:14px;margin-top:24px;margin-right:0;margin-left:0;text-align:center;background:#f8f9fa;padding:15px;border-radius:6px;">
+                              <strong>Jay - {{phoneContactSection}}</strong>
+                            </div>
+                            {{shiftsSection}}
+                            <p style="font-size:14px;line-height:24px;color:#333;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;margin:24px 0;margin-bottom:14px;margin-top:24px;margin-right:0;margin-left:0">
+                              Break a leg! 🎭
+                            </p>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                    <hr style="width:100%;border:none;border-top:1px solid #eaeaea" />
+                    <table align="center" width="100%" border="0" cellpadding="0" cellspacing="0" role="presentation" style="padding:25px 35px">
+                      <tbody>
+                        <tr>
+                          <td>
+                            <h3 style="color:#333;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;font-size:16px;font-weight:bold;margin-bottom:10px;">
+                              📎 In this email:
+                            </h3>
+                            <ul style="color:#333;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;font-size:14px;line-height:24px;margin:0;padding-left:20px;">
+                              <li>Your complete shift schedule [PDF attached]</li>
+                              <li>Contact information for reference</li>
+                              <li>Important dates and times</li>
+                            </ul>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+            <p style="font-size:12px;line-height:24px;color:#666;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;margin:24px 0;padding:0 20px;margin-top:24px;margin-right:0;margin-bottom:24px;margin-left:0;text-align:center;">
+              This email was sent by Theatre Shifts volunteer management system. 
+              Your schedule is attached for easy reference and printing. 
+              If you have any questions, please contact the theatre administration.
+            </p>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </body>
+</html>`;
+
+  // Replace placeholders with actual data
+  return template
+    .replace(/\{\{volunteerName\}\}/g, escapeHtml(data.volunteerName))
+    .replace(/\{\{shiftsSection\}\}/g, shiftsSection)
+    .replace(/\{\{phoneContactSection\}\}/g, phoneContactSection);
 }
 
 /**
@@ -394,23 +639,26 @@ export function renderVolunteerScheduleEmail(data: VolunteerScheduleEmailData): 
 export async function sendVolunteerScheduleEmail(
   data: VolunteerScheduleEmailData,
   pdfAttachment: { content: Uint8Array; filename: string },
-  sentByUserId?: string
+  sentByUserId?: string,
+  forceProduction?: boolean
 ): Promise<boolean> {
   try {
     const htmlContent = renderVolunteerScheduleEmail(data);
     const fromAddress = getFromAddress();
     
     // Check if we're in development mode or if Resend is not configured
-    const isDevelopment = Deno.env.get('DENO_ENV') === 'development' || !Deno.env.get('RESEND_API_KEY');
+    // forceProduction parameter can override development mode for testing
+    const isDevelopment = !forceProduction && (Deno.env.get('DENO_ENV') === 'development' || !Deno.env.get('RESEND_API_KEY'));
     
     let resendEmailId: string | undefined;
     
     if (isDevelopment) {
       // Development mode: just log the email
+      const modeNote = forceProduction ? " (Force Production Mode DISABLED - still in development)" : "";
       console.log(`
-=== SCHEDULE EMAIL WOULD BE SENT (Development Mode) ===
+=== SCHEDULE EMAIL WOULD BE SENT (Development Mode${modeNote}) ===
 To: ${data.volunteerEmail}
-Subject: Your Theatre Shifts Schedule
+Subject: Your Arts Theatre Shifts Schedule
 HTML Content Length: ${htmlContent.length} characters
 Login URL: ${data.loginUrl}
 Attachment: ${pdfAttachment.filename} (${pdfAttachment.content.length} bytes)
@@ -440,7 +688,8 @@ Shifts Count: ${data.shifts.length}
         });
         
         resendEmailId = emailResult.data?.id;
-        console.log(`✅ Schedule email sent successfully via Resend. ID: ${resendEmailId}`);
+        const forceNote = forceProduction ? " (FORCED from development mode)" : "";
+        console.log(`✅ Schedule email sent successfully via Resend${forceNote}. ID: ${resendEmailId}`);
         
       } catch (resendError) {
         console.error('❌ Failed to send schedule email via Resend:', resendError);
@@ -483,6 +732,108 @@ Shifts Count: ${data.shifts.length}
     
   } catch (error) {
     console.error("Error sending volunteer schedule email:", error);
+    return false;
+  }
+}
+
+/**
+ * Sends a "It's Show Week" email to a volunteer with their schedule PDF attached using Resend
+ */
+export async function sendShowWeekEmail(
+  data: ShowWeekEmailData,
+  pdfAttachment: { content: Uint8Array; filename: string },
+  sentByUserId?: string,
+  forceProduction?: boolean
+): Promise<boolean> {
+  try {
+    const htmlContent = renderShowWeekEmail(data);
+    const fromAddress = getFromAddress();
+    
+    // Check if we're in development mode or if Resend is not configured
+    // forceProduction parameter can override development mode for testing
+    const isDevelopment = !forceProduction && (Deno.env.get('DENO_ENV') === 'development' || !Deno.env.get('RESEND_API_KEY'));
+    
+    let resendEmailId: string | undefined;
+    
+    if (isDevelopment) {
+      // Development mode: just log the email
+      const modeNote = forceProduction ? " (Force Production Mode DISABLED - still in development)" : "";
+      console.log(`
+=== SHOW WEEK EMAIL WOULD BE SENT (Development Mode${modeNote}) ===
+To: ${data.volunteerEmail}
+Subject: It's Show Week! 🎭
+HTML Content Length: ${htmlContent.length} characters
+Attachment: ${pdfAttachment.filename} (${pdfAttachment.content.length} bytes)
+Has Shifts: ${data.hasShifts}
+Shifts Count: ${data.shifts.length}
+============================================================
+      `);
+      
+      // Simulate async operation
+      await new Promise(resolve => setTimeout(resolve, 100));
+    } else {
+      // Production mode: send actual email with Resend
+      try {
+        const resend = createResendClient();
+        
+        const emailResult = await resend.emails.send({
+          from: fromAddress,
+          to: [data.volunteerEmail],
+          subject: "It's Show Week! 🎭",
+          html: htmlContent,
+          attachments: [
+            {
+              filename: pdfAttachment.filename,
+              content: btoa(String.fromCharCode(...pdfAttachment.content)),
+            }
+          ],
+        });
+        
+        resendEmailId = emailResult.data?.id;
+        const forceNote = forceProduction ? " (FORCED from development mode)" : "";
+        console.log(`✅ Show Week email sent successfully via Resend${forceNote}. ID: ${resendEmailId}`);
+        
+      } catch (resendError) {
+        console.error('❌ Failed to send Show Week email via Resend:', resendError);
+        return false;
+      }
+    }
+
+    // Record the email in our tracking system
+    try {
+      // Extract participant ID from the volunteer data or URL (if available)
+      const participantId = data.loginUrl ? extractParticipantIdFromUrl(data.loginUrl) : undefined;
+      
+      const emailRecord: CreateEmailRecord = {
+        to_email: data.volunteerEmail,
+        to_participant_id: participantId,
+        from_email: fromAddress,
+        subject: "It's Show Week! 🎭",
+        email_type: 'show_week',
+        html_content: htmlContent,
+        sent_by_user_id: sentByUserId,
+        resend_email_id: resendEmailId,
+        delivery_status: isDevelopment ? 'simulated' : 'sent'
+      };
+
+      const attachments: CreateEmailAttachment[] = [{
+        filename: pdfAttachment.filename,
+        content_type: 'application/pdf',
+        file_data: pdfAttachment.content
+      }];
+      
+      await recordSentEmail(emailRecord, attachments);
+      console.log('📧 Show Week email and attachment recorded in tracking system');
+      
+    } catch (trackingError) {
+      console.error('⚠️ Failed to record email in tracking system:', trackingError);
+      // Don't fail the email send if tracking fails
+    }
+    
+    return true;
+    
+  } catch (error) {
+    console.error("Error sending Show Week email:", error);
     return false;
   }
 }
