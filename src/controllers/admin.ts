@@ -1882,6 +1882,7 @@ export async function emailLastMinuteShifts(ctx: RouterContext<string>) {
     const emailData = {
       volunteerName: volunteer.name,
       volunteerEmail: volunteer.email,
+      volunteerId: volunteerId, // Add the volunteer ID for tracking
       hasShifts,
       shifts
     };

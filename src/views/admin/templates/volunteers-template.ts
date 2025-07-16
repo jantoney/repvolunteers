@@ -253,6 +253,7 @@ export function renderVolunteersTemplate(data: VolunteersPageData): string {
                       <button class="send-pdf-btn btn btn-sm btn-success" data-volunteer-id="${volunteer.id}" data-volunteer-name="${volunteer.name}" data-volunteer-email="${volunteer.email || ''}" ${!volunteer.email ? 'disabled title="No email address"' : ''}>📧 Send PDF</button>
                       <button class="send-show-week-btn btn btn-sm btn-warning" data-volunteer-id="${volunteer.id}" data-volunteer-name="${volunteer.name}" data-volunteer-email="${volunteer.email || ''}" ${!volunteer.email ? 'disabled title="No email address"' : ''}>🎭 Show Week</button>
                       <button class="send-last-minute-btn btn btn-sm" style="background-color:#ff6b35;color:white;" data-volunteer-id="${volunteer.id}" data-volunteer-name="${volunteer.name}" data-volunteer-email="${volunteer.email || ''}" ${!volunteer.email ? 'disabled title="No email address"' : ''}>🚨 Last Minute</button>
+                      <button class="email-history-btn btn btn-sm btn-info" data-volunteer-id="${volunteer.id}" data-volunteer-name="${volunteer.name}">📧 History</button>
                       <button onclick="deleteVolunteer('${volunteer.id}', '${volunteer.name.replace(/'/g, "\\'")}')" class="btn btn-sm btn-danger">Delete</button>
                     </div>
                   </td>
@@ -357,6 +358,21 @@ export function renderVolunteersTemplate(data: VolunteersPageData): string {
               
               if (volunteerId && volunteerName) {
                 sendLastMinuteShiftsEmail(volunteerId, volunteerName, volunteerEmail);
+              }
+            });
+          });
+          
+          // Add event listeners for Email History buttons
+          const emailHistoryButtons = document.querySelectorAll('.email-history-btn');
+          emailHistoryButtons.forEach(button => {
+            button.addEventListener('click', function() {
+              const volunteerId = this.getAttribute('data-volunteer-id');
+              const volunteerName = this.getAttribute('data-volunteer-name');
+              
+              console.log('Email History clicked:', { volunteerId, volunteerName });
+              
+              if (volunteerId && volunteerName) {
+                showEmailHistory(volunteerId, volunteerName);
               }
             });
           });
@@ -948,6 +964,197 @@ export function renderVolunteersTemplate(data: VolunteersPageData): string {
               }
             }
           }
+        }
+        
+        // Show email history for a volunteer
+        async function showEmailHistory(volunteerId, volunteerName) {
+          console.log('Loading email history for:', { volunteerId, volunteerName });
+          
+          try {
+            const response = await fetch(getAPIURL(\`/admin/api/volunteers/\${volunteerId}/emails\`), {
+              method: 'GET',
+              credentials: 'include'
+            });
+            
+            if (response.ok) {
+              const result = await response.json();
+              const emails = result.emails || [];
+              
+              // Create modal content
+              let modalContent = \`
+                <div class="email-history-modal">
+                  <h3>Email History for \${escapeHtml(volunteerName)}</h3>
+                  <div class="email-history-list">
+              \`;
+              
+              if (emails.length === 0) {
+                modalContent += \`
+                  <div class="no-emails">
+                    <p style="color: #666; text-align: center; padding: 2rem;">
+                      📧 No emails have been sent to this volunteer yet.
+                    </p>
+                  </div>
+                \`;
+              } else {
+                emails.forEach(email => {
+                  const sentDate = new Date(email.sent_at).toLocaleDateString('en-AU', {
+                    weekday: 'short',
+                    day: '2-digit',
+                    month: 'short',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  });
+                  
+                  const typeIcon = {
+                    'volunteer_login': '🔑',
+                    'volunteer_schedule': '📅',
+                    'show_week': '🎭',
+                    'last_minute_shifts': '🚨'
+                  }[email.email_type] || '📧';
+                  
+                  const statusIcon = {
+                    'sent': '✅',
+                    'delivered': '✅',
+                    'failed': '❌',
+                    'simulated': '🧪'
+                  }[email.delivery_status] || '❓';
+                  
+                  modalContent += \`
+                    <div class="email-entry">
+                      <div class="email-header">
+                        <span class="email-type">\${typeIcon} \${email.email_type.replace(/_/g, ' ').replace(/\\b\\w/g, l => l.toUpperCase())}</span>
+                        <span class="email-date">\${sentDate}</span>
+                        <span class="email-status">\${statusIcon} \${email.delivery_status}</span>
+                      </div>
+                      <div class="email-subject">\${escapeHtml(email.subject)}</div>
+                      <div class="email-to">To: \${escapeHtml(email.to_email)}</div>
+                      \${email.attachment_count > 0 ? \`<div class="email-attachments">📎 \${email.attachment_count} attachment(s)</div>\` : ''}
+                    </div>
+                  \`;
+                });
+              }
+              
+              modalContent += \`
+                  </div>
+                </div>
+                <style>
+                  .email-history-modal {
+                    max-width: 600px;
+                    max-height: 500px;
+                    overflow-y: auto;
+                  }
+                  .email-history-list {
+                    margin-top: 1rem;
+                  }
+                  .email-entry {
+                    border: 1px solid #ddd;
+                    border-radius: 6px;
+                    padding: 1rem;
+                    margin-bottom: 0.5rem;
+                    background: #f9f9f9;
+                  }
+                  .email-header {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    margin-bottom: 0.5rem;
+                    flex-wrap: wrap;
+                    gap: 0.5rem;
+                  }
+                  .email-type {
+                    font-weight: bold;
+                    color: #007bff;
+                  }
+                  .email-date {
+                    font-size: 0.9rem;
+                    color: #666;
+                  }
+                  .email-status {
+                    font-size: 0.9rem;
+                  }
+                  .email-subject {
+                    font-weight: bold;
+                    margin-bottom: 0.5rem;
+                  }
+                  .email-to {
+                    font-size: 0.9rem;
+                    color: #666;
+                  }
+                  .email-attachments {
+                    font-size: 0.9rem;
+                    color: #007bff;
+                    margin-top: 0.5rem;
+                  }
+                  .no-emails {
+                    text-align: center;
+                    padding: 2rem;
+                  }
+                </style>
+              \`;
+              
+              if (typeof Modal !== 'undefined') {
+                const uniqueModalId = \`email-history-\${Date.now()}\`;
+                Modal.showModal(uniqueModalId, {
+                  title: \`Email History - \${volunteerName}\`,
+                  body: modalContent,
+                  buttons: [
+                    {
+                      text: 'Close',
+                      className: 'modal-btn-outline',
+                      action: 'cancel'
+                    }
+                  ]
+                });
+              } else {
+                // Fallback for browsers without modal support
+                const newWindow = window.open('', '_blank', 'width=700,height=600,scrollbars=yes');
+                newWindow.document.write(\`
+                  <html>
+                    <head>
+                      <title>Email History - \${escapeHtml(volunteerName)}</title>
+                      <style>
+                        body { font-family: Arial, sans-serif; padding: 20px; }
+                        .email-entry { border: 1px solid #ddd; padding: 15px; margin-bottom: 10px; border-radius: 5px; }
+                        .email-header { display: flex; justify-content: space-between; margin-bottom: 10px; }
+                        .email-type { font-weight: bold; color: #007bff; }
+                        .email-date { color: #666; }
+                        .email-subject { font-weight: bold; margin-bottom: 5px; }
+                        .email-to { color: #666; }
+                        .email-attachments { color: #007bff; margin-top: 5px; }
+                      </style>
+                    </head>
+                    <body>
+                      \${modalContent}
+                    </body>
+                  </html>
+                \`);
+                newWindow.document.close();
+              }
+              
+            } else {
+              const error = await response.json();
+              if (typeof Toast !== 'undefined') {
+                Toast.error('Failed to load email history: ' + (error.error || 'Unknown error'));
+              } else {
+                alert('Failed to load email history: ' + (error.error || 'Unknown error'));
+              }
+            }
+          } catch (error) {
+            console.error('Error loading email history:', error);
+            if (typeof Toast !== 'undefined') {
+              Toast.error('Error loading email history');
+            } else {
+              alert('Error loading email history');
+            }
+          }
+        }
+        
+        // HTML escape function
+        function escapeHtml(text) {
+          const div = document.createElement('div');
+          div.textContent = text;
+          return div.innerHTML;
         }
       </script>
     </body>

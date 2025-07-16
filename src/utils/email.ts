@@ -36,6 +36,7 @@ export interface ShowWeekEmailData {
 export interface LastMinuteShiftsEmailData {
   volunteerName: string;
   volunteerEmail: string;
+  volunteerId?: string; // Add volunteer ID for tracking
   hasShifts: boolean;
   shifts: string[];
   contactInfo?: ContactInfo;
@@ -1042,7 +1043,7 @@ Shifts Count: ${data.shifts.length}
     try {
       const emailRecord: CreateEmailRecord = {
         to_email: data.volunteerEmail,
-        to_participant_id: undefined, // Last minute shifts emails don't have participant IDs
+        to_participant_id: data.volunteerId, // Use the volunteer ID from the data
         from_email: fromAddress,
         subject: "Last Minute Shifts @ the Arts Theatre",
         email_type: 'last_minute_shifts',
