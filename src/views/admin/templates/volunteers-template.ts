@@ -252,6 +252,7 @@ export function renderVolunteersTemplate(data: VolunteersPageData): string {
                       <a href="/admin/volunteers/${volunteer.id}/edit" class="btn btn-sm btn-secondary">Edit</a>
                       <button class="send-pdf-btn btn btn-sm btn-success" data-volunteer-id="${volunteer.id}" data-volunteer-name="${volunteer.name}" data-volunteer-email="${volunteer.email || ''}" ${!volunteer.email ? 'disabled title="No email address"' : ''}>📧 Send PDF</button>
                       <button class="send-show-week-btn btn btn-sm btn-warning" data-volunteer-id="${volunteer.id}" data-volunteer-name="${volunteer.name}" data-volunteer-email="${volunteer.email || ''}" ${!volunteer.email ? 'disabled title="No email address"' : ''}>🎭 Show Week</button>
+                      <button class="send-last-minute-btn btn btn-sm" style="background-color:#ff6b35;color:white;" data-volunteer-id="${volunteer.id}" data-volunteer-name="${volunteer.name}" data-volunteer-email="${volunteer.email || ''}" ${!volunteer.email ? 'disabled title="No email address"' : ''}>🚨 Last Minute</button>
                       <button onclick="deleteVolunteer('${volunteer.id}', '${volunteer.name.replace(/'/g, "\\'")}')" class="btn btn-sm btn-danger">Delete</button>
                     </div>
                   </td>
@@ -340,6 +341,22 @@ export function renderVolunteersTemplate(data: VolunteersPageData): string {
               
               if (volunteerId && volunteerName) {
                 sendShowWeekEmail(volunteerId, volunteerName, volunteerEmail);
+              }
+            });
+          });
+          
+          // Add event listeners for Last Minute Shifts buttons
+          const sendLastMinuteButtons = document.querySelectorAll('.send-last-minute-btn');
+          sendLastMinuteButtons.forEach(button => {
+            button.addEventListener('click', function() {
+              const volunteerId = this.getAttribute('data-volunteer-id');
+              const volunteerName = this.getAttribute('data-volunteer-name');
+              const volunteerEmail = this.getAttribute('data-volunteer-email');
+              
+              console.log('Send Last Minute clicked:', { volunteerId, volunteerName, volunteerEmail });
+              
+              if (volunteerId && volunteerName) {
+                sendLastMinuteShiftsEmail(volunteerId, volunteerName, volunteerEmail);
               }
             });
           });
@@ -802,6 +819,131 @@ export function renderVolunteersTemplate(data: VolunteersPageData): string {
                   Toast.error('Error sending Show Week email');
                 } else {
                   alert('Error sending Show Week email');
+                }
+              }
+            }
+          }
+        }
+        
+        // Send Last Minute Shifts email via email
+        async function sendLastMinuteShiftsEmail(volunteerId, volunteerName, volunteerEmail) {
+          console.log('sendLastMinuteShiftsEmail called with:', { volunteerId, volunteerName, volunteerEmail });
+          
+          if (!volunteerEmail) {
+            if (typeof Modal !== 'undefined') {
+              Modal.error('Cannot Send Last Minute Email', 'This volunteer does not have an email address on file.');
+            } else {
+              alert('Cannot send Last Minute Shifts email: No email address on file');
+            }
+            return;
+          }
+          
+          // Generate the confirmation message fresh each time
+          console.log('Generating modal with:', { volunteerName, volunteerEmail });
+          
+          if (typeof Modal !== 'undefined') {
+            // Generate unique modal ID to prevent caching issues
+            const uniqueModalId = \`send-last-minute-\${Date.now()}-\${Math.random().toString(36).substr(2, 9)}\`;
+            const modalTitle = "Send Last Minute Shifts Email";
+            const modalMessage = \`Send "Last Minute Shifts" email to \${volunteerName} at \${volunteerEmail}?\`;
+            
+            console.log('Modal message will be:', modalMessage);
+            console.log('Using modal ID:', uniqueModalId);
+            
+            // Use showModal with unique ID instead of confirm method
+            Modal.showModal(uniqueModalId, {
+              title: modalTitle,
+              body: \`<p>\${modalMessage}</p><p><small>This will include a PDF with the next 10 outstanding shifts that need volunteers.</small></p>\`,
+              buttons: [
+                {
+                  text: 'Cancel',
+                  className: 'modal-btn-outline',
+                  action: 'cancel',
+                  handler: () => {
+                    console.log('Last Minute Shifts email cancelled');
+                  }
+                },
+                {
+                  text: 'Send Email',
+                  className: 'modal-btn-primary',
+                  action: 'send',
+                  handler: async () => {
+                    // Close the modal immediately so user can continue working
+                    Modal.closeModal(uniqueModalId);
+                    
+                    // Capture the variables at modal confirmation time to ensure they're current
+                    const currentVolunteerId = volunteerId;
+                    const currentVolunteerEmail = volunteerEmail;
+                    const currentVolunteerName = volunteerName;
+                    
+                    try {
+                      console.log('Modal confirmed, sending to:', { 
+                        currentVolunteerId, 
+                        currentVolunteerName, 
+                        currentVolunteerEmail,
+                        originalArgs: { volunteerId, volunteerName, volunteerEmail }
+                      });
+                      
+                      const response = await fetch(getAPIURL(\`/admin/api/volunteers/\${currentVolunteerId}/email-last-minute-shifts\`), {
+                        method: 'POST',
+                        credentials: 'include'
+                      });
+                      
+                      if (response.ok) {
+                        const result = await response.json();
+                        console.log('Last Minute Shifts email send response:', result);
+                        const message = result.hasShifts 
+                          ? \`Last Minute Shifts email sent to \${currentVolunteerEmail}! There are \${result.shiftsCount} outstanding shifts.\`
+                          : \`Last Minute Shifts email sent to \${currentVolunteerEmail}! All shifts are currently filled.\`;
+                          
+                        Toast.success(message, 4000);
+                      } else {
+                        const error = await response.json();
+                        Toast.error('Failed to send Last Minute Shifts email: ' + (error.error || 'Unknown error'));
+                      }
+                    } catch (error) {
+                      console.error('Error sending Last Minute Shifts email:', error);
+                      Toast.error('Error sending Last Minute Shifts email');
+                    }
+                  }
+                }
+              ]
+            });
+          } else {
+            const confirmMessage = \`Send "Last Minute Shifts" email to \${volunteerName} at \${volunteerEmail}?\`;
+            if (confirm(confirmMessage)) {
+              try {
+                const response = await fetch(getAPIURL(\`/admin/api/volunteers/\${volunteerId}/email-last-minute-shifts\`), {
+                  method: 'POST',
+                  credentials: 'include'
+                });
+                
+                if (response.ok) {
+                  const result = await response.json();
+                  console.log('Last Minute Shifts email send response (fallback):', result);
+                  const message = result.hasShifts 
+                    ? \`Last Minute Shifts email sent to \${volunteerEmail}! There are \${result.shiftsCount} outstanding shifts.\`
+                    : \`Last Minute Shifts email sent to \${volunteerEmail}! All shifts are currently filled.\`;
+                    
+                  if (typeof Toast !== 'undefined') {
+                    Toast.success(message, 4000);
+                  } else {
+                    alert(message);
+                  }
+                } else {
+                  const error = await response.json();
+                  if (typeof Toast !== 'undefined') {
+                    Toast.error('Failed to send Last Minute Shifts email: ' + (error.error || 'Unknown error'));
+                  } else {
+                    alert('Failed to send Last Minute Shifts email: ' + (error.error || 'Unknown error'));
+                  }
+                }
+              } catch (error) {
+                console.error('Error sending Last Minute Shifts email:', error);
+                if (typeof Toast !== 'undefined') {
+                  Toast.error('Error sending Last Minute Shifts email');
+                } else {
+                  alert('Error sending Last Minute Shifts email');
                 }
               }
             }

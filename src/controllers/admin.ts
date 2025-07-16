@@ -1,9 +1,7 @@
 import type { RouterContext } from "oak";
 import { getPool } from "../models/db.ts";
 import {
-  getAdelaideTimeSelectSQL,
-  getAdelaideTimeParameterSQL,
-  getAdelaideTimeInsertSQL
+  getAdelaideTimeParameterSQL
 } from "../utils/timezone.ts";
 import { getAuth } from "../auth.ts";
 import { generateShiftRemovalPDF as generatePDF, getMimeType, getFileExtension, type ShiftData, type VolunteerData } from "../utils/pdf-generator.ts";
@@ -1820,6 +1818,135 @@ export async function emailShowWeekPDF(ctx: RouterContext<string>) {
     console.error("Error sending Show Week email:", error);
     ctx.response.status = 500;
     ctx.response.body = { error: "Failed to send Show Week email" };
+  }
+}
+
+/**
+ * Sends a "Last Minute Shifts" email to a volunteer with outstanding shifts PDF attached - admin only
+ */
+export async function emailLastMinuteShifts(ctx: RouterContext<string>) {
+  const volunteerId = ctx.params.id;
+
+  try {
+    const { generateOutstandingShiftsPDF } = await import("../utils/unfilled-shifts-pdf-generator.ts");
+    const { sendLastMinuteShiftsEmail } = await import("../utils/email.ts");
+
+    // Get volunteer data
+    const pool = getPool();
+    const client = await pool.connect();
+    let volunteer;
+    
+    try {
+      const volunteerResult = await client.queryObject<{ id: number; name: string; email: string }>(
+        "SELECT id, name, email FROM participants WHERE id = $1",
+        [volunteerId]
+      );
+      
+      if (volunteerResult.rows.length === 0) {
+        ctx.response.status = 404;
+        ctx.response.body = { error: "Volunteer not found" };
+        return;
+      }
+      
+      volunteer = volunteerResult.rows[0];
+    } finally {
+      client.release();
+    }
+
+    // Check if volunteer has email
+    if (!volunteer.email) {
+      ctx.response.status = 400;
+      ctx.response.body = { error: "Volunteer does not have an email address" };
+      return;
+    }
+
+    // Generate PDF of next 10 outstanding shifts
+    const pdfBuffer = await generateOutstandingShiftsPDF(10);
+    const filename = `last-minute-shifts-${new Date().toISOString().split('T')[0]}.pdf`;
+
+    // Get the next 10 unfilled shifts for email preview
+    const unfilledShifts = await getNext10UnfilledShifts();
+    const hasShifts = unfilledShifts.length > 0;
+    
+    // Format shifts for email preview (similar to existing email formats)
+    const shifts = unfilledShifts.map(shift => {
+      const date = new Date(shift.show_start).toLocaleDateString('en-AU', {
+        weekday: 'short', day: '2-digit', month: 'short', year: 'numeric'
+      });
+      const arriveTime = new Date(shift.arrive_time).toLocaleTimeString('en-AU', {
+        hour: '2-digit', minute: '2-digit', hour12: true
+      });
+      return `${date} ${arriveTime}<br><span style="margin-left:1.5em;display:inline-block;">${shift.show_name} (${shift.role})</span>`;
+    });
+
+    const emailData = {
+      volunteerName: volunteer.name,
+      volunteerEmail: volunteer.email,
+      hasShifts,
+      shifts
+    };
+
+    // Send email with PDF attachment
+    const currentUserId = ctx.state?.user?.id;
+    const forceProduction = ctx.request.url.searchParams.get('force') === 'true';
+    const emailSent = await sendLastMinuteShiftsEmail(emailData, {
+      content: pdfBuffer,
+      filename
+    }, currentUserId, forceProduction);
+
+    if (emailSent) {
+      ctx.response.status = 200;
+      ctx.response.body = {
+        success: true,
+        message: `Last Minute Shifts email sent to ${volunteer.email}`,
+        hasShifts,
+        shiftsCount: unfilledShifts.length
+      };
+    } else {
+      ctx.response.status = 500;
+      ctx.response.body = { error: "Failed to send email" };
+    }
+  } catch (error) {
+    console.error("Error sending Last Minute Shifts email:", error);
+    ctx.response.status = 500;
+    ctx.response.body = { error: "Failed to send Last Minute Shifts email" };
+  }
+}
+
+// Helper function to get next 10 unfilled shifts
+async function getNext10UnfilledShifts() {
+  const pool = getPool();
+  const client = await pool.connect();
+  try {
+    type ShiftRow = {
+      id: number;
+      show_name: string;
+      date: string;
+      show_start: string;
+      role: string;
+      arrive_time: string;
+    };
+    
+    const result = await client.queryObject<ShiftRow>(
+      `SELECT s.id, sh.name as show_name, 
+              DATE(sd.start_time) as date, 
+              sd.start_time as show_start,
+              s.role, 
+              s.arrive_time AT TIME ZONE 'Australia/Adelaide' as arrive_time
+       FROM shifts s
+       JOIN show_dates sd ON sd.id = s.show_date_id
+       JOIN shows sh ON sh.id = sd.show_id
+       LEFT JOIN participant_shifts vs ON vs.shift_id = s.id
+       WHERE sd.start_time >= NOW()
+       GROUP BY s.id, sh.name, DATE(sd.start_time), sd.start_time, s.role, s.arrive_time
+       HAVING COUNT(vs.participant_id) = 0
+       ORDER BY sd.start_time, s.arrive_time
+       LIMIT 10`
+    );
+    
+    return result.rows;
+  } finally {
+    client.release();
   }
 }
 

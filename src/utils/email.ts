@@ -33,6 +33,14 @@ export interface ShowWeekEmailData {
   contactInfo?: ContactInfo;
 }
 
+export interface LastMinuteShiftsEmailData {
+  volunteerName: string;
+  volunteerEmail: string;
+  hasShifts: boolean;
+  shifts: string[];
+  contactInfo?: ContactInfo;
+}
+
 /**
  * Renders the volunteer login email template with provided data
  */
@@ -634,6 +642,135 @@ export function renderShowWeekEmail(data: ShowWeekEmailData): string {
 }
 
 /**
+ * Renders the "Last Minute Shifts" email template with provided data
+ */
+export function renderLastMinuteShiftsEmail(data: LastMinuteShiftsEmailData): string {
+  // Generate shifts section based on whether there are outstanding shifts
+  let shiftsSection = '';
+  if (data.hasShifts && data.shifts.length > 0) {
+    // Do not escape HTML, as shift preview now contains <br> and <span> for formatting
+    const shiftsList = data.shifts.map((shift: string) => `<li style="margin-bottom:5px;">${shift}</li>`).join('');
+    shiftsSection = `
+            <div style="background:#fff3cd;border-radius:6px;padding:20px;margin:25px 0;border-left:4px solid #ffc107;">
+              <h3 style="color:#856404;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;font-size:16px;font-weight:bold;margin:0 0 10px 0;">
+                🚨 Next 10 Outstanding Shifts:
+              </h3>
+              <ul style="color:#856404;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;font-size:14px;line-height:20px;margin:0;padding-left:20px;">
+                ${shiftsList}
+              </ul>
+            </div>`;
+  } else {
+    shiftsSection = `
+            <div style="background:#d4edda;border-radius:6px;padding:20px;margin:25px 0;border-left:4px solid #28a745;">
+              <p style="color:#155724;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;font-size:14px;margin:0;">
+                ✅ Great news! All shifts are currently filled. 
+                Thank you for being available to help when needed.
+              </p>
+            </div>`;
+  }
+
+  // Use a simplified template inline
+  const template = `<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html dir="ltr" lang="en">
+  <head>
+    <meta content="text/html; charset=UTF-8" http-equiv="Content-Type" />
+    <meta name="x-apple-disable-message-reformatting" />
+  </head>
+  <body style="background-color:#fff;color:#212121">
+    <div style="display:none;overflow:hidden;line-height:1px;opacity:0;max-height:0;max-width:0" data-skip-in-text="true">
+      Last Minute Shifts @ the Arts Theatre
+    </div>
+    <table align="center" width="100%" border="0" cellpadding="0" cellspacing="0" role="presentation" style="max-width:37.5em;padding:20px;margin:0 auto;background-color:#eee">
+      <tbody>
+        <tr style="width:100%">
+          <td>
+            <table align="center" width="100%" border="0" cellpadding="0" cellspacing="0" role="presentation" style="background-color:#fff">
+              <tbody>
+                <tr>
+                  <td>
+                    <table align="center" width="100%" border="0" cellpadding="0" cellspacing="0" role="presentation" style="background-color:#ff6b35;display:flex;padding:20px 0;align-items:center;justify-content:center">
+                      <tbody>
+                        <tr>
+                          <td style="text-align:center;">
+                            <h2 style="color:#fff;margin:0;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;font-size:24px;font-weight:bold;">
+                              🎭 Last Minute Shifts @ the Arts Theatre
+                            </h2>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                    <table align="center" width="100%" border="0" cellpadding="0" cellspacing="0" role="presentation" style="padding:25px 35px">
+                      <tbody>
+                        <tr>
+                          <td>
+                            <h1 style="color:#333;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;font-size:20px;font-weight:bold;margin-bottom:15px">
+                              Hi {{volunteerName}}, can you help us out?
+                            </h1>
+                            <p style="font-size:14px;line-height:24px;color:#333;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;margin:24px 0;margin-bottom:14px;margin-top:24px;margin-right:0;margin-left:0">
+                              We understand that people get sick last minute, or have to pull out of a shift every now and then. 
+                              If you can, we would love any assistance you can provide in filling a shift.
+                            </p>
+                            <p style="font-size:14px;line-height:24px;color:#333;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;margin:24px 0;margin-bottom:14px;margin-top:24px;margin-right:0;margin-left:0">
+                              We've attached a PDF with the next 10 outstanding shifts that need volunteers. 
+                              If any of these times work for you, please let us know!
+                            </p>
+                            {{shiftsSection}}
+                            <div style="background:#f8f9fa;border-radius:6px;padding:20px;margin:25px 0;">
+                              <h3 style="color:#333;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;font-size:16px;font-weight:bold;margin:0 0 10px 0;">
+                                📞 For urgent shifts or last minute sickness:
+                              </h3>
+                              <div style="text-align:center;background:#fff;padding:15px;border-radius:6px;border:2px solid #007bff;">
+                                <strong>Please message or call Jay - 0434586878</strong><br>
+                                <small style="color:#666;">Available for urgent volunteer coordination</small>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                    <hr style="width:100%;border:none;border-top:1px solid #eaeaea" />
+                    <table align="center" width="100%" border="0" cellpadding="0" cellspacing="0" role="presentation" style="padding:25px 35px">
+                      <tbody>
+                        <tr>
+                          <td>
+                            <h3 style="color:#333;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;font-size:16px;font-weight:bold;margin-bottom:10px;">
+                              📎 In this email:
+                            </h3>
+                            <ul style="color:#333;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;font-size:14px;line-height:24px;margin:0;padding-left:20px;">
+                              <li>Next 10 outstanding shifts needing volunteers [PDF attached]</li>
+                              <li>Contact information for urgent coordination</li>
+                              <li>Details about available volunteer opportunities</li>
+                            </ul>
+                            <p style="font-size:14px;line-height:24px;color:#666;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;margin:20px 0 0 0;">
+                              <strong>Can you help out?</strong> Contact Jay to let us know which shifts work for you, or if you have any questions about volunteering.
+                            </p>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+            <p style="font-size:12px;line-height:24px;color:#666;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;margin:24px 0;padding:0 20px;margin-top:24px;margin-right:0;margin-bottom:24px;margin-left:0;text-align:center;">
+              This email was sent by Theatre Shifts volunteer management system. 
+              The outstanding shifts list is attached for your reference. 
+              If you have any questions, please contact Jay on 0434586878.
+            </p>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </body>
+</html>`;
+
+  // Replace placeholders with actual data
+  return template
+    .replace(/\{\{volunteerName\}\}/g, escapeHtml(data.volunteerName))
+    .replace(/\{\{shiftsSection\}\}/g, shiftsSection);
+}
+
+/**
  * Sends an email to a volunteer with their schedule PDF attached using Resend
  */
 export async function sendVolunteerScheduleEmail(
@@ -834,6 +971,105 @@ Shifts Count: ${data.shifts.length}
     
   } catch (error) {
     console.error("Error sending Show Week email:", error);
+    return false;
+  }
+}
+
+/**
+ * Sends a "Last Minute Shifts" email to a volunteer with outstanding shifts PDF attached using Resend
+ */
+export async function sendLastMinuteShiftsEmail(
+  data: LastMinuteShiftsEmailData,
+  pdfAttachment: { content: Uint8Array; filename: string },
+  sentByUserId?: string,
+  forceProduction?: boolean
+): Promise<boolean> {
+  try {
+    const htmlContent = renderLastMinuteShiftsEmail(data);
+    const fromAddress = getFromAddress();
+    
+    // Check if we're in development mode or if Resend is not configured
+    // forceProduction parameter can override development mode for testing
+    const isDevelopment = !forceProduction && (Deno.env.get('DENO_ENV') === 'development' || !Deno.env.get('RESEND_API_KEY'));
+    
+    let resendEmailId: string | undefined;
+    
+    if (isDevelopment) {
+      // Development mode: just log the email
+      const modeNote = forceProduction ? " (Force Production Mode DISABLED - still in development)" : "";
+      console.log(`
+=== LAST MINUTE SHIFTS EMAIL WOULD BE SENT (Development Mode${modeNote}) ===
+To: ${data.volunteerEmail}
+Subject: Last Minute Shifts @ the Arts Theatre
+HTML Content Length: ${htmlContent.length} characters
+Attachment: ${pdfAttachment.filename} (${pdfAttachment.content.length} bytes)
+Has Shifts: ${data.hasShifts}
+Shifts Count: ${data.shifts.length}
+=================================================================
+      `);
+      
+      // Simulate async operation
+      await new Promise(resolve => setTimeout(resolve, 100));
+    } else {
+      // Production mode: send actual email with Resend
+      try {
+        const resend = createResendClient();
+        
+        const emailResult = await resend.emails.send({
+          from: fromAddress,
+          to: [data.volunteerEmail],
+          subject: "Last Minute Shifts @ the Arts Theatre",
+          html: htmlContent,
+          attachments: [
+            {
+              filename: pdfAttachment.filename,
+              content: btoa(String.fromCharCode(...pdfAttachment.content)),
+            }
+          ],
+        });
+        
+        resendEmailId = emailResult.data?.id;
+        const forceNote = forceProduction ? " (FORCED from development mode)" : "";
+        console.log(`✅ Last Minute Shifts email sent successfully via Resend${forceNote}. ID: ${resendEmailId}`);
+        
+      } catch (resendError) {
+        console.error('❌ Failed to send Last Minute Shifts email via Resend:', resendError);
+        return false;
+      }
+    }
+
+    // Record the email in our tracking system
+    try {
+      const emailRecord: CreateEmailRecord = {
+        to_email: data.volunteerEmail,
+        to_participant_id: undefined, // Last minute shifts emails don't have participant IDs
+        from_email: fromAddress,
+        subject: "Last Minute Shifts @ the Arts Theatre",
+        email_type: 'last_minute_shifts',
+        html_content: htmlContent,
+        sent_by_user_id: sentByUserId,
+        resend_email_id: resendEmailId,
+        delivery_status: isDevelopment ? 'simulated' : 'sent'
+      };
+
+      const attachments: CreateEmailAttachment[] = [{
+        filename: pdfAttachment.filename,
+        content_type: 'application/pdf',
+        file_data: pdfAttachment.content
+      }];
+      
+      await recordSentEmail(emailRecord, attachments);
+      console.log('📧 Last Minute Shifts email and attachment recorded in tracking system');
+      
+    } catch (trackingError) {
+      console.error('⚠️ Failed to record email in tracking system:', trackingError);
+      // Don't fail the email send if tracking fails
+    }
+    
+    return true;
+    
+  } catch (error) {
+    console.error("Error sending Last Minute Shifts email:", error);
     return false;
   }
 }

@@ -62,6 +62,7 @@ router.post("/api/volunteers/:id/shifts/removal-pdf", adminController.generateSh
 router.get("/api/volunteers/:id/schedule-pdf", adminController.downloadVolunteerSchedulePDF);
 router.post("/api/volunteers/:id/email-schedule-pdf", adminController.emailVolunteerSchedulePDF);
 router.post("/api/volunteers/:id/email-show-week", adminController.emailShowWeekPDF);
+router.post("/api/volunteers/:id/email-last-minute-shifts", adminController.emailLastMinuteShifts);
 router.get("/api/volunteers/:id/emails", adminController.getParticipantEmailHistory);
 router.get("/api/emails/:emailId/content", adminController.getEmailContent);
 router.get("/api/emails/attachments/:attachmentId/download", adminController.downloadEmailAttachment);
