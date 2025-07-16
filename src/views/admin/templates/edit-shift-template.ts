@@ -81,6 +81,7 @@ export function renderEditShiftTemplate(data: EditShiftPageData): string {
             
             <div class="form-actions">
               <button type="submit" class="btn btn-primary">Update Shift</button>
+              <button type="button" id="deleteShiftBtn" class="btn btn-danger">Delete Shift</button>
               <a href="/admin/shifts" class="btn btn-secondary">Cancel</a>
             </div>
           </form>
