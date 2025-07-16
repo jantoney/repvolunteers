@@ -99,3 +99,35 @@ CREATE TABLE IF NOT EXISTS show_intervals (
   duration_minutes INTEGER NOT NULL, -- Length of interval in minutes
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Email tracking tables to record all emails sent
+CREATE TABLE IF NOT EXISTS sent_emails (
+  id SERIAL PRIMARY KEY,
+  to_email TEXT NOT NULL,
+  to_participant_id UUID REFERENCES participants(id) ON DELETE SET NULL,
+  to_user_id TEXT REFERENCES "user"(id) ON DELETE SET NULL,
+  from_email TEXT NOT NULL,
+  subject TEXT NOT NULL,
+  email_type TEXT NOT NULL, -- 'volunteer_login', 'volunteer_schedule', 'admin_password_reset'
+  html_content TEXT NOT NULL,
+  sent_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  sent_by_user_id TEXT REFERENCES "user"(id) ON DELETE SET NULL, -- Who triggered the email (if applicable)
+  resend_email_id TEXT, -- ID from Resend service
+  delivery_status TEXT DEFAULT 'sent' -- 'sent', 'delivered', 'failed', etc.
+);
+
+-- Email attachments table to store PDF attachments and other files
+CREATE TABLE IF NOT EXISTS email_attachments (
+  id SERIAL PRIMARY KEY,
+  sent_email_id INTEGER REFERENCES sent_emails(id) ON DELETE CASCADE,
+  filename TEXT NOT NULL,
+  content_type TEXT NOT NULL DEFAULT 'application/pdf',
+  file_size INTEGER NOT NULL,
+  file_data BYTEA NOT NULL, -- Store the actual file content
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Index for performance
+CREATE INDEX IF NOT EXISTS idx_sent_emails_participant ON sent_emails(to_participant_id, sent_at DESC);
+CREATE INDEX IF NOT EXISTS idx_sent_emails_user ON sent_emails(to_user_id, sent_at DESC);
+CREATE INDEX IF NOT EXISTS idx_sent_emails_type ON sent_emails(email_type, sent_at DESC);

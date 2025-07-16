@@ -1,4 +1,5 @@
 import { createResendClient, getFromAddress } from './resend-config.ts';
+import { recordSentEmail, CreateEmailRecord } from './email-tracking.ts';
 
 export interface AdminPasswordResetEmailData {
   adminName: string;
@@ -123,24 +124,52 @@ function escapeHtml(text: string): string {
 /**
  * Sends an admin password reset email using Resend
  */
-export async function sendAdminPasswordResetEmail(data: AdminPasswordResetEmailData): Promise<boolean> {
+export async function sendAdminPasswordResetEmail(data: AdminPasswordResetEmailData, sentByUserId?: string): Promise<boolean> {
   try {
     const htmlContent = renderAdminPasswordResetEmail(data);
+    const fromAddress = getFromAddress();
     const isDevelopment = Deno.env.get('DENO_ENV') === 'development' || !Deno.env.get('RESEND_API_KEY');
+    
+    let resendEmailId: string | undefined;
+    
     if (isDevelopment) {
       console.log(`\n=== ADMIN PASSWORD RESET EMAIL (Development Mode) ===\nTo: ${data.adminEmail}\nSubject: Admin Password Reset Request\nHTML Content Length: ${htmlContent.length} characters\nReset URL: ${data.resetUrl}\n====================================\n`);
       await new Promise(resolve => setTimeout(resolve, 100));
-      return true;
+    } else {
+      const resend = createResendClient();
+      
+      const emailResult = await resend.emails.send({
+        from: fromAddress,
+        to: [data.adminEmail],
+        subject: 'Admin Password Reset Request',
+        html: htmlContent,
+      });
+      
+      resendEmailId = emailResult.data?.id;
+      console.log(`✅ Admin password reset email sent via Resend. ID: ${resendEmailId}`);
     }
-    const resend = createResendClient();
-    const fromAddress = getFromAddress();
-    const emailResult = await resend.emails.send({
-      from: fromAddress,
-      to: [data.adminEmail],
-      subject: 'Admin Password Reset Request',
-      html: htmlContent,
-    });
-    console.log(`✅ Admin password reset email sent via Resend. ID: ${emailResult.data?.id}`);
+
+    // Record the email in our tracking system
+    try {
+      const emailRecord: CreateEmailRecord = {
+        to_email: data.adminEmail,
+        from_email: fromAddress,
+        subject: 'Admin Password Reset Request',
+        email_type: 'admin_password_reset',
+        html_content: htmlContent,
+        sent_by_user_id: sentByUserId,
+        resend_email_id: resendEmailId,
+        delivery_status: isDevelopment ? 'simulated' : 'sent'
+      };
+      
+      await recordSentEmail(emailRecord);
+      console.log('📧 Admin password reset email recorded in tracking system');
+      
+    } catch (trackingError) {
+      console.error('⚠️ Failed to record admin email in tracking system:', trackingError);
+      // Don't fail the email send if tracking fails
+    }
+    
     return true;
   } catch (error) {
     console.error('❌ Failed to send admin password reset email:', error);

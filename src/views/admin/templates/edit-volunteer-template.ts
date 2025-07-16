@@ -29,6 +29,7 @@ export function renderEditVolunteerTemplate(data: EditVolunteerPageData): string
       <link rel="apple-touch-icon" href="/icons/ios/180.png">
       <meta name="theme-color" content="#007bff">
       ${getAdminStyles()}
+      <link rel="stylesheet" href="/src/views/admin/edit-volunteer.css">
     </head>
     <body>
       ${getAdminNavigation('volunteers')}
@@ -61,6 +62,43 @@ export function renderEditVolunteerTemplate(data: EditVolunteerPageData): string
               <a href="/admin/volunteers" class="btn btn-secondary">Cancel</a>
             </div>
           </form>
+        </div>
+
+        <!-- Email History Section -->
+        <div class="email-history-section" style="margin-top: 2rem;">
+          <div class="section-header">
+            <h2>Email History</h2>
+            <p class="text-muted">All emails sent to this volunteer</p>
+          </div>
+          
+          <div id="emailHistoryContainer" class="email-history-container">
+            <div class="loading-spinner" id="emailHistoryLoading">
+              <div class="spinner"></div>
+              <span>Loading email history...</span>
+            </div>
+            <div id="emailHistoryContent" style="display: none;">
+              <!-- Email history will be loaded here -->
+            </div>
+            <div id="emailHistoryError" style="display: none;" class="alert alert-warning">
+              No email history found for this volunteer.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Email Content Modal -->
+      <div id="emailContentModal" class="modal" style="display: none;">
+        <div class="modal-content modal-lg">
+          <div class="modal-header">
+            <h3 id="emailContentTitle">Email Details</h3>
+            <button type="button" class="close" onclick="closeEmailModal()">&times;</button>
+          </div>
+          <div class="modal-body" id="emailContentBody">
+            <!-- Email content will be loaded here -->
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" onclick="closeEmailModal()">Close</button>
+          </div>
         </div>
       </div>
 

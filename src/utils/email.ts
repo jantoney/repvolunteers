@@ -1,4 +1,5 @@
 import { createResendClient, getFromAddress } from './resend-config.ts';
+import { recordSentEmail, CreateEmailRecord, CreateEmailAttachment } from './email-tracking.ts';
 
 export interface VolunteerEmailData {
   volunteerName: string;
@@ -184,14 +185,25 @@ function escapeHtml(text: string): string {
 }
 
 /**
+ * Extracts participant ID from a volunteer login URL
+ */
+function extractParticipantIdFromUrl(loginUrl: string): string | undefined {
+  const match = loginUrl.match(/\/volunteer\/signup\/([a-f0-9-]{36})$/);
+  return match ? match[1] : undefined;
+}
+
+/**
  * Sends an email to a volunteer with their login link using Resend
  */
-export async function sendVolunteerLoginEmail(data: VolunteerEmailData): Promise<boolean> {
+export async function sendVolunteerLoginEmail(data: VolunteerEmailData, sentByUserId?: string): Promise<boolean> {
   try {
     const htmlContent = renderVolunteerLoginEmail(data);
+    const fromAddress = getFromAddress();
     
     // Check if we're in development mode or if Resend is not configured
     const isDevelopment = Deno.env.get('DENO_ENV') === 'development' || !Deno.env.get('RESEND_API_KEY');
+    
+    let resendEmailId: string | undefined;
     
     if (isDevelopment) {
       // Development mode: just log the email
@@ -206,28 +218,53 @@ Login URL: ${data.loginUrl}
       
       // Simulate async operation
       await new Promise(resolve => setTimeout(resolve, 100));
-      return true;
+    } else {
+      // Production mode: send actual email with Resend
+      try {
+        const resend = createResendClient();
+        
+        const emailResult = await resend.emails.send({
+          from: fromAddress,
+          to: [data.volunteerEmail],
+          subject: 'Your Theatre Shifts Login Link',
+          html: htmlContent,
+        });
+        
+        resendEmailId = emailResult.data?.id;
+        console.log(`✅ Email sent successfully via Resend. ID: ${resendEmailId}`);
+        
+      } catch (resendError) {
+        console.error('❌ Failed to send email via Resend:', resendError);
+        return false;
+      }
+    }
+
+    // Record the email in our tracking system
+    try {
+      // Extract participant ID from the volunteer data or URL
+      const participantId = extractParticipantIdFromUrl(data.loginUrl);
+      
+      const emailRecord: CreateEmailRecord = {
+        to_email: data.volunteerEmail,
+        to_participant_id: participantId,
+        from_email: fromAddress,
+        subject: 'Your Theatre Shifts Login Link',
+        email_type: 'volunteer_login',
+        html_content: htmlContent,
+        sent_by_user_id: sentByUserId,
+        resend_email_id: resendEmailId,
+        delivery_status: isDevelopment ? 'simulated' : 'sent'
+      };
+      
+      await recordSentEmail(emailRecord);
+      console.log('📧 Email recorded in tracking system');
+      
+    } catch (trackingError) {
+      console.error('⚠️ Failed to record email in tracking system:', trackingError);
+      // Don't fail the email send if tracking fails
     }
     
-    // Production mode: send actual email with Resend
-    try {
-      const resend = createResendClient();
-      const fromAddress = getFromAddress();
-      
-      const emailResult = await resend.emails.send({
-        from: fromAddress,
-        to: [data.volunteerEmail],
-        subject: 'Your Theatre Shifts Login Link',
-        html: htmlContent,
-      });
-      
-      console.log(`✅ Email sent successfully via Resend. ID: ${emailResult.data?.id}`);
-      return true;
-      
-    } catch (resendError) {
-      console.error('❌ Failed to send email via Resend:', resendError);
-      return false;
-    }
+    return true;
     
   } catch (error) {
     console.error("Error sending volunteer login email:", error);
@@ -356,13 +393,17 @@ export function renderVolunteerScheduleEmail(data: VolunteerScheduleEmailData): 
  */
 export async function sendVolunteerScheduleEmail(
   data: VolunteerScheduleEmailData,
-  pdfAttachment: { content: Uint8Array; filename: string }
+  pdfAttachment: { content: Uint8Array; filename: string },
+  sentByUserId?: string
 ): Promise<boolean> {
   try {
     const htmlContent = renderVolunteerScheduleEmail(data);
+    const fromAddress = getFromAddress();
     
     // Check if we're in development mode or if Resend is not configured
     const isDevelopment = Deno.env.get('DENO_ENV') === 'development' || !Deno.env.get('RESEND_API_KEY');
+    
+    let resendEmailId: string | undefined;
     
     if (isDevelopment) {
       // Development mode: just log the email
@@ -380,34 +421,65 @@ Shifts Count: ${data.shifts.length}
       
       // Simulate async operation
       await new Promise(resolve => setTimeout(resolve, 100));
-      return true;
+    } else {
+      // Production mode: send actual email with Resend
+      try {
+        const resend = createResendClient();
+        
+        const emailResult = await resend.emails.send({
+          from: fromAddress,
+          to: [data.volunteerEmail],
+          subject: 'Your Theatre Shifts Schedule',
+          html: htmlContent,
+          attachments: [
+            {
+              filename: pdfAttachment.filename,
+              content: btoa(String.fromCharCode(...pdfAttachment.content)),
+            }
+          ],
+        });
+        
+        resendEmailId = emailResult.data?.id;
+        console.log(`✅ Schedule email sent successfully via Resend. ID: ${resendEmailId}`);
+        
+      } catch (resendError) {
+        console.error('❌ Failed to send schedule email via Resend:', resendError);
+        return false;
+      }
+    }
+
+    // Record the email in our tracking system
+    try {
+      // Extract participant ID from the volunteer data or URL
+      const participantId = extractParticipantIdFromUrl(data.loginUrl);
+      
+      const emailRecord: CreateEmailRecord = {
+        to_email: data.volunteerEmail,
+        to_participant_id: participantId,
+        from_email: fromAddress,
+        subject: 'Your Theatre Shifts Schedule',
+        email_type: 'volunteer_schedule',
+        html_content: htmlContent,
+        sent_by_user_id: sentByUserId,
+        resend_email_id: resendEmailId,
+        delivery_status: isDevelopment ? 'simulated' : 'sent'
+      };
+
+      const attachments: CreateEmailAttachment[] = [{
+        filename: pdfAttachment.filename,
+        content_type: 'application/pdf',
+        file_data: pdfAttachment.content
+      }];
+      
+      await recordSentEmail(emailRecord, attachments);
+      console.log('📧 Schedule email and attachment recorded in tracking system');
+      
+    } catch (trackingError) {
+      console.error('⚠️ Failed to record email in tracking system:', trackingError);
+      // Don't fail the email send if tracking fails
     }
     
-    // Production mode: send actual email with Resend
-    try {
-      const resend = createResendClient();
-      const fromAddress = getFromAddress();
-      
-      const emailResult = await resend.emails.send({
-        from: fromAddress,
-        to: [data.volunteerEmail],
-        subject: 'Your Theatre Shifts Schedule',
-        html: htmlContent,
-        attachments: [
-          {
-            filename: pdfAttachment.filename,
-            content: btoa(String.fromCharCode(...pdfAttachment.content)),
-          }
-        ],
-      });
-      
-      console.log(`✅ Schedule email sent successfully via Resend. ID: ${emailResult.data?.id}`);
-      return true;
-      
-    } catch (resendError) {
-      console.error('❌ Failed to send schedule email via Resend:', resendError);
-      return false;
-    }
+    return true;
     
   } catch (error) {
     console.error("Error sending volunteer schedule email:", error);

@@ -1719,10 +1719,11 @@ export async function emailVolunteerSchedulePDF(ctx: RouterContext<string>) {
     };
 
     // Send email with PDF attachment
+    const currentUserId = ctx.state?.user?.id;
     const emailSent = await sendVolunteerScheduleEmail(emailData, {
       content: pdfBuffer,
       filename
-    });
+    }, currentUserId);
 
     if (emailSent) {
       ctx.response.status = 200;
@@ -1762,5 +1763,107 @@ export async function downloadUnfilledShiftsPDF(ctx: RouterContext<string>) {
     console.error("Error generating unfilled shifts PDF:", error);
     ctx.response.status = 500;
     ctx.response.body = { error: "Failed to generate PDF" };
+  }
+}
+
+/**
+ * Gets email history for a participant - admin only
+ */
+export async function getParticipantEmailHistory(ctx: RouterContext<string>) {
+  const participantId = ctx.params.id;
+
+  try {
+    const { getEmailsForParticipant } = await import("../utils/email-tracking.ts");
+    const emails = await getEmailsForParticipant(participantId);
+
+    // Format the response with safe data (don't expose full HTML content in list)
+    const formattedEmails = emails.map(email => ({
+      id: email.id,
+      to_email: email.to_email,
+      from_email: email.from_email,
+      subject: email.subject,
+      email_type: email.email_type,
+      sent_at: email.sent_at,
+      delivery_status: email.delivery_status,
+      attachment_count: email.attachments?.length || 0,
+      attachments: email.attachments?.map(att => ({
+        id: att.id,
+        filename: att.filename,
+        content_type: att.content_type,
+        file_size: att.file_size
+      }))
+    }));
+
+    ctx.response.body = { emails: formattedEmails };
+  } catch (error) {
+    console.error("Error getting participant email history:", error);
+    ctx.response.status = 500;
+    ctx.response.body = { error: "Failed to get email history" };
+  }
+}
+
+/**
+ * Gets a specific email's full content - admin only
+ */
+export async function getEmailContent(ctx: RouterContext<string>) {
+  const emailId = parseInt(ctx.params.emailId);
+
+  try {
+    const pool = getPool();
+    const client = await pool.connect();
+    
+    try {
+      const result = await client.queryObject<{
+        id: number;
+        html_content: string;
+        subject: string;
+        email_type: string;
+        sent_at: Date;
+      }>(
+        `SELECT id, html_content, subject, email_type, sent_at 
+        FROM sent_emails WHERE id = $1`,
+        [emailId]
+      );
+
+      if (result.rows.length === 0) {
+        ctx.response.status = 404;
+        ctx.response.body = { error: "Email not found" };
+        return;
+      }
+
+      ctx.response.body = result.rows[0];
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    console.error("Error getting email content:", error);
+    ctx.response.status = 500;
+    ctx.response.body = { error: "Failed to get email content" };
+  }
+}
+
+/**
+ * Downloads an email attachment - admin only
+ */
+export async function downloadEmailAttachment(ctx: RouterContext<string>) {
+  const attachmentId = parseInt(ctx.params.attachmentId);
+
+  try {
+    const { getEmailAttachment } = await import("../utils/email-tracking.ts");
+    const attachment = await getEmailAttachment(attachmentId);
+
+    if (!attachment) {
+      ctx.response.status = 404;
+      ctx.response.body = { error: "Attachment not found" };
+      return;
+    }
+
+    ctx.response.headers.set("Content-Type", attachment.content_type);
+    ctx.response.headers.set("Content-Disposition", `attachment; filename="${attachment.filename}"`);
+    ctx.response.body = attachment.file_data;
+  } catch (error) {
+    console.error("Error downloading email attachment:", error);
+    ctx.response.status = 500;
+    ctx.response.body = { error: "Failed to download attachment" };
   }
 }
