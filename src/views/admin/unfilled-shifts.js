@@ -37,7 +37,7 @@ async function assignParticipant(shiftId) {
     
     // Build participant list
     const participantList = participants.map(participant => `
-      <div class="participant-item" onclick="selectParticipant(${participant.id})">
+  <div class="participant-item" onclick="selectParticipant('${participant.id}')">
         <div class="participant-info">
           <div class="participant-name">${participant.name}</div>
           <div class="participant-details">${participant.email}${participant.phone ? ' | ' + participant.phone : ''}</div>
