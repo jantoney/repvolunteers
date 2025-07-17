@@ -85,11 +85,21 @@ router.delete("/api/shifts/:id", adminController.deleteShift);
 // Analytics pages
 router.get("/unfilled-shifts", adminController.showUnfilledShiftsPage);
 
+// Bulk email pages
+router.get("/bulk-email", adminController.showBulkEmailPage);
+
 // Analytics API endpoints
 router.get("/api/analytics/unfilled", adminController.unfilledShifts);
 router.get("/api/unfilled-shifts/count", adminController.getUnfilledShiftsCount);
 router.get("/api/unfilled-shifts/pdf", adminController.downloadUnfilledShiftsPDF);
 router.get("/api/performances-without-shifts/count", adminController.getPerformancesWithoutShiftsCount);
+
+// Bulk email API endpoints
+router.get("/api/bulk-email/shows", adminController.getShowsForBulkEmail);
+router.get("/api/bulk-email/shows/:showId/volunteers", adminController.getVolunteersForShow);
+router.get("/api/bulk-email/volunteers/unfilled-shifts", adminController.getVolunteersForUnfilledShifts);
+router.post("/api/bulk-email/send-show-week", adminController.sendBulkShowWeekEmails);
+router.post("/api/bulk-email/send-unfilled-shifts", adminController.sendBulkUnfilledShiftsEmails);
 
 // Server time API endpoint
 router.get("/api/server-time", adminController.getServerTime);

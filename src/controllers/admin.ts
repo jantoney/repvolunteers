@@ -22,6 +22,7 @@ export {
   showNewShiftForm,
   showEditShiftForm,
   showUnfilledShiftsPage,
+  showBulkEmailPage,
 } from "../views/admin/index.ts";
 
 // Logout function
@@ -2072,5 +2073,395 @@ export async function downloadEmailAttachment(ctx: RouterContext<string>) {
     console.error("Error downloading email attachment:", error);
     ctx.response.status = 500;
     ctx.response.body = { error: "Failed to download attachment" };
+  }
+}
+
+/**
+ * Gets shows that can be used for bulk email filtering - admin only
+ */
+export async function getShowsForBulkEmail(ctx: RouterContext<string>) {
+  const pool = getPool();
+  const client = await pool.connect();
+  try {
+    // Get shows that have upcoming performances with volunteers
+    const result = await client.queryObject<{
+      id: number;
+      name: string;
+      upcoming_performances: number;
+      volunteers_with_shifts: number;
+    }>(
+      `SELECT s.id, s.name,
+              COUNT(DISTINCT sd.id) as upcoming_performances,
+              COUNT(DISTINCT vs.participant_id) as volunteers_with_shifts
+       FROM shows s
+       JOIN show_dates sd ON sd.show_id = s.id
+       JOIN shifts sh ON sh.show_date_id = sd.id
+       LEFT JOIN participant_shifts vs ON vs.shift_id = sh.id
+       WHERE sd.start_time >= NOW() - INTERVAL '1 week'
+       GROUP BY s.id, s.name
+       HAVING COUNT(DISTINCT sd.id) > 0
+       ORDER BY MIN(sd.start_time), s.name`
+    );
+
+    ctx.response.body = result.rows.map(show => ({
+      ...show,
+      upcoming_performances: Number(show.upcoming_performances),
+      volunteers_with_shifts: Number(show.volunteers_with_shifts)
+    }));
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Gets volunteers with shifts for a specific show - admin only
+ */
+export async function getVolunteersForShow(ctx: RouterContext<string>) {
+  const showId = ctx.params.showId;
+  const pool = getPool();
+  const client = await pool.connect();
+  try {
+    const result = await client.queryObject<{
+      id: string;
+      name: string;
+      email: string;
+      shift_count: number;
+      next_shift_date: string | null;
+    }>(
+      `SELECT p.id, p.name, p.email,
+              COUNT(DISTINCT vs.shift_id) as shift_count,
+              MIN(sd.start_time)::date::text as next_shift_date
+       FROM participants p
+       JOIN participant_shifts vs ON vs.participant_id = p.id
+       JOIN shifts s ON s.id = vs.shift_id
+       JOIN show_dates sd ON sd.id = s.show_date_id
+       WHERE sd.show_id = $1
+         AND sd.start_time >= NOW() - INTERVAL '1 week'
+         AND p.email IS NOT NULL
+         AND p.email != ''
+       GROUP BY p.id, p.name, p.email
+       ORDER BY p.name`,
+      [showId]
+    );
+
+    ctx.response.body = result.rows.map(volunteer => ({
+      ...volunteer,
+      shift_count: Number(volunteer.shift_count)
+    }));
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Gets all volunteers who are available for unfilled shifts - admin only
+ */
+export async function getVolunteersForUnfilledShifts(ctx: RouterContext<string>) {
+  const pool = getPool();
+  const client = await pool.connect();
+  try {
+    // Get all approved volunteers with email addresses
+    const result = await client.queryObject<{
+      id: string;
+      name: string;
+      email: string;
+      total_shifts: number;
+      upcoming_shifts: number;
+    }>(
+      `SELECT p.id, p.name, p.email,
+              COUNT(DISTINCT vs.shift_id) as total_shifts,
+              COUNT(DISTINCT CASE WHEN sd.start_time >= NOW() THEN vs.shift_id END) as upcoming_shifts
+       FROM participants p
+       LEFT JOIN participant_shifts vs ON vs.participant_id = p.id
+       LEFT JOIN shifts s ON s.id = vs.shift_id
+       LEFT JOIN show_dates sd ON sd.id = s.show_date_id
+       WHERE p.approved = true
+         AND p.email IS NOT NULL
+         AND p.email != ''
+       GROUP BY p.id, p.name, p.email
+       ORDER BY p.name`
+    );
+
+    ctx.response.body = result.rows.map(volunteer => ({
+      ...volunteer,
+      total_shifts: Number(volunteer.total_shifts),
+      upcoming_shifts: Number(volunteer.upcoming_shifts)
+    }));
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Sends bulk show week emails to volunteers with shifts for a specific show - admin only
+ */
+export async function sendBulkShowWeekEmails(ctx: RouterContext<string>) {
+  const { showId, volunteerIds } = await ctx.request.body.json();
+  
+  if (!showId || !volunteerIds || !Array.isArray(volunteerIds)) {
+    ctx.response.status = 400;
+    ctx.response.body = { error: "Show ID and volunteer IDs are required" };
+    return;
+  }
+
+  const pool = getPool();
+  const client = await pool.connect();
+  const currentUserId = ctx.state?.user?.id;
+  const forceProduction = ctx.request.url.searchParams.get('force') === 'true';
+  
+  const results = [];
+  let successCount = 0;
+  let errorCount = 0;
+
+  try {
+    const { generateVolunteerPDFData, filterCurrentAndFutureShifts } = await import("../utils/pdf-generator.ts");
+    const { generateServerSidePDF } = await import("../utils/server-pdf-generator.ts");
+    const { sendShowWeekEmail, createVolunteerLoginUrl } = await import("../utils/email.ts");
+
+    const baseUrl = Deno.env.get('BASE_URL') || `${ctx.request.url.protocol}//${ctx.request.url.host}`;
+
+    for (const volunteerId of volunteerIds) {
+      try {
+        // Generate PDF data for this volunteer
+        const pdfData = await generateVolunteerPDFData(volunteerId);
+
+        // Check if volunteer has email
+        if (!pdfData.volunteer.email) {
+          results.push({
+            volunteerId,
+            volunteerName: pdfData.volunteer.name,
+            success: false,
+            error: "No email address"
+          });
+          errorCount++;
+          continue;
+        }
+
+        // Generate PDF buffer
+        const pdfBuffer = await generateServerSidePDF(pdfData);
+        const filename = `show-week-shifts-${pdfData.volunteer.name.replace(/[^a-zA-Z0-9]/g, '-')}-${new Date().toISOString().split('T')[0]}.pdf`;
+
+        // Prepare email data
+        const currentAndFutureShifts = filterCurrentAndFutureShifts(pdfData.assignedShifts);
+        const hasShifts = currentAndFutureShifts.length > 0;
+        
+        // Format shifts for email preview
+        const shifts = currentAndFutureShifts.slice(0, 5).map(shift => {
+          const date = new Date(shift.show_date).toLocaleDateString('en-AU', {
+            weekday: 'short', day: '2-digit', month: 'short', year: 'numeric'
+          });
+          const arriveTime = new Date(shift.arrive_time).toLocaleTimeString('en-AU', {
+            hour: '2-digit', minute: '2-digit', hour12: true
+          });
+          return `${date} ${arriveTime}<br><span style="margin-left:1.5em;display:inline-block;">${shift.show_name} (${shift.role})</span>`;
+        });
+
+        const loginUrl = createVolunteerLoginUrl(baseUrl, pdfData.volunteer.id);
+
+        const emailData = {
+          volunteerName: pdfData.volunteer.name,
+          volunteerEmail: pdfData.volunteer.email,
+          loginUrl,
+          hasShifts,
+          shifts
+        };
+
+        // Send email
+        const emailSent = await sendShowWeekEmail(emailData, {
+          content: pdfBuffer,
+          filename
+        }, currentUserId, forceProduction);
+
+        if (emailSent) {
+          results.push({
+            volunteerId,
+            volunteerName: pdfData.volunteer.name,
+            volunteerEmail: pdfData.volunteer.email,
+            success: true,
+            shiftsCount: currentAndFutureShifts.length
+          });
+          successCount++;
+        } else {
+          results.push({
+            volunteerId,
+            volunteerName: pdfData.volunteer.name,
+            volunteerEmail: pdfData.volunteer.email,
+            success: false,
+            error: "Failed to send email"
+          });
+          errorCount++;
+        }
+
+        // Add a small delay between emails to avoid overwhelming the email service
+        await new Promise(resolve => setTimeout(resolve, 100));
+
+      } catch (error) {
+        console.error(`Error sending show week email to volunteer ${volunteerId}:`, error);
+        results.push({
+          volunteerId,
+          success: false,
+          error: error instanceof Error ? error.message : "Unknown error"
+        });
+        errorCount++;
+      }
+    }
+
+    ctx.response.status = 200;
+    ctx.response.body = {
+      success: true,
+      message: `Bulk show week emails completed: ${successCount} sent, ${errorCount} failed`,
+      successCount,
+      errorCount,
+      results
+    };
+
+  } catch (error) {
+    console.error("Error in bulk show week email operation:", error);
+    ctx.response.status = 500;
+    ctx.response.body = { error: "Failed to send bulk show week emails" };
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Sends bulk unfilled shifts emails to selected volunteers - admin only
+ */
+export async function sendBulkUnfilledShiftsEmails(ctx: RouterContext<string>) {
+  const { volunteerIds } = await ctx.request.body.json();
+  
+  if (!volunteerIds || !Array.isArray(volunteerIds)) {
+    ctx.response.status = 400;
+    ctx.response.body = { error: "Volunteer IDs are required" };
+    return;
+  }
+
+  const pool = getPool();
+  const client = await pool.connect();
+  const currentUserId = ctx.state?.user?.id;
+  const forceProduction = ctx.request.url.searchParams.get('force') === 'true';
+  
+  const results = [];
+  let successCount = 0;
+  let errorCount = 0;
+
+  try {
+    const { generateOutstandingShiftsPDF } = await import("../utils/unfilled-shifts-pdf-generator.ts");
+    const { sendLastMinuteShiftsEmail } = await import("../utils/email.ts");
+
+    // Generate the outstanding shifts PDF once (same for all volunteers)
+    const pdfBuffer = await generateOutstandingShiftsPDF(10);
+    const filename = `last-minute-shifts-${new Date().toISOString().split('T')[0]}.pdf`;
+
+    // Get the next 10 unfilled shifts for email preview
+    const unfilledShifts = await getNext10UnfilledShifts();
+    const hasShifts = unfilledShifts.length > 0;
+    
+    // Format shifts for email preview
+    const shifts = unfilledShifts.map(shift => {
+      const date = new Date(shift.show_start).toLocaleDateString('en-AU', {
+        weekday: 'short', day: '2-digit', month: 'short', year: 'numeric'
+      });
+      const arriveTime = new Date(shift.arrive_time).toLocaleTimeString('en-AU', {
+        hour: '2-digit', minute: '2-digit', hour12: true
+      });
+      return `${date} ${arriveTime}<br><span style="margin-left:1.5em;display:inline-block;">${shift.show_name} (${shift.role})</span>`;
+    });
+
+    for (const volunteerId of volunteerIds) {
+      try {
+        // Get volunteer data
+        const volunteerResult = await client.queryObject<{ id: string; name: string; email: string }>(
+          "SELECT id, name, email FROM participants WHERE id = $1",
+          [volunteerId]
+        );
+        
+        if (volunteerResult.rows.length === 0) {
+          results.push({
+            volunteerId,
+            success: false,
+            error: "Volunteer not found"
+          });
+          errorCount++;
+          continue;
+        }
+        
+        const volunteer = volunteerResult.rows[0];
+
+        // Check if volunteer has email
+        if (!volunteer.email) {
+          results.push({
+            volunteerId,
+            volunteerName: volunteer.name,
+            success: false,
+            error: "No email address"
+          });
+          errorCount++;
+          continue;
+        }
+
+        const emailData = {
+          volunteerName: volunteer.name,
+          volunteerEmail: volunteer.email,
+          volunteerId: volunteerId,
+          hasShifts,
+          shifts
+        };
+
+        // Send email
+        const emailSent = await sendLastMinuteShiftsEmail(emailData, {
+          content: pdfBuffer,
+          filename
+        }, currentUserId, forceProduction);
+
+        if (emailSent) {
+          results.push({
+            volunteerId,
+            volunteerName: volunteer.name,
+            volunteerEmail: volunteer.email,
+            success: true,
+            shiftsCount: unfilledShifts.length
+          });
+          successCount++;
+        } else {
+          results.push({
+            volunteerId,
+            volunteerName: volunteer.name,
+            volunteerEmail: volunteer.email,
+            success: false,
+            error: "Failed to send email"
+          });
+          errorCount++;
+        }
+
+        // Add a small delay between emails to avoid overwhelming the email service
+        await new Promise(resolve => setTimeout(resolve, 100));
+
+      } catch (error) {
+        console.error(`Error sending unfilled shifts email to volunteer ${volunteerId}:`, error);
+        results.push({
+          volunteerId,
+          success: false,
+          error: error instanceof Error ? error.message : "Unknown error"
+        });
+        errorCount++;
+      }
+    }
+
+    ctx.response.status = 200;
+    ctx.response.body = {
+      success: true,
+      message: `Bulk unfilled shifts emails completed: ${successCount} sent, ${errorCount} failed`,
+      successCount,
+      errorCount,
+      results
+    };
+
+  } catch (error) {
+    console.error("Error in bulk unfilled shifts email operation:", error);
+    ctx.response.status = 500;
+    ctx.response.body = { error: "Failed to send bulk unfilled shifts emails" };
+  } finally {
+    client.release();
   }
 }

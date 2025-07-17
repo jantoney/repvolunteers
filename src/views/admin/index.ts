@@ -12,3 +12,4 @@ export { showShiftsPage } from "./shifts.ts";
 export { showNewShiftForm } from "./new-shift.ts";
 export { showEditShiftForm } from "./edit-shift.ts";
 export { showUnfilledShiftsPage } from "./unfilled-shifts.ts";
+export { showBulkEmailPage } from "./bulk-email.ts";

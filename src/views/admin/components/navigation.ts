@@ -30,6 +30,7 @@ export function getAdminNavigation(currentPage: string = '') {
             </ul>
           </li>
           <li class="nav-item"><a href="/admin/unfilled-shifts" class="nav-link ${currentPage === 'unfilled' ? 'active' : ''}" id="unfilled-nav">Unfilled</a></li>
+          <li class="nav-item"><a href="/admin/bulk-email" class="nav-link ${currentPage === 'bulk-email' ? 'active' : ''}">Bulk Email</a></li>
         </ul>
         <div class="nav-item" id="server-time">
           <span class="server-time-display"></span>
