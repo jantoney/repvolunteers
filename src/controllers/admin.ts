@@ -1966,7 +1966,7 @@ async function getUnfilledShiftsForVolunteer(volunteerId: string, limit = 10) {
       show_start: string;
       role: string;
       arrive_time: string;
-      end_time: string;
+      depart_time: string;
     };
     
     const result = await client.queryObject<ShiftRow>(
@@ -1975,7 +1975,7 @@ async function getUnfilledShiftsForVolunteer(volunteerId: string, limit = 10) {
               sd.start_time as show_start,
               s.role, 
               s.arrive_time AT TIME ZONE 'Australia/Adelaide' as arrive_time,
-              s.end_time AT TIME ZONE 'Australia/Adelaide' as end_time
+              s.depart_time AT TIME ZONE 'Australia/Adelaide' as depart_time
        FROM shifts s
        JOIN show_dates sd ON sd.id = s.show_date_id
        JOIN shows sh ON sh.id = sd.show_id
@@ -1995,13 +1995,13 @@ async function getUnfilledShiftsForVolunteer(volunteerId: string, limit = 10) {
            WHERE unfilled_sd.start_time >= NOW()
              AND (
                -- Check for time overlap: shifts overlap if one starts before the other ends
-               (unfilled.arrive_time < existing.end_time AND unfilled.end_time > existing.arrive_time)
+               (unfilled.arrive_time < existing.depart_time AND unfilled.depart_time > existing.arrive_time)
                OR 
                -- Also check show date overlap as backup
                (unfilled_sd.start_time < existing_sd.end_time AND unfilled_sd.end_time > existing_sd.start_time)
              )
          )
-       GROUP BY s.id, sh.name, DATE(sd.start_time), sd.start_time, s.role, s.arrive_time, s.end_time
+       GROUP BY s.id, sh.name, DATE(sd.start_time), sd.start_time, s.role, s.arrive_time, s.depart_time
        HAVING COUNT(vs.participant_id) = 0
        ORDER BY sd.start_time, s.arrive_time
        LIMIT $2`,
@@ -2495,10 +2495,21 @@ export async function sendBulkUnfilledShiftsEmails(ctx: RouterContext<string>) {
           continue;
         }
 
+
         // Get unfilled shifts that don't overlap with this volunteer's existing shifts
         const unfilledShifts = await getUnfilledShiftsForVolunteer(volunteerId, 10);
-        const hasShifts = unfilledShifts.length > 0;
-        
+        if (unfilledShifts.length === 0) {
+          results.push({
+            volunteerId,
+            volunteerName: volunteer.name,
+            volunteerEmail: volunteer.email,
+            success: true,
+            info: "No available shifts for this volunteer, email not sent"
+          });
+          // Do not increment errorCount, this is an expected case
+          continue;
+        }
+
         // Format shifts for email preview
         const shifts = unfilledShifts.map(shift => {
           const date = new Date(shift.show_start).toLocaleDateString('en-AU', {
@@ -2518,7 +2529,7 @@ export async function sendBulkUnfilledShiftsEmails(ctx: RouterContext<string>) {
           volunteerName: volunteer.name,
           volunteerEmail: volunteer.email,
           volunteerId: volunteerId,
-          hasShifts,
+          hasShifts: true,
           shifts
         };
 
