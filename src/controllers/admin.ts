@@ -2083,25 +2083,70 @@ export async function getEmailContent(ctx: RouterContext<string>) {
     const client = await pool.connect();
     
     try {
-      const result = await client.queryObject<{
+      // Get email details with sender/recipient information
+      const emailResult = await client.queryObject<{
         id: number;
         html_content: string;
         subject: string;
         email_type: string;
         sent_at: Date;
+        to_email: string;
+        from_email: string;
+        to_participant_id: string;
+        delivery_status: string;
       }>(
-        `SELECT id, html_content, subject, email_type, sent_at 
+        `SELECT id, html_content, subject, email_type, sent_at, to_email, from_email, 
+                to_participant_id, delivery_status
         FROM sent_emails WHERE id = $1`,
         [emailId]
       );
 
-      if (result.rows.length === 0) {
+      if (emailResult.rows.length === 0) {
         ctx.response.status = 404;
         ctx.response.body = { error: "Email not found" };
         return;
       }
 
-      ctx.response.body = result.rows[0];
+      const email = emailResult.rows[0];
+
+      // Get participant name if available
+      let recipientName = 'Unknown';
+      if (email.to_participant_id) {
+        const participantResult = await client.queryObject<{ name: string }>(
+          `SELECT name FROM participants WHERE id = $1`,
+          [email.to_participant_id]
+        );
+        if (participantResult.rows.length > 0) {
+          recipientName = participantResult.rows[0].name;
+        }
+      }
+
+      // Get attachments
+      const attachmentResult = await client.queryObject<{
+        id: number;
+        filename: string;
+        content_type: string;
+        file_size: number;
+      }>(
+        `SELECT id, filename, content_type, file_size
+        FROM email_attachments WHERE sent_email_id = $1`,
+        [emailId]
+      );
+
+      // Build response with all necessary information
+      ctx.response.body = {
+        id: email.id,
+        html_content: email.html_content,
+        subject: email.subject,
+        email_type: email.email_type,
+        sent_at: email.sent_at,
+        sender_name: 'Theatre Shifts Admin',
+        sender_email: email.from_email,
+        recipient_name: recipientName,
+        recipient_email: email.to_email,
+        delivery_status: email.delivery_status,
+        attachments: attachmentResult.rows
+      };
     } finally {
       client.release();
     }
@@ -2129,7 +2174,14 @@ export async function downloadEmailAttachment(ctx: RouterContext<string>) {
     }
 
     ctx.response.headers.set("Content-Type", attachment.content_type);
-    ctx.response.headers.set("Content-Disposition", `attachment; filename="${attachment.filename}"`);
+    
+    // For PDFs, use inline to open in browser; for other files, force download
+    if (attachment.content_type === 'application/pdf') {
+      ctx.response.headers.set("Content-Disposition", `inline; filename="${attachment.filename}"`);
+    } else {
+      ctx.response.headers.set("Content-Disposition", `attachment; filename="${attachment.filename}"`);
+    }
+    
     ctx.response.body = attachment.file_data;
   } catch (error) {
     console.error("Error downloading email attachment:", error);

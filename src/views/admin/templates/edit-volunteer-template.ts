@@ -87,8 +87,8 @@ export function renderEditVolunteerTemplate(data: EditVolunteerPageData): string
       </div>
 
       <!-- Email Content Modal -->
-      <div id="emailContentModal" class="modal" style="display: none;">
-        <div class="modal-content modal-lg">
+      <div id="emailContentModal" class="modal modal-fullscreen" style="display: none;">
+  <div class="modal-content modal-lg" style="max-width: calc(100vw - 4vw); width: 100%; max-height: calc(100vh - 4vw); margin: 0 auto; box-sizing: border-box;">
           <div class="modal-header">
             <h3 id="emailContentTitle">Email Details</h3>
             <button type="button" class="close" onclick="closeEmailModal()">&times;</button>
