@@ -1953,6 +1953,68 @@ async function getNext10UnfilledShifts() {
 }
 
 /**
+ * Get unfilled shifts that don't overlap with a volunteer's existing shifts
+ */
+async function getUnfilledShiftsForVolunteer(volunteerId: string, limit = 10) {
+  const pool = getPool();
+  const client = await pool.connect();
+  try {
+    type ShiftRow = {
+      id: number;
+      show_name: string;
+      date: string;
+      show_start: string;
+      role: string;
+      arrive_time: string;
+      end_time: string;
+    };
+    
+    const result = await client.queryObject<ShiftRow>(
+      `SELECT s.id, sh.name as show_name, 
+              DATE(sd.start_time) as date, 
+              sd.start_time as show_start,
+              s.role, 
+              s.arrive_time AT TIME ZONE 'Australia/Adelaide' as arrive_time,
+              s.end_time AT TIME ZONE 'Australia/Adelaide' as end_time
+       FROM shifts s
+       JOIN show_dates sd ON sd.id = s.show_date_id
+       JOIN shows sh ON sh.id = sd.show_id
+       LEFT JOIN participant_shifts vs ON vs.shift_id = s.id
+       WHERE sd.start_time >= NOW()
+         AND s.id NOT IN (
+           -- Exclude shifts that overlap with volunteer's existing shifts
+           SELECT DISTINCT unfilled.id
+           FROM shifts unfilled
+           JOIN show_dates unfilled_sd ON unfilled_sd.id = unfilled.show_date_id
+           JOIN shifts existing ON existing.id IN (
+             SELECT ps.shift_id 
+             FROM participant_shifts ps 
+             WHERE ps.participant_id = $1
+           )
+           JOIN show_dates existing_sd ON existing_sd.id = existing.show_date_id
+           WHERE unfilled_sd.start_time >= NOW()
+             AND (
+               -- Check for time overlap: shifts overlap if one starts before the other ends
+               (unfilled.arrive_time < existing.end_time AND unfilled.end_time > existing.arrive_time)
+               OR 
+               -- Also check show date overlap as backup
+               (unfilled_sd.start_time < existing_sd.end_time AND unfilled_sd.end_time > existing_sd.start_time)
+             )
+         )
+       GROUP BY s.id, sh.name, DATE(sd.start_time), sd.start_time, s.role, s.arrive_time, s.end_time
+       HAVING COUNT(vs.participant_id) = 0
+       ORDER BY sd.start_time, s.arrive_time
+       LIMIT $2`,
+      [volunteerId, limit]
+    );
+    
+    return result.rows;
+  } finally {
+    client.release();
+  }
+}
+
+/**
  * Generates and downloads unfilled shifts PDF - admin only
  */
 export async function downloadUnfilledShiftsPDF(ctx: RouterContext<string>) {
@@ -2346,27 +2408,8 @@ export async function sendBulkUnfilledShiftsEmails(ctx: RouterContext<string>) {
   let errorCount = 0;
 
   try {
-    const { generateOutstandingShiftsPDF } = await import("../utils/unfilled-shifts-pdf-generator.ts");
+    const { generateOutstandingShiftsPDFForVolunteer } = await import("../utils/unfilled-shifts-pdf-generator.ts");
     const { sendLastMinuteShiftsEmail } = await import("../utils/email.ts");
-
-    // Generate the outstanding shifts PDF once (same for all volunteers)
-    const pdfBuffer = await generateOutstandingShiftsPDF(10);
-    const filename = `last-minute-shifts-${new Date().toISOString().split('T')[0]}.pdf`;
-
-    // Get the next 10 unfilled shifts for email preview
-    const unfilledShifts = await getNext10UnfilledShifts();
-    const hasShifts = unfilledShifts.length > 0;
-    
-    // Format shifts for email preview
-    const shifts = unfilledShifts.map(shift => {
-      const date = new Date(shift.show_start).toLocaleDateString('en-AU', {
-        weekday: 'short', day: '2-digit', month: 'short', year: 'numeric'
-      });
-      const arriveTime = new Date(shift.arrive_time).toLocaleTimeString('en-AU', {
-        hour: '2-digit', minute: '2-digit', hour12: true
-      });
-      return `${date} ${arriveTime}<br><span style="margin-left:1.5em;display:inline-block;">${shift.show_name} (${shift.role})</span>`;
-    });
 
     for (const volunteerId of volunteerIds) {
       try {
@@ -2399,6 +2442,25 @@ export async function sendBulkUnfilledShiftsEmails(ctx: RouterContext<string>) {
           errorCount++;
           continue;
         }
+
+        // Get unfilled shifts that don't overlap with this volunteer's existing shifts
+        const unfilledShifts = await getUnfilledShiftsForVolunteer(volunteerId, 10);
+        const hasShifts = unfilledShifts.length > 0;
+        
+        // Format shifts for email preview
+        const shifts = unfilledShifts.map(shift => {
+          const date = new Date(shift.show_start).toLocaleDateString('en-AU', {
+            weekday: 'short', day: '2-digit', month: 'short', year: 'numeric'
+          });
+          const arriveTime = new Date(shift.arrive_time).toLocaleTimeString('en-AU', {
+            hour: '2-digit', minute: '2-digit', hour12: true
+          });
+          return `${date} ${arriveTime}<br><span style="margin-left:1.5em;display:inline-block;">${shift.show_name} (${shift.role})</span>`;
+        });
+
+        // Generate volunteer-specific PDF with non-overlapping shifts
+        const pdfBuffer = await generateOutstandingShiftsPDFForVolunteer(volunteerId, 10);
+        const filename = `last-minute-shifts-${volunteer.name.replace(/\s+/g, '-').toLowerCase()}-${new Date().toISOString().split('T')[0]}.pdf`;
 
         const emailData = {
           volunteerName: volunteer.name,

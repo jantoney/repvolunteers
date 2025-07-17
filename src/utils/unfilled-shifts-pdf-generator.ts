@@ -475,6 +475,134 @@ export async function generateOutstandingShiftsPDF(limit: number = 10): Promise<
   }
 }
 
+/**
+ * Generates a PDF of outstanding shifts for a specific volunteer (excluding shifts that overlap with their existing shifts)
+ */
+export async function generateOutstandingShiftsPDFForVolunteer(volunteerId: string, limit: number = 10): Promise<Uint8Array> {
+  try {
+    const data = await getOutstandingShiftsDataForVolunteer(volunteerId, limit);
+    
+    const doc = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a4'
+    });
+
+    const pageWidth = 210;
+    const pageHeight = 297;
+    const margin = 15;
+    const contentWidth = pageWidth - (2 * margin);
+    let yPos = margin + 5;
+
+    // Title
+    doc.setFontSize(20);
+    doc.setFont("helvetica", 'bold');
+    doc.text('Last Minute Shifts @ the Arts Theatre', margin, yPos);
+    yPos += 12;
+
+    // Subtitle
+    doc.setFontSize(14);
+    doc.setFont("helvetica", 'normal');
+    doc.text(`Available Shifts for You`, margin, yPos);
+    yPos += 10;
+
+    // Summary stats
+    doc.setFontSize(12);
+    doc.setFont("helvetica", 'normal');
+    doc.text(`Report Generated: ${data.generatedAt}`, margin, yPos);
+    yPos += 8;
+
+    if (data.totalShifts === 0) {
+      doc.setFontSize(16);
+      doc.setFont("helvetica", 'bold');
+      doc.text('No Available Shifts', margin, yPos);
+      yPos += 10;
+      doc.setFontSize(12);
+      doc.setFont("helvetica", 'normal');
+      doc.text('Either all shifts are filled, or the remaining unfilled shifts', margin, yPos);
+      yPos += 6;
+      doc.text('conflict with your current schedule. Thank you for volunteering!', margin, yPos);
+    } else {
+      // Header message
+      doc.setFillColor(255, 243, 205); // Light orange background
+      doc.rect(margin, yPos - 2, contentWidth, 25, 'F');
+      doc.setDrawColor(255, 193, 7);
+      doc.rect(margin, yPos - 2, contentWidth, 25);
+      
+      doc.setFontSize(11);
+      doc.setFont("helvetica", 'bold');
+      doc.text(`${data.totalShifts} shifts available that don't conflict with your schedule!`, margin + 3, yPos + 5);
+      doc.setFont("helvetica", 'normal');
+      doc.text('These shifts are filtered to exclude any that overlap with your existing', margin + 3, yPos + 12);
+      doc.text('commitments. Contact Jay (0434586878) if you can help with any:', margin + 3, yPos + 19);
+      
+      yPos += 33;
+
+      // Column headers
+      doc.setFontSize(10);
+      doc.setFont("helvetica", 'bold');
+      doc.text('Date & Time', margin, yPos);
+      doc.text('Show', margin + 50, yPos);
+      doc.text('Role', margin + 110, yPos);
+      doc.text('Arrive - Depart', margin + 150, yPos);
+      yPos += 6;
+
+      // Line under headers
+      doc.setDrawColor(0, 0, 0);
+      doc.line(margin, yPos, margin + contentWidth, yPos);
+      yPos += 5;
+
+      // List shifts
+      doc.setFont("helvetica", 'normal');
+      for (const shift of data.shifts) {
+        // Check if we need a new page
+        if (yPos > pageHeight - 40) {
+          addPageFooter(doc, pageWidth, pageHeight, margin, data.generatedAt);
+          doc.addPage();
+          yPos = margin + 5;
+        }
+
+        const date = new Date(shift.date).toLocaleDateString('en-AU', {
+          weekday: 'short', day: '2-digit', month: 'short', year: 'numeric'
+        });
+        const arriveTime = extractTime(shift.arrive_time);
+        const departTime = extractTime(shift.depart_time) + plusOneDayIfNeeded(shift.arrive_time, shift.depart_time);
+
+        doc.text(date, margin, yPos);
+        doc.text(shift.show_name, margin + 50, yPos);
+        doc.text(shift.role.length > 26 ? shift.role.slice(0, 20) + '...' : shift.role, margin + 110, yPos);
+        doc.text(`${arriveTime} - ${departTime}`, margin + 150, yPos);
+        
+        yPos += 5;
+      }
+
+      yPos += 10;
+
+      // Thank you message
+      doc.setFontSize(12);
+      doc.setFont("helvetica", 'normal');
+      doc.text('Thank you for being part of our volunteer community!', margin, yPos);
+      yPos += 5;
+      
+      // Contact message
+      doc.setFontSize(14);
+      doc.text('Please message or call Jay - 0434586878', margin + 3, yPos + 15);
+    }
+
+    // Add footer to last page
+    addPageFooter(doc, pageWidth, pageHeight, margin, data.generatedAt);
+
+    // Generate the PDF as a Uint8Array
+    const pdfData = doc.output('arraybuffer');
+    return new Uint8Array(pdfData);
+
+  } catch (error) {
+    console.error('Volunteer-specific outstanding shifts PDF generation failed:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    throw new Error(`Volunteer-specific outstanding shifts PDF generation failed: ${errorMessage}`);
+  }
+}
+
 // Helper function to get next N outstanding shifts
 async function getOutstandingShiftsData(limit: number = 10): Promise<UnfilledShiftsData> {
   const pool = getPool();
@@ -498,6 +626,67 @@ async function getOutstandingShiftsData(limit: number = 10): Promise<UnfilledShi
        ORDER BY sd.start_time, s.arrive_time
        LIMIT $1`,
       [limit]
+    );
+
+    const shifts = result.rows;
+    const uniqueShows = new Set(shifts.map(s => s.show_name));
+    const uniqueDates = new Set(shifts.map(s => s.date));
+
+    return {
+      shifts,
+      generatedAt: formatCurrentDateAdelaide() + ' ' + formatCurrentTimeAdelaide(),
+      totalShifts: shifts.length,
+      affectedShows: uniqueShows.size,
+      performanceDates: uniqueDates.size
+    };
+  } finally {
+    client.release();
+  }
+}
+
+// Helper function to get outstanding shifts for a specific volunteer (excluding overlapping shifts)
+async function getOutstandingShiftsDataForVolunteer(volunteerId: string, limit: number = 10): Promise<UnfilledShiftsData> {
+  const pool = getPool();
+  const client = await pool.connect();
+
+  try {
+    const result = await client.queryObject<UnfilledShift>(
+      `SELECT s.id, s.show_date_id, sh.name as show_name, DATE(sd.start_time) as date,
+              TO_CHAR(sd.start_time AT TIME ZONE 'Australia/Adelaide', 'HH24:MI') as show_start, 
+              TO_CHAR(sd.end_time AT TIME ZONE 'Australia/Adelaide', 'HH24:MI') as show_end,
+              s.role, 
+              TO_CHAR(s.arrive_time AT TIME ZONE 'Australia/Adelaide', 'YYYY-MM-DD"T"HH24:MI:SS') as arrive_time, 
+              TO_CHAR(s.depart_time AT TIME ZONE 'Australia/Adelaide', 'YYYY-MM-DD"T"HH24:MI:SS') as depart_time
+       FROM shifts s
+       JOIN show_dates sd ON sd.id = s.show_date_id
+       JOIN shows sh ON sh.id = sd.show_id
+       LEFT JOIN participant_shifts vs ON vs.shift_id = s.id
+       WHERE sd.start_time >= NOW()
+         AND s.id NOT IN (
+           -- Exclude shifts that overlap with volunteer's existing shifts
+           SELECT DISTINCT unfilled.id
+           FROM shifts unfilled
+           JOIN show_dates unfilled_sd ON unfilled_sd.id = unfilled.show_date_id
+           JOIN shifts existing ON existing.id IN (
+             SELECT ps.shift_id 
+             FROM participant_shifts ps 
+             WHERE ps.participant_id = $1
+           )
+           JOIN show_dates existing_sd ON existing_sd.id = existing.show_date_id
+           WHERE unfilled_sd.start_time >= NOW()
+             AND (
+               -- Check for time overlap: shifts overlap if one starts before the other ends
+               (unfilled.arrive_time < existing.depart_time AND unfilled.depart_time > existing.arrive_time)
+               OR 
+               -- Also check show date overlap as backup
+               (unfilled_sd.start_time < existing_sd.end_time AND unfilled_sd.end_time > existing_sd.start_time)
+             )
+         )
+       GROUP BY s.id, sh.name, DATE(sd.start_time), sd.start_time, sd.end_time, s.role, s.arrive_time, s.depart_time
+       HAVING COUNT(vs.participant_id) = 0
+       ORDER BY sd.start_time, s.arrive_time
+       LIMIT $2`,
+      [volunteerId, limit]
     );
 
     const shifts = result.rows;
