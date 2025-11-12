@@ -1,5 +1,5 @@
 import { APP_VERSION } from "../../../version.ts";
-export function getAdminNavigation(currentPage: string = '') {
+export function getAdminNavigation(currentPage: string = "") {
   return `
     <!-- Top Navigation -->
     <nav class="top-nav">
@@ -7,30 +7,47 @@ export function getAdminNavigation(currentPage: string = '') {
         <a href="/admin" class="nav-brand" title="Version: ${APP_VERSION}">Theatre Shifts Admin</a>
         
         <button class="mobile-menu-toggle" onclick="toggleMobileMenu()">☰</button>        <ul class="nav-menu" id="navMenu">
-          <li class="nav-item"><a href="/admin/dashboard" class="nav-link ${currentPage === 'dashboard' ? 'active' : ''}">Dashboard</a></li>
+          <li class="nav-item"><a href="/admin/dashboard" class="nav-link ${
+            currentPage === "dashboard" ? "active" : ""
+          }">Dashboard</a></li>
           <li class="nav-item dropdown">
-            <a href="/admin/shows" class="nav-link dropdown-toggle ${currentPage === 'shows' ? 'active' : ''}" onclick="toggleMobileDropdown(event)">Shows</a>
+            <a href="/admin/shows" class="nav-link dropdown-toggle ${
+              currentPage === "shows" ? "active" : ""
+            }" onclick="toggleMobileDropdown(event)">Shows</a>
             <ul class="dropdown-menu">
               <li><a href="/admin/shows" class="dropdown-link">All Shows</a></li>
               <li><a href="/admin/shows/new" class="dropdown-link">New Show</a></li>
             </ul>
           </li>
           <li class="nav-item dropdown">
-            <a href="/admin/shifts" class="nav-link dropdown-toggle ${currentPage === 'shifts' ? 'active' : ''}" onclick="toggleMobileDropdown(event)">Shifts</a>
+            <a href="/admin/shifts" class="nav-link dropdown-toggle ${
+              currentPage === "shifts" || currentPage === "shifts-bulk-update"
+                ? "active"
+                : ""
+            }" onclick="toggleMobileDropdown(event)">Shifts</a>
             <ul class="dropdown-menu">
               <li><a href="/admin/shifts" class="dropdown-link">All Shifts</a></li>
               <li><a href="/admin/shifts/new" class="dropdown-link">New Shift</a></li>
+              <li><a href="/admin/shifts/bulk-update" class="dropdown-link ${
+                currentPage === "shifts-bulk-update" ? "active" : ""
+              }">Bulk Update Times</a></li>
             </ul>
           </li>
           <li class="nav-item dropdown">
-            <a href="/admin/volunteers" class="nav-link dropdown-toggle ${currentPage === 'volunteers' ? 'active' : ''}" onclick="toggleMobileDropdown(event)">Participants</a>
+            <a href="/admin/volunteers" class="nav-link dropdown-toggle ${
+              currentPage === "volunteers" ? "active" : ""
+            }" onclick="toggleMobileDropdown(event)">Participants</a>
             <ul class="dropdown-menu">
               <li><a href="/admin/volunteers" class="dropdown-link">All Participants</a></li>
               <li><a href="/admin/volunteers/new" class="dropdown-link">New Participant</a></li>
             </ul>
           </li>
-          <li class="nav-item"><a href="/admin/unfilled-shifts" class="nav-link ${currentPage === 'unfilled' ? 'active' : ''}" id="unfilled-nav">Unfilled</a></li>
-          <li class="nav-item"><a href="/admin/bulk-email" class="nav-link ${currentPage === 'bulk-email' ? 'active' : ''}">Bulk Email</a></li>
+          <li class="nav-item"><a href="/admin/unfilled-shifts" class="nav-link ${
+            currentPage === "unfilled" ? "active" : ""
+          }" id="unfilled-nav">Unfilled</a></li>
+          <li class="nav-item"><a href="/admin/bulk-email" class="nav-link ${
+            currentPage === "bulk-email" ? "active" : ""
+          }">Bulk Email</a></li>
         </ul>
         <div class="nav-item" id="server-time">
           <span class="server-time-display"></span>

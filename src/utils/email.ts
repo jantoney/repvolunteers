@@ -1,5 +1,9 @@
-import { createResendClient, getFromAddress } from './resend-config.ts';
-import { recordSentEmail, CreateEmailRecord, CreateEmailAttachment } from './email-tracking.ts';
+import { createResendClient, getFromAddress } from "./resend-config.ts";
+import {
+  recordSentEmail,
+  CreateEmailRecord,
+  CreateEmailAttachment,
+} from "./email-tracking.ts";
 
 export interface ContactInfo {
   name: string;
@@ -37,8 +41,33 @@ export interface LastMinuteShiftsEmailData {
   volunteerName: string;
   volunteerEmail: string;
   volunteerId?: string; // Add volunteer ID for tracking
+  loginUrl: string;
   hasShifts: boolean;
   shifts: string[];
+  contactInfo?: ContactInfo;
+}
+
+export interface UpcomingShowWizardEmailData {
+  volunteerName: string;
+  volunteerEmail: string;
+  loginUrl: string;
+  showName: string;
+  performances: Array<{ date: string; startTime: string; endTime: string }>;
+  contactInfo?: ContactInfo;
+}
+
+export interface WizardConfirmationEmailData {
+  volunteerName: string;
+  volunteerEmail: string;
+  loginUrl: string;
+  showName: string;
+  selectedShifts: Array<{
+    date: string;
+    startTime: string;
+    endTime: string;
+    role: string;
+  }>;
+  additionalNotes?: string;
   contactInfo?: ContactInfo;
 }
 
@@ -47,15 +76,18 @@ export interface LastMinuteShiftsEmailData {
  */
 export function renderVolunteerLoginEmail(data: VolunteerEmailData): string {
   // Generate contact section if contact info is provided
-  const contactSection = data.contactInfo 
+  const contactSection = data.contactInfo
     ? `<p style="font-size:14px;line-height:24px;color:#333;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;margin:20px 0;text-align:center;background:#f8f9fa;padding:15px;border-radius:6px;">
-        <strong>Questions? Contact ${createClickablePhoneNumber(data.contactInfo.name, data.contactInfo.phone, {
-          organization: data.contactInfo.organization,
-          displayFormat: data.contactInfo.displayFormat
-        })}</strong>
+        <strong>Questions? Contact ${createClickablePhoneNumber(
+          data.contactInfo.name,
+          data.contactInfo.phone,
+          {
+            organization: data.contactInfo.organization,
+            displayFormat: data.contactInfo.displayFormat,
+          }
+        )}</strong>
       </p>`
-    : '';
-
+    : "";
   // Use the beautiful template from volunteer-login-email.html
   const template = `<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html dir="ltr" lang="en">
@@ -214,59 +246,76 @@ export function renderVolunteerLoginEmail(data: VolunteerEmailData): string {
  */
 export function createTheatreContactInfo(): ContactInfo {
   return {
-    name: 'Jay - Theatre Volunteer Coordinator',
-    phone: '0434586878',
-    organization: 'Theatre Volunteer Management',
-    displayFormat: '0434 586 878'
+    name: "Jay - Theatre Volunteer Coordinator",
+    phone: "0434586878",
+    organization: "Theatre Volunteer Management",
+    displayFormat: "0434 586 878",
   };
 }
 
 /**
  * Creates a VCF (vCard) data URI for adding a contact to phone/contacts app
  */
-function createVcfDataUri(name: string, phone: string, organization?: string): string {
+function createVcfDataUri(
+  name: string,
+  phone: string,
+  organization?: string
+): string {
   // Format phone number for international format if it starts with 0
-  const formattedPhone = phone.startsWith('0') ? `+61${phone.substring(1)}` : phone;
-  
+  const formattedPhone = phone.startsWith("0")
+    ? `+61${phone.substring(1)}`
+    : phone;
+
   const vcfContent = [
-    'BEGIN:VCARD',
-    'VERSION:3.0',
+    "BEGIN:VCARD",
+    "VERSION:3.0",
     `FN:${name}`,
-    organization ? `ORG:${organization}` : '',
+    organization ? `ORG:${organization}` : "",
     `TEL;TYPE=CELL:${formattedPhone}`,
-    'END:VCARD'
-  ].filter(Boolean).join('\\n');
-  
+    "END:VCARD",
+  ]
+    .filter(Boolean)
+    .join("\\n");
+
   return `data:text/vcard;charset=utf-8,${encodeURIComponent(vcfContent)}`;
 }
 
 /**
  * Creates a clickable phone number link with optional contact save functionality
  */
-function createClickablePhoneNumber(name: string, phone: string, options?: {
-  showAddToContacts?: boolean;
-  organization?: string;
-  displayFormat?: string;
-}): string {
-  const { showAddToContacts = true, organization, displayFormat } = options || {};
-  
+function createClickablePhoneNumber(
+  name: string,
+  phone: string,
+  options?: {
+    showAddToContacts?: boolean;
+    organization?: string;
+    displayFormat?: string;
+  }
+): string {
+  const {
+    showAddToContacts = true,
+    organization,
+    displayFormat,
+  } = options || {};
+
   // Format phone number for tel: link (international format)
-  const telPhone = phone.startsWith('0') ? `+61${phone.substring(1)}` : phone;
-  
+  const telPhone = phone.startsWith("0") ? `+61${phone.substring(1)}` : phone;
+
   // Use provided display format or format with spaces for readability
-  const displayPhone = displayFormat || phone.replace(/(\d{4})(\d{3})(\d{3})/, '$1 $2 $3');
-  
+  const displayPhone =
+    displayFormat || phone.replace(/(\d{4})(\d{3})(\d{3})/, "$1 $2 $3");
+
   let html = `<a href="tel:${telPhone}" style="color:#007bff;text-decoration:none;">${displayPhone}</a>`;
-  
+
   if (showAddToContacts) {
     const vcfUri = createVcfDataUri(name, phone, organization);
-    const filename = `${name.toLowerCase().replace(/\s+/g, '-')}-contact.vcf`;
-    
+    const filename = `${name.toLowerCase().replace(/\s+/g, "-")}-contact.vcf`;
+
     html += `<br><small style="color:#666;font-size:12px;">`;
     html += `<a href="${vcfUri}" download="${filename}" style="color:#007bff;text-decoration:none;">`;
     html += `📱 Add to contacts</a></small>`;
   }
-  
+
   return html;
 }
 
@@ -275,11 +324,11 @@ function createClickablePhoneNumber(name: string, phone: string, options?: {
  */
 function escapeHtml(text: string): string {
   const map: { [key: string]: string } = {
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    '"': '&quot;',
-    "'": '&#039;'
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#039;",
   };
   return text.replace(/[&<>"']/g, (m) => map[m]);
 }
@@ -288,27 +337,36 @@ function escapeHtml(text: string): string {
  * Extracts participant ID from a volunteer login URL
  */
 function extractParticipantIdFromUrl(loginUrl: string): string | undefined {
-  const match = loginUrl.match(/\/volunteer\/signup\/([a-f0-9-]{36})$/);
+  const match = loginUrl.match(/\/volunteer\/signup\/([a-f0-9-]{36})/i);
   return match ? match[1] : undefined;
 }
 
 /**
  * Sends an email to a volunteer with their login link using Resend
  */
-export async function sendVolunteerLoginEmail(data: VolunteerEmailData, sentByUserId?: string, forceProduction?: boolean): Promise<boolean> {
+export async function sendVolunteerLoginEmail(
+  data: VolunteerEmailData,
+  sentByUserId?: string,
+  forceProduction?: boolean
+): Promise<boolean> {
   try {
     const htmlContent = renderVolunteerLoginEmail(data);
     const fromAddress = getFromAddress();
-    
+
     // Check if we're in development mode or if Resend is not configured
     // forceProduction parameter can override development mode for testing
-    const isDevelopment = !forceProduction && (Deno.env.get('DENO_ENV') === 'development' || !Deno.env.get('RESEND_API_KEY'));
-    
+    const isDevelopment =
+      !forceProduction &&
+      (Deno.env.get("DENO_ENV") === "development" ||
+        !Deno.env.get("RESEND_API_KEY"));
+
     let resendEmailId: string | undefined;
-    
+
     if (isDevelopment) {
       // Development mode: just log the email
-      const modeNote = forceProduction ? " (Force Production Mode DISABLED - still in development)" : "";
+      const modeNote = forceProduction
+        ? " (Force Production Mode DISABLED - still in development)"
+        : "";
       console.log(`
 === EMAIL WOULD BE SENT (Development Mode${modeNote}) ===
 To: ${data.volunteerEmail}
@@ -317,27 +375,30 @@ HTML Content Length: ${htmlContent.length} characters
 Login URL: ${data.loginUrl}
 ===========================
       `);
-      
+
       // Simulate async operation
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
     } else {
       // Production mode: send actual email with Resend
       try {
         const resend = createResendClient();
-        
+
         const emailResult = await resend.emails.send({
           from: fromAddress,
           to: [data.volunteerEmail],
-          subject: 'Your Theatre Shifts Login Link',
+          subject: "Your Theatre Shifts Login Link",
           html: htmlContent,
         });
-        
+
         resendEmailId = emailResult.data?.id;
-        const forceNote = forceProduction ? " (FORCED from development mode)" : "";
-        console.log(`✅ Email sent successfully via Resend${forceNote}. ID: ${resendEmailId}`);
-        
+        const forceNote = forceProduction
+          ? " (FORCED from development mode)"
+          : "";
+        console.log(
+          `✅ Email sent successfully via Resend${forceNote}. ID: ${resendEmailId}`
+        );
       } catch (resendError) {
-        console.error('❌ Failed to send email via Resend:', resendError);
+        console.error("❌ Failed to send email via Resend:", resendError);
         return false;
       }
     }
@@ -346,29 +407,30 @@ Login URL: ${data.loginUrl}
     try {
       // Extract participant ID from the volunteer data or URL
       const participantId = extractParticipantIdFromUrl(data.loginUrl);
-      
+
       const emailRecord: CreateEmailRecord = {
         to_email: data.volunteerEmail,
         to_participant_id: participantId,
         from_email: fromAddress,
-        subject: 'Your Theatre Shifts Login Link',
-        email_type: 'volunteer_login',
+        subject: "Your Theatre Shifts Login Link",
+        email_type: "volunteer_login",
         html_content: htmlContent,
         sent_by_user_id: sentByUserId,
         resend_email_id: resendEmailId,
-        delivery_status: isDevelopment ? 'simulated' : 'sent'
+        delivery_status: isDevelopment ? "simulated" : "sent",
       };
-      
+
       await recordSentEmail(emailRecord);
-      console.log('📧 Email recorded in tracking system');
-      
+      console.log("📧 Email recorded in tracking system");
     } catch (trackingError) {
-      console.error('⚠️ Failed to record email in tracking system:', trackingError);
+      console.error(
+        "⚠️ Failed to record email in tracking system:",
+        trackingError
+      );
       // Don't fail the email send if tracking fails
     }
-    
+
     return true;
-    
   } catch (error) {
     console.error("Error sending volunteer login email:", error);
     return false;
@@ -386,22 +448,30 @@ export interface VolunteerScheduleEmailData {
 /**
  * Renders the volunteer schedule email template with provided data
  */
-export function renderVolunteerScheduleEmail(data: VolunteerScheduleEmailData): string {
+export function renderVolunteerScheduleEmail(
+  data: VolunteerScheduleEmailData
+): string {
   // Generate contact section if contact info is provided
-  const contactSection = data.contactInfo 
+  const contactSection = data.contactInfo
     ? `<div style="font-size:14px;line-height:24px;color:#333;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;margin:20px 0;text-align:center;background:#f8f9fa;padding:15px;border-radius:6px;">
-        <strong>Questions? Contact ${createClickablePhoneNumber(data.contactInfo.name, data.contactInfo.phone, {
-          organization: data.contactInfo.organization,
-          displayFormat: data.contactInfo.displayFormat
-        })}</strong>
+        <strong>Questions? Contact ${createClickablePhoneNumber(
+          data.contactInfo.name,
+          data.contactInfo.phone,
+          {
+            organization: data.contactInfo.organization,
+            displayFormat: data.contactInfo.displayFormat,
+          }
+        )}</strong>
       </div>`
-    : '';
+    : "";
 
   // Generate shifts section based on whether they have shifts
-  let shiftsSection = '';
+  let shiftsSection = "";
   if (data.hasShifts && data.shifts.length > 0) {
     // Do not escape HTML, as shift preview now contains <br> and <span> for formatting
-    const shiftsList = data.shifts.map(shift => `<li style="margin-bottom:5px;">${shift}</li>`).join('');
+    const shiftsList = data.shifts
+      .map((shift) => `<li style="margin-bottom:5px;">${shift}</li>`)
+      .join("");
     shiftsSection = `
             <div style="background:#f8f9fa;border-radius:6px;padding:20px;margin:25px 0;">
               <h3 style="color:#333;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;font-size:16px;font-weight:bold;margin:0 0 10px 0;">
@@ -508,10 +578,12 @@ export function renderVolunteerScheduleEmail(data: VolunteerScheduleEmailData): 
  */
 export function renderShowWeekEmail(data: ShowWeekEmailData): string {
   // Generate shifts section based on whether they have shifts
-  let shiftsSection = '';
+  let shiftsSection = "";
   if (data.hasShifts && data.shifts.length > 0) {
     // Do not escape HTML, as shift preview now contains <br> and <span> for formatting
-    const shiftsList = data.shifts.map(shift => `<li style="margin-bottom:5px;">${shift}</li>`).join('');
+    const shiftsList = data.shifts
+      .map((shift) => `<li style="margin-bottom:5px;">${shift}</li>`)
+      .join("");
     shiftsSection = `
             <div style="background:#f8f9fa;border-radius:6px;padding:20px;margin:25px 0;">
               <h3 style="color:#333;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;font-size:16px;font-weight:bold;margin:0 0 10px 0;">
@@ -532,18 +604,18 @@ export function renderShowWeekEmail(data: ShowWeekEmailData): string {
   }
 
   // Generate clickable phone contact section
-  const phoneContactSection = data.contactInfo 
+  const phoneContactSection = data.contactInfo
     ? createClickablePhoneNumber(
-        data.contactInfo.name, 
-        data.contactInfo.phone, 
-        { 
+        data.contactInfo.name,
+        data.contactInfo.phone,
+        {
           organization: data.contactInfo.organization,
-          displayFormat: data.contactInfo.displayFormat 
+          displayFormat: data.contactInfo.displayFormat,
         }
       )
-    : createClickablePhoneNumber('Jay Antoney - Adelaide Rep', '0434586878', { 
-        organization: 'Adelaide Repertory Theatre',
-        displayFormat: '0434 586 878'
+    : createClickablePhoneNumber("Jay Antoney - Adelaide Rep", "0434586878", {
+        organization: "Adelaide Repertory Theatre",
+        displayFormat: "0434 586 878",
       });
 
   // Use a simplified template inline
@@ -642,15 +714,246 @@ export function renderShowWeekEmail(data: ShowWeekEmailData): string {
     .replace(/\{\{phoneContactSection\}\}/g, phoneContactSection);
 }
 
+export function renderUpcomingShowWizardEmail(
+  data: UpcomingShowWizardEmailData
+): string {
+  const performancesList = data.performances
+    .map(
+      (perf) => `
+            <li style="margin-bottom:6px;">${perf.date}<br><span style="margin-left:1.5em;display:inline-block;color:#555;">${perf.startTime} - ${perf.endTime}</span></li>`
+    )
+    .join("");
+
+  const contactSection = data.contactInfo
+    ? `<div style="font-size:14px;line-height:24px;color:#333;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;margin:20px 0;text-align:center;background:#f8f9fa;padding:15px;border-radius:6px;">
+        <strong>Questions? Contact ${createClickablePhoneNumber(
+          data.contactInfo.name,
+          data.contactInfo.phone,
+          {
+            organization: data.contactInfo.organization,
+            displayFormat: data.contactInfo.displayFormat,
+          }
+        )}</strong>
+      </div>`
+    : "";
+
+  const template = `<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html dir="ltr" lang="en">
+  <head>
+    <meta content="text/html; charset=UTF-8" http-equiv="Content-Type" />
+    <meta name="x-apple-disable-message-reformatting" />
+  </head>
+  <body style="background-color:#fff;color:#212121">
+    <div style="display:none;overflow:hidden;line-height:1px;opacity:0;max-height:0;max-width:0" data-skip-in-text="true">
+      Upcoming shifts for {{showName}}
+    </div>
+    <table align="center" width="100%" border="0" cellpadding="0" cellspacing="0" role="presentation" style="max-width:37.5em;padding:20px;margin:0 auto;background-color:#eee">
+      <tbody>
+        <tr style="width:100%">
+          <td>
+            <table align="center" width="100%" border="0" cellpadding="0" cellspacing="0" role="presentation" style="background-color:#fff">
+              <tbody>
+                <tr>
+                  <td>
+                    <table align="center" width="100%" border="0" cellpadding="0" cellspacing="0" role="presentation" style="background-color:#007bff;display:flex;padding:20px 0;align-items:center;justify-content:center">
+                      <tbody>
+                        <tr>
+                          <td style="text-align:center;">
+                            <h2 style="color:#fff;margin:0;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;font-size:24px;font-weight:bold;">
+                              🎭 Theatre Shifts
+                            </h2>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                    <table align="center" width="100%" border="0" cellpadding="0" cellspacing="0" role="presentation" style="padding:25px 35px">
+                      <tbody>
+                        <tr>
+                          <td>
+                            <h1 style="color:#333;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;font-size:20px;font-weight:bold;margin-bottom:15px">
+                              Hi {{volunteerName}}, can you help with {{showName}}?
+                            </h1>
+                            <p style="font-size:14px;line-height:24px;color:#333;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;margin:24px 0;margin-bottom:14px;margin-top:24px;margin-right:0;margin-left:0">
+                              We have a quick new wizard that makes it easy to choose the shifts you prefer. Tap the button below to pick your roles and the performances you can help with.
+                            </p>
+                            <div style="background:#f8f9fa;border-radius:6px;padding:20px;margin:25px 0;">
+                              <h3 style="color:#333;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;font-size:16px;font-weight:bold;margin:0 0 10px 0;">
+                                Upcoming performances:
+                              </h3>
+                              <ul style="color:#555;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;font-size:14px;line-height:20px;margin:0;padding-left:20px;">
+                                ${performancesList}
+                              </ul>
+                            </div>
+                            <table align="center" width="100%" border="0" cellpadding="0" cellspacing="0" role="presentation" style="display:flex;align-items:center;justify-content:center;margin:30px 0;">
+                              <tbody>
+                                <tr>
+                                  <td>
+                                    <a href="{{loginUrl}}" style="display:inline-block;padding:15px 30px;background-color:#007bff;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:bold;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;font-size:16px;">
+                                      Start Wizard
+                                    </a>
+                                  </td>
+                                </tr>
+                              </tbody>
+                            </table>
+                            <p style="font-size:14px;line-height:24px;color:#666;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;margin:20px 0;text-align:center;">
+                              Prefer to view online later?<br>
+                              <span style="font-family:monospace;background:#f8f9fa;padding:8px;border-radius:4px;word-break:break-all;color:#007bff;">{{loginUrl}}</span>
+                            </p>
+                            ${contactSection}
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+            <p style="font-size:12px;line-height:24px;color:#666;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;margin:24px 0;padding:0 20px;margin-top:24px;margin-right:0;margin-bottom:24px;margin-left:0;text-align:center;">
+              This email contains your personalised volunteer link for {{showName}}. Save it so you can return to the wizard anytime.
+            </p>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </body>
+</html>`;
+
+  return template
+    .replace(/\{\{volunteerName\}\}/g, escapeHtml(data.volunteerName))
+    .replace(/\{\{showName\}\}/g, escapeHtml(data.showName))
+    .replace(/\{\{loginUrl\}\}/g, data.loginUrl);
+}
+
+export function renderWizardConfirmationEmail(
+  data: WizardConfirmationEmailData
+): string {
+  const shiftsList = data.selectedShifts
+    .map(
+      (shift) => `
+            <li style="margin-bottom:6px;">${
+              shift.date
+            }<br><span style="margin-left:1.5em;display:inline-block;color:#555;">${
+        shift.startTime
+      } - ${shift.endTime} (${escapeHtml(shift.role)})</span></li>`
+    )
+    .join("");
+
+  const notesBlock = data.additionalNotes
+    ? `<div style="background:#fff3cd;border-radius:6px;padding:16px;margin:20px 0;border-left:4px solid #ffc107;color:#856404;">${escapeHtml(
+        data.additionalNotes
+      )}</div>`
+    : "";
+
+  const contactSection = data.contactInfo
+    ? `<div style="font-size:14px;line-height:24px;color:#333;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;margin:20px 0;text-align:center;background:#f8f9fa;padding:15px;border-radius:6px;">
+        <strong>Questions? Contact ${createClickablePhoneNumber(
+          data.contactInfo.name,
+          data.contactInfo.phone,
+          {
+            organization: data.contactInfo.organization,
+            displayFormat: data.contactInfo.displayFormat,
+          }
+        )}</strong>
+      </div>`
+    : "";
+
+  const template = `<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html dir="ltr" lang="en">
+  <head>
+    <meta content="text/html; charset=UTF-8" http-equiv="Content-Type" />
+    <meta name="x-apple-disable-message-reformatting" />
+  </head>
+  <body style="background-color:#fff;color:#212121">
+    <div style="display:none;overflow:hidden;line-height:1px;opacity:0;max-height:0;max-width:0" data-skip-in-text="true">
+      Your shifts for {{showName}}
+    </div>
+    <table align="center" width="100%" border="0" cellpadding="0" cellspacing="0" role="presentation" style="max-width:37.5em;padding:20px;margin:0 auto;background-color:#eee">
+      <tbody>
+        <tr style="width:100%">
+          <td>
+            <table align="center" width="100%" border="0" cellpadding="0" cellspacing="0" role="presentation" style="background-color:#fff">
+              <tbody>
+                <tr>
+                  <td>
+                    <table align="center" width="100%" border="0" cellpadding="0" cellspacing="0" role="presentation" style="background-color:#007bff;display:flex;padding:20px 0;align-items:center;justify-content:center">
+                      <tbody>
+                        <tr>
+                          <td style="text-align:center;">
+                            <h2 style="color:#fff;margin:0;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;font-size:24px;font-weight:bold;">
+                              🎭 Theatre Shifts
+                            </h2>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                    <table align="center" width="100%" border="0" cellpadding="0" cellspacing="0" role="presentation" style="padding:25px 35px">
+                      <tbody>
+                        <tr>
+                          <td>
+                            <h1 style="color:#333;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;font-size:20px;font-weight:bold;margin-bottom:15px">
+                              Thanks {{volunteerName}}! Here are your selections for {{showName}}
+                            </h1>
+                            <div style="background:#f8f9fa;border-radius:6px;padding:20px;margin:25px 0;">
+                              <h3 style="color:#333;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;font-size:16px;font-weight:bold;margin:0 0 10px 0;">
+                                Confirmed shifts:
+                              </h3>
+                              <ul style="color:#555;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;font-size:14px;line-height:20px;margin:0;padding-left:20px;">
+                                ${shiftsList}
+                              </ul>
+                            </div>
+                            ${notesBlock}
+                            <table align="center" width="100%" border="0" cellpadding="0" cellspacing="0" role="presentation" style="display:flex;align-items:center;justify-content:center;margin:30px 0;">
+                              <tbody>
+                                <tr>
+                                  <td>
+                                    <a href="{{loginUrl}}" style="display:inline-block;padding:15px 30px;background-color:#007bff;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:bold;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;font-size:16px;">
+                                      Review Online
+                                    </a>
+                                  </td>
+                                </tr>
+                              </tbody>
+                            </table>
+                            <p style="font-size:14px;line-height:24px;color:#666;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;margin:20px 0;text-align:center;">
+                              We've attached a PDF copy of your full schedule for easy reference.
+                            </p>
+                            ${contactSection}
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+            <p style="font-size:12px;line-height:24px;color:#666;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;margin:24px 0;padding:0 20px;margin-top:24px;margin-right:0;margin-bottom:24px;margin-left:0;text-align:center;">
+              This confirmation email includes your updated shift schedule and PDF attachment. Keep it handy in case you need to double-check your shifts.
+            </p>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </body>
+</html>`;
+
+  return template
+    .replace(/\{\{volunteerName\}\}/g, escapeHtml(data.volunteerName))
+    .replace(/\{\{showName\}\}/g, escapeHtml(data.showName))
+    .replace(/\{\{loginUrl\}\}/g, data.loginUrl);
+}
+
 /**
  * Renders the "Last Minute Shifts" email template with provided data
  */
-export function renderLastMinuteShiftsEmail(data: LastMinuteShiftsEmailData): string {
+export function renderLastMinuteShiftsEmail(
+  data: LastMinuteShiftsEmailData
+): string {
   // Generate shifts section based on whether there are outstanding shifts
-  let shiftsSection = '';
+  let shiftsSection = "";
   if (data.hasShifts && data.shifts.length > 0) {
     // Do not escape HTML, as shift preview now contains <br> and <span> for formatting
-    const shiftsList = data.shifts.map((shift: string) => `<li style="margin-bottom:5px;">${shift}</li>`).join('');
+    const shiftsList = data.shifts
+      .map((shift: string) => `<li style="margin-bottom:5px;">${shift}</li>`)
+      .join("");
     shiftsSection = `
             <div style="background:#fff3cd;border-radius:6px;padding:20px;margin:25px 0;border-left:4px solid #ffc107;">
               <h3 style="color:#856404;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;font-size:16px;font-weight:bold;margin:0 0 10px 0;">
@@ -715,6 +1018,20 @@ export function renderLastMinuteShiftsEmail(data: LastMinuteShiftsEmailData): st
                               We've attached a PDF with the next 10 outstanding shifts that need volunteers. 
                               If any of these times work for you, please let us know!
                             </p>
+                            <table align="center" width="100%" border="0" cellpadding="0" cellspacing="0" role="presentation" style="display:flex;align-items:center;justify-content:center;margin:24px 0 10px 0">
+                              <tbody>
+                                <tr>
+                                  <td>
+                                    <a href="{{loginUrl}}" style="display:inline-block;padding:14px 28px;background-color:#007bff;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:bold;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;font-size:16px;">
+                                      Accept Shifts Online
+                                    </a>
+                                  </td>
+                                </tr>
+                              </tbody>
+                            </table>
+                            <p style="font-size:13px;line-height:22px;color:#555;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;margin:0 0 20px 0;text-align:center;">
+                              Use the button above to log in and grab any shifts that suit you before someone else does.
+                            </p>
                             {{shiftsSection}}
                             <div style="background:#f8f9fa;border-radius:6px;padding:20px;margin:25px 0;">
                               <h3 style="color:#333;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;font-size:16px;font-weight:bold;margin:0 0 10px 0;">
@@ -768,7 +1085,8 @@ export function renderLastMinuteShiftsEmail(data: LastMinuteShiftsEmailData): st
   // Replace placeholders with actual data
   return template
     .replace(/\{\{volunteerName\}\}/g, escapeHtml(data.volunteerName))
-    .replace(/\{\{shiftsSection\}\}/g, shiftsSection);
+    .replace(/\{\{shiftsSection\}\}/g, shiftsSection)
+    .replace(/\{\{loginUrl\}\}/g, escapeHtml(data.loginUrl));
 }
 
 /**
@@ -783,16 +1101,21 @@ export async function sendVolunteerScheduleEmail(
   try {
     const htmlContent = renderVolunteerScheduleEmail(data);
     const fromAddress = getFromAddress();
-    
+
     // Check if we're in development mode or if Resend is not configured
     // forceProduction parameter can override development mode for testing
-    const isDevelopment = !forceProduction && (Deno.env.get('DENO_ENV') === 'development' || !Deno.env.get('RESEND_API_KEY'));
-    
+    const isDevelopment =
+      !forceProduction &&
+      (Deno.env.get("DENO_ENV") === "development" ||
+        !Deno.env.get("RESEND_API_KEY"));
+
     let resendEmailId: string | undefined;
-    
+
     if (isDevelopment) {
       // Development mode: just log the email
-      const modeNote = forceProduction ? " (Force Production Mode DISABLED - still in development)" : "";
+      const modeNote = forceProduction
+        ? " (Force Production Mode DISABLED - still in development)"
+        : "";
       console.log(`
 === SCHEDULE EMAIL WOULD BE SENT (Development Mode${modeNote}) ===
 To: ${data.volunteerEmail}
@@ -804,33 +1127,39 @@ Has Shifts: ${data.hasShifts}
 Shifts Count: ${data.shifts.length}
 ============================================================
       `);
-      
+
       // Simulate async operation
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
     } else {
       // Production mode: send actual email with Resend
       try {
         const resend = createResendClient();
-        
+
         const emailResult = await resend.emails.send({
           from: fromAddress,
           to: [data.volunteerEmail],
-          subject: 'Your Theatre Shifts Schedule',
+          subject: "Your Theatre Shifts Schedule",
           html: htmlContent,
           attachments: [
             {
               filename: pdfAttachment.filename,
               content: btoa(String.fromCharCode(...pdfAttachment.content)),
-            }
+            },
           ],
         });
-        
+
         resendEmailId = emailResult.data?.id;
-        const forceNote = forceProduction ? " (FORCED from development mode)" : "";
-        console.log(`✅ Schedule email sent successfully via Resend${forceNote}. ID: ${resendEmailId}`);
-        
+        const forceNote = forceProduction
+          ? " (FORCED from development mode)"
+          : "";
+        console.log(
+          `✅ Schedule email sent successfully via Resend${forceNote}. ID: ${resendEmailId}`
+        );
       } catch (resendError) {
-        console.error('❌ Failed to send schedule email via Resend:', resendError);
+        console.error(
+          "❌ Failed to send schedule email via Resend:",
+          resendError
+        );
         return false;
       }
     }
@@ -839,35 +1168,40 @@ Shifts Count: ${data.shifts.length}
     try {
       // Extract participant ID from the volunteer data or URL
       const participantId = extractParticipantIdFromUrl(data.loginUrl);
-      
+
       const emailRecord: CreateEmailRecord = {
         to_email: data.volunteerEmail,
         to_participant_id: participantId,
         from_email: fromAddress,
-        subject: 'Your Theatre Shifts Schedule',
-        email_type: 'volunteer_schedule',
+        subject: "Your Theatre Shifts Schedule",
+        email_type: "volunteer_schedule",
         html_content: htmlContent,
         sent_by_user_id: sentByUserId,
         resend_email_id: resendEmailId,
-        delivery_status: isDevelopment ? 'simulated' : 'sent'
+        delivery_status: isDevelopment ? "simulated" : "sent",
       };
 
-      const attachments: CreateEmailAttachment[] = [{
-        filename: pdfAttachment.filename,
-        content_type: 'application/pdf',
-        file_data: pdfAttachment.content
-      }];
-      
+      const attachments: CreateEmailAttachment[] = [
+        {
+          filename: pdfAttachment.filename,
+          content_type: "application/pdf",
+          file_data: pdfAttachment.content,
+        },
+      ];
+
       await recordSentEmail(emailRecord, attachments);
-      console.log('📧 Schedule email and attachment recorded in tracking system');
-      
+      console.log(
+        "📧 Schedule email and attachment recorded in tracking system"
+      );
     } catch (trackingError) {
-      console.error('⚠️ Failed to record email in tracking system:', trackingError);
+      console.error(
+        "⚠️ Failed to record email in tracking system:",
+        trackingError
+      );
       // Don't fail the email send if tracking fails
     }
-    
+
     return true;
-    
   } catch (error) {
     console.error("Error sending volunteer schedule email:", error);
     return false;
@@ -886,16 +1220,21 @@ export async function sendShowWeekEmail(
   try {
     const htmlContent = renderShowWeekEmail(data);
     const fromAddress = getFromAddress();
-    
+
     // Check if we're in development mode or if Resend is not configured
     // forceProduction parameter can override development mode for testing
-    const isDevelopment = !forceProduction && (Deno.env.get('DENO_ENV') === 'development' || !Deno.env.get('RESEND_API_KEY'));
-    
+    const isDevelopment =
+      !forceProduction &&
+      (Deno.env.get("DENO_ENV") === "development" ||
+        !Deno.env.get("RESEND_API_KEY"));
+
     let resendEmailId: string | undefined;
-    
+
     if (isDevelopment) {
       // Development mode: just log the email
-      const modeNote = forceProduction ? " (Force Production Mode DISABLED - still in development)" : "";
+      const modeNote = forceProduction
+        ? " (Force Production Mode DISABLED - still in development)"
+        : "";
       console.log(`
 === SHOW WEEK EMAIL WOULD BE SENT (Development Mode${modeNote}) ===
 To: ${data.volunteerEmail}
@@ -906,14 +1245,14 @@ Has Shifts: ${data.hasShifts}
 Shifts Count: ${data.shifts.length}
 ============================================================
       `);
-      
+
       // Simulate async operation
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
     } else {
       // Production mode: send actual email with Resend
       try {
         const resend = createResendClient();
-        
+
         const emailResult = await resend.emails.send({
           from: fromAddress,
           to: [data.volunteerEmail],
@@ -923,16 +1262,22 @@ Shifts Count: ${data.shifts.length}
             {
               filename: pdfAttachment.filename,
               content: btoa(String.fromCharCode(...pdfAttachment.content)),
-            }
+            },
           ],
         });
-        
+
         resendEmailId = emailResult.data?.id;
-        const forceNote = forceProduction ? " (FORCED from development mode)" : "";
-        console.log(`✅ Show Week email sent successfully via Resend${forceNote}. ID: ${resendEmailId}`);
-        
+        const forceNote = forceProduction
+          ? " (FORCED from development mode)"
+          : "";
+        console.log(
+          `✅ Show Week email sent successfully via Resend${forceNote}. ID: ${resendEmailId}`
+        );
       } catch (resendError) {
-        console.error('❌ Failed to send Show Week email via Resend:', resendError);
+        console.error(
+          "❌ Failed to send Show Week email via Resend:",
+          resendError
+        );
         return false;
       }
     }
@@ -940,36 +1285,43 @@ Shifts Count: ${data.shifts.length}
     // Record the email in our tracking system
     try {
       // Extract participant ID from the volunteer data or URL (if available)
-      const participantId = data.loginUrl ? extractParticipantIdFromUrl(data.loginUrl) : undefined;
-      
+      const participantId = data.loginUrl
+        ? extractParticipantIdFromUrl(data.loginUrl)
+        : undefined;
+
       const emailRecord: CreateEmailRecord = {
         to_email: data.volunteerEmail,
         to_participant_id: participantId,
         from_email: fromAddress,
         subject: "It's Show Week! 🎭",
-        email_type: 'show_week',
+        email_type: "show_week",
         html_content: htmlContent,
         sent_by_user_id: sentByUserId,
         resend_email_id: resendEmailId,
-        delivery_status: isDevelopment ? 'simulated' : 'sent'
+        delivery_status: isDevelopment ? "simulated" : "sent",
       };
 
-      const attachments: CreateEmailAttachment[] = [{
-        filename: pdfAttachment.filename,
-        content_type: 'application/pdf',
-        file_data: pdfAttachment.content
-      }];
-      
+      const attachments: CreateEmailAttachment[] = [
+        {
+          filename: pdfAttachment.filename,
+          content_type: "application/pdf",
+          file_data: pdfAttachment.content,
+        },
+      ];
+
       await recordSentEmail(emailRecord, attachments);
-      console.log('📧 Show Week email and attachment recorded in tracking system');
-      
+      console.log(
+        "📧 Show Week email and attachment recorded in tracking system"
+      );
     } catch (trackingError) {
-      console.error('⚠️ Failed to record email in tracking system:', trackingError);
+      console.error(
+        "⚠️ Failed to record email in tracking system:",
+        trackingError
+      );
       // Don't fail the email send if tracking fails
     }
-    
+
     return true;
-    
   } catch (error) {
     console.error("Error sending Show Week email:", error);
     return false;
@@ -988,34 +1340,42 @@ export async function sendLastMinuteShiftsEmail(
   try {
     const htmlContent = renderLastMinuteShiftsEmail(data);
     const fromAddress = getFromAddress();
-    
+
     // Check if we're in development mode or if Resend is not configured
     // forceProduction parameter can override development mode for testing
-    const isDevelopment = !forceProduction && (Deno.env.get('DENO_ENV') === 'development' || !Deno.env.get('RESEND_API_KEY'));
-    
+    const isDevelopment =
+      !forceProduction &&
+      (Deno.env.get("DENO_ENV") === "development" ||
+        !Deno.env.get("RESEND_API_KEY"));
+
     let resendEmailId: string | undefined;
-    
+
     if (isDevelopment) {
       // Development mode: just log the email
-      const modeNote = forceProduction ? " (Force Production Mode DISABLED - still in development)" : "";
-      console.log(`
-=== LAST MINUTE SHIFTS EMAIL WOULD BE SENT (Development Mode${modeNote}) ===
-To: ${data.volunteerEmail}
-Subject: Last Minute Shifts @ the Arts Theatre
-HTML Content Length: ${htmlContent.length} characters
-Attachment: ${pdfAttachment.filename} (${pdfAttachment.content.length} bytes)
-Has Shifts: ${data.hasShifts}
-Shifts Count: ${data.shifts.length}
-=================================================================
-      `);
-      
+      const modeNote = forceProduction
+        ? " (Force Production Mode DISABLED - still in development)"
+        : "";
+      console.log(
+        [
+          `=== LAST MINUTE SHIFTS EMAIL WOULD BE SENT (Development Mode${modeNote}) ===`,
+          `To: ${data.volunteerEmail}`,
+          `Subject: Last Minute Shifts @ the Arts Theatre`,
+          `HTML Content Length: ${htmlContent.length} characters`,
+          `Login URL: ${data.loginUrl}`,
+          `Attachment: ${pdfAttachment.filename} (${pdfAttachment.content.length} bytes)`,
+          `Has Shifts: ${data.hasShifts}`,
+          `Shifts Count: ${data.shifts.length}`,
+          `=================================================================`,
+        ].join("\n")
+      );
+
       // Simulate async operation
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
     } else {
       // Production mode: send actual email with Resend
       try {
         const resend = createResendClient();
-        
+
         const emailResult = await resend.emails.send({
           from: fromAddress,
           to: [data.volunteerEmail],
@@ -1025,52 +1385,253 @@ Shifts Count: ${data.shifts.length}
             {
               filename: pdfAttachment.filename,
               content: btoa(String.fromCharCode(...pdfAttachment.content)),
-            }
+            },
           ],
         });
-        
+
         resendEmailId = emailResult.data?.id;
-        const forceNote = forceProduction ? " (FORCED from development mode)" : "";
-        console.log(`✅ Last Minute Shifts email sent successfully via Resend${forceNote}. ID: ${resendEmailId}`);
-        
+        const forceNote = forceProduction
+          ? " (FORCED from development mode)"
+          : "";
+        console.log(
+          `✅ Last Minute Shifts email sent successfully via Resend${forceNote}. ID: ${resendEmailId}`
+        );
       } catch (resendError) {
-        console.error('❌ Failed to send Last Minute Shifts email via Resend:', resendError);
+        console.error(
+          "❌ Failed to send Last Minute Shifts email via Resend:",
+          resendError
+        );
         return false;
       }
     }
 
     // Record the email in our tracking system
     try {
+      const participantId =
+        data.volunteerId ?? extractParticipantIdFromUrl(data.loginUrl);
+
       const emailRecord: CreateEmailRecord = {
         to_email: data.volunteerEmail,
-        to_participant_id: data.volunteerId, // Use the volunteer ID from the data
+        to_participant_id: participantId,
         from_email: fromAddress,
         subject: "Last Minute Shifts @ the Arts Theatre",
-        email_type: 'last_minute_shifts',
+        email_type: "last_minute_shifts",
         html_content: htmlContent,
         sent_by_user_id: sentByUserId,
         resend_email_id: resendEmailId,
-        delivery_status: isDevelopment ? 'simulated' : 'sent'
+        delivery_status: isDevelopment ? "simulated" : "sent",
       };
 
-      const attachments: CreateEmailAttachment[] = [{
-        filename: pdfAttachment.filename,
-        content_type: 'application/pdf',
-        file_data: pdfAttachment.content
-      }];
-      
+      const attachments: CreateEmailAttachment[] = [
+        {
+          filename: pdfAttachment.filename,
+          content_type: "application/pdf",
+          file_data: pdfAttachment.content,
+        },
+      ];
+
       await recordSentEmail(emailRecord, attachments);
-      console.log('📧 Last Minute Shifts email and attachment recorded in tracking system');
-      
+      console.log(
+        "📧 Last Minute Shifts email and attachment recorded in tracking system"
+      );
     } catch (trackingError) {
-      console.error('⚠️ Failed to record email in tracking system:', trackingError);
+      console.error(
+        "⚠️ Failed to record email in tracking system:",
+        trackingError
+      );
       // Don't fail the email send if tracking fails
     }
-    
+
     return true;
-    
   } catch (error) {
     console.error("Error sending Last Minute Shifts email:", error);
+    return false;
+  }
+}
+
+export async function sendUpcomingShowWizardEmail(
+  data: UpcomingShowWizardEmailData,
+  sentByUserId?: string,
+  forceProduction?: boolean,
+  simulateOnly = false
+): Promise<boolean> {
+  try {
+    const htmlContent = renderUpcomingShowWizardEmail(data);
+    const fromAddress = getFromAddress();
+
+    const isDevelopment =
+      !forceProduction &&
+      (simulateOnly ||
+        Deno.env.get("DENO_ENV") === "development" ||
+        !Deno.env.get("RESEND_API_KEY"));
+
+    let resendEmailId: string | undefined;
+
+    if (isDevelopment) {
+      const modeNote = forceProduction
+        ? " (Force Production Mode DISABLED - still in development)"
+        : "";
+      console.log(`
+=== UPCOMING SHOW WIZARD EMAIL WOULD BE SENT (Development Mode${modeNote}) ===
+To: ${data.volunteerEmail}
+Subject: Upcoming Shifts for ${data.showName}
+Link: ${data.loginUrl}
+Performances: ${data.performances.length}
+============================================================
+      `);
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    } else {
+      try {
+        const resend = createResendClient();
+        const emailResult = await resend.emails.send({
+          from: fromAddress,
+          to: [data.volunteerEmail],
+          subject: `Upcoming Shifts for ${data.showName}`,
+          html: htmlContent,
+        });
+        resendEmailId = emailResult.data?.id;
+        const forceNote = forceProduction
+          ? " (FORCED from development mode)"
+          : "";
+        console.log(
+          `✅ Upcoming show wizard email sent via Resend${forceNote}. ID: ${resendEmailId}`
+        );
+      } catch (resendError) {
+        console.error(
+          "❌ Failed to send upcoming show wizard email via Resend:",
+          resendError
+        );
+        return false;
+      }
+    }
+
+    try {
+      const participantId = extractParticipantIdFromUrl(data.loginUrl);
+
+      const emailRecord: CreateEmailRecord = {
+        to_email: data.volunteerEmail,
+        to_participant_id: participantId,
+        from_email: fromAddress,
+        subject: `Upcoming Shifts for ${data.showName}`,
+        email_type: "upcoming_show_wizard",
+        html_content: htmlContent,
+        sent_by_user_id: sentByUserId,
+        resend_email_id: resendEmailId,
+        delivery_status: isDevelopment ? "simulated" : "sent",
+      };
+
+      await recordSentEmail(emailRecord);
+      console.log("📧 Upcoming show wizard email recorded in tracking system");
+    } catch (trackingError) {
+      console.error(
+        "⚠️ Failed to record upcoming show wizard email:",
+        trackingError
+      );
+    }
+
+    return true;
+  } catch (error) {
+    console.error("Error sending upcoming show wizard email:", error);
+    return false;
+  }
+}
+
+export async function sendWizardConfirmationEmail(
+  data: WizardConfirmationEmailData,
+  pdfAttachment: { content: Uint8Array; filename: string },
+  sentByUserId?: string,
+  forceProduction?: boolean
+): Promise<boolean> {
+  try {
+    const htmlContent = renderWizardConfirmationEmail(data);
+    const fromAddress = getFromAddress();
+
+    const isDevelopment =
+      !forceProduction &&
+      (Deno.env.get("DENO_ENV") === "development" ||
+        !Deno.env.get("RESEND_API_KEY"));
+
+    let resendEmailId: string | undefined;
+
+    if (isDevelopment) {
+      const modeNote = forceProduction
+        ? " (Force Production Mode DISABLED - still in development)"
+        : "";
+      console.log(`
+=== WIZARD CONFIRMATION EMAIL WOULD BE SENT (Development Mode${modeNote}) ===
+To: ${data.volunteerEmail}
+Subject: Your Shifts for ${data.showName}
+Attachment: ${pdfAttachment.filename} (${pdfAttachment.content.length} bytes)
+Confirmed Shifts: ${data.selectedShifts.length}
+============================================================
+      `);
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    } else {
+      try {
+        const resend = createResendClient();
+        const emailResult = await resend.emails.send({
+          from: fromAddress,
+          to: [data.volunteerEmail],
+          subject: `Your Shifts for ${data.showName}`,
+          html: htmlContent,
+          attachments: [
+            {
+              filename: pdfAttachment.filename,
+              content: btoa(String.fromCharCode(...pdfAttachment.content)),
+            },
+          ],
+        });
+        resendEmailId = emailResult.data?.id;
+        const forceNote = forceProduction
+          ? " (FORCED from development mode)"
+          : "";
+        console.log(
+          `✅ Wizard confirmation email sent via Resend${forceNote}. ID: ${resendEmailId}`
+        );
+      } catch (resendError) {
+        console.error(
+          "❌ Failed to send wizard confirmation email via Resend:",
+          resendError
+        );
+        return false;
+      }
+    }
+
+    try {
+      const participantId = extractParticipantIdFromUrl(data.loginUrl);
+
+      const emailRecord: CreateEmailRecord = {
+        to_email: data.volunteerEmail,
+        to_participant_id: participantId,
+        from_email: fromAddress,
+        subject: `Your Shifts for ${data.showName}`,
+        email_type: "wizard_confirmation",
+        html_content: htmlContent,
+        sent_by_user_id: sentByUserId,
+        resend_email_id: resendEmailId,
+        delivery_status: isDevelopment ? "simulated" : "sent",
+      };
+
+      const attachments: CreateEmailAttachment[] = [
+        {
+          filename: pdfAttachment.filename,
+          content_type: "application/pdf",
+          file_data: pdfAttachment.content,
+        },
+      ];
+
+      await recordSentEmail(emailRecord, attachments);
+      console.log("📧 Wizard confirmation email recorded in tracking system");
+    } catch (trackingError) {
+      console.error(
+        "⚠️ Failed to record wizard confirmation email:",
+        trackingError
+      );
+    }
+
+    return true;
+  } catch (error) {
+    console.error("Error sending wizard confirmation email:", error);
     return false;
   }
 }
@@ -1078,6 +1639,9 @@ Shifts Count: ${data.shifts.length}
 /**
  * Creates the complete login URL for a volunteer
  */
-export function createVolunteerLoginUrl(baseUrl: string, volunteerId: string): string {
+export function createVolunteerLoginUrl(
+  baseUrl: string,
+  volunteerId: string
+): string {
   return `${baseUrl}/volunteer/signup/${volunteerId}`;
 }

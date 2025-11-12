@@ -1,0 +1,1023 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{{showName}} Volunteer Wizard</title>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta name="theme-color" content="#007bff">
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    body {
+      margin: 0;
+      background: #f8f9fa;
+      color: #212529;
+    }
+    .wizard-container {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 1.5rem;
+    }
+    .wizard-card {
+      background: #ffffff;
+      border-radius: 12px;
+      box-shadow: 0 12px 24px rgba(0,0,0,0.08);
+      padding: 2rem;
+    }
+    header {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      margin-bottom: 2rem;
+      text-align: center;
+    }
+    header h1 {
+      margin: 0;
+      font-size: 1.75rem;
+    }
+    header p {
+      margin: 0;
+      color: #6c757d;
+      font-size: 0.95rem;
+    }
+    .progress {
+      display: flex;
+      gap: 0.5rem;
+      justify-content: center;
+      margin-bottom: 1.5rem;
+      flex-wrap: wrap;
+    }
+    .progress-step {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 0.75rem;
+      border-radius: 20px;
+      background: #e9ecef;
+      color: #6c757d;
+      font-size: 0.9rem;
+      transition: background 0.3s ease, color 0.3s ease;
+    }
+    .progress-step.active {
+      background: #007bff;
+      color: #ffffff;
+    }
+    .progress-step.completed {
+      background: #28a745;
+      color: #ffffff;
+    }
+    .wizard-step {
+      display: none;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+    .wizard-step.active {
+      display: flex;
+    }
+    .roles-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 1rem;
+    }
+    .role-pill {
+      padding: 0.75rem 1rem;
+      border-radius: 10px;
+      border: 2px solid #dee2e6;
+      background: #ffffff;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.2s ease;
+      font-weight: 600;
+    }
+    .role-pill[data-selected="true"],
+    .role-pill:hover {
+      border-color: #007bff;
+      background: rgba(0, 123, 255, 0.1);
+      color: #007bff;
+    }
+    .performance-card {
+      border: 1px solid #dee2e6;
+      border-radius: 10px;
+      padding: 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      background: #fdfdff;
+    }
+    .performance-card.disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    .performance-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+    .performance-meta {
+      color: #6c757d;
+      font-size: 0.9rem;
+    }
+    .shift-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+    .shift-option {
+      border: 1px solid #ced4da;
+      border-radius: 10px;
+      padding: 0.75rem 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+      background: #ffffff;
+      cursor: pointer;
+      transition: border 0.2s ease, background 0.2s ease;
+    }
+    .shift-option[data-selected="true"],
+    .shift-option:hover {
+      border-color: #007bff;
+      background: rgba(0, 123, 255, 0.08);
+    }
+    .shift-option input {
+      accent-color: #007bff;
+      transform: scale(1.1);
+    }
+    .shift-role {
+      font-weight: 600;
+      color: #343a40;
+    }
+    .shift-time {
+      color: #6c757d;
+      font-size: 0.9rem;
+    }
+    .step-actions {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: 1rem;
+    }
+    .step-actions .left,
+    .step-actions .right {
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+    button {
+      border: none;
+      border-radius: 8px;
+      padding: 0.75rem 1.5rem;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+    button.primary {
+      background: #007bff;
+      color: #ffffff;
+    }
+    button.secondary {
+      background: #e9ecef;
+      color: #343a40;
+    }
+    button.danger {
+      background: #dc3545;
+      color: #ffffff;
+    }
+    button[disabled] {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+    button:not([disabled]):hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 16px rgba(0,0,0,0.12);
+    }
+    .summary-list {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+    .summary-item {
+      border: 1px solid #dee2e6;
+      border-radius: 10px;
+      padding: 1rem;
+      display: flex;
+      justify-content: space-between;
+      gap: 1rem;
+      flex-wrap: wrap;
+      background: #ffffff;
+    }
+    .summary-item.existing {
+      border-style: dashed;
+      background: #f1f3f5;
+    }
+    .summary-info {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+    }
+    .summary-actions {
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+    }
+    .notice {
+      border-radius: 10px;
+      padding: 1rem 1.25rem;
+      font-size: 0.95rem;
+    }
+    .notice.info {
+      background: rgba(0, 123, 255, 0.08);
+      color: #0c5460;
+      border: 1px solid rgba(0, 123, 255, 0.25);
+    }
+    .notice.warning {
+      background: rgba(255, 193, 7, 0.15);
+      color: #856404;
+      border: 1px solid rgba(255, 193, 7, 0.5);
+    }
+    .notice.success {
+      background: rgba(40, 167, 69, 0.12);
+      color: #155724;
+      border: 1px solid rgba(40, 167, 69, 0.35);
+    }
+    .hidden {
+      display: none !important;
+    }
+    .fallback-list {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+    .fallback-card {
+      border: 1px solid #ffc107;
+      border-radius: 10px;
+      padding: 1rem;
+      background: rgba(255, 193, 7, 0.08);
+    }
+    .fallback-title {
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+    }
+    .link-button {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: 0.95rem;
+      text-decoration: none;
+      color: #007bff;
+    }
+    .link-button:hover {
+      text-decoration: underline;
+    }
+    @media (max-width: 640px) {
+      .wizard-card {
+        padding: 1.25rem;
+      }
+      .performance-header {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+      .summary-item {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+      button {
+        width: 100%;
+      }
+      .step-actions {
+        flex-direction: column;
+      }
+      .step-actions .left,
+      .step-actions .right {
+        width: 100%;
+        justify-content: stretch;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="wizard-container">
+    <div class="wizard-card">
+      <header>
+        <h1>{{showName}} Volunteer Wizard</h1>
+        <p>Hello {{volunteerName}}, follow the steps to pick your shifts. You can revisit this wizard anytime using your personal link.</p>
+      </header>
+
+      <div class="progress" id="progressBar">
+        <div class="progress-step active" data-step="1">1. Roles</div>
+        <div class="progress-step" data-step="2">2. Performances</div>
+        <div class="progress-step" data-step="3">3. Shifts</div>
+        <div class="progress-step" data-step="4">4. Summary</div>
+        <div class="progress-step" data-step="5">5. Extras</div>
+      </div>
+
+      <section class="wizard-step active" id="step-1">
+        <div>
+          <h2>Step 1. Pick your preferred roles</h2>
+          <p class="step-description">Select the roles you enjoy. Choose "I don't mind" to see every remaining option.</p>
+        </div>
+        <div class="roles-grid" id="rolesGrid"></div>
+        <div class="notice info hidden" id="noRolesNotice">No available roles remain for this show. You can continue to review performances.</div>
+        <div class="step-actions">
+          <div class="left"></div>
+          <div class="right">
+            <button class="primary" id="rolesNext">Next</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="wizard-step" id="step-2">
+        <div>
+          <h2>Step 2. Choose the performances you can help with</h2>
+          <p class="step-description">We only show performances that still have your preferred roles available and where you are not already rostered.</p>
+        </div>
+        <div class="performance-list" id="performanceList" style="display:flex;flex-direction:column;gap:1rem;"></div>
+        <div class="notice warning hidden" id="noPerformancesNotice">No performances match your current role choices. Try broadening your selection.</div>
+        <div class="step-actions">
+          <div class="left">
+            <button class="secondary" id="performancesBack">Back</button>
+          </div>
+          <div class="right">
+            <button class="primary" id="performancesNext">Next</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="wizard-step" id="step-3">
+        <div>
+          <h2 id="shiftStepTitle">Step 3. Pick your shift</h2>
+          <p class="step-description" id="shiftStepSubtitle">Select one shift for each performance.</p>
+        </div>
+        <div class="notice warning hidden" id="noShiftsForPerformance">No shifts match your filters for this performance. You can go back or continue to the next one.</div>
+        <div class="shift-list" id="shiftOptions"></div>
+        <div class="step-actions">
+          <div class="left">
+            <button class="secondary" id="shiftBack">Back</button>
+          </div>
+          <div class="right">
+            <button class="primary" id="shiftNext">Next</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="wizard-step" id="step-4">
+        <div>
+          <h2>Step 4. Review your selections</h2>
+          <p class="step-description">Double-check your shift choices. You can edit before submitting.</p>
+        </div>
+        <div class="summary-list" id="summaryList"></div>
+        <div class="notice info hidden" id="existingAssignmentsNotice">You already have shifts for some performances. They are locked in but still shown here for reference.</div>
+        <div class="notice warning hidden" id="missingPerformancesNotice"></div>
+        <div class="notice success hidden" id="submissionSuccess"></div>
+        <div class="notice warning hidden" id="submissionWarning"></div>
+        <div class="fallback-list hidden" id="fallbackContainer"></div>
+        <div class="step-actions">
+          <div class="left">
+            <button class="secondary" id="summaryBack">Back</button>
+          </div>
+          <div class="right">
+            <button class="primary" id="submitWizard">Submit</button>
+          </div>
+        </div>
+        <div class="hidden" id="postSubmitActions" style="margin-top:1.5rem;display:flex;flex-direction:column;gap:0.75rem;">
+          <a class="link-button" id="downloadScheduleLink" href="#" target="_blank">📄 Download my schedule PDF</a>
+          <a class="link-button" id="returnToDashboardLink" href="/" target="_self">🏠 Return to main menu</a>
+        </div>
+      </section>
+
+      <section class="wizard-step" id="step-5">
+        <div>
+          <h2>Step 5. Want to see other roles?</h2>
+          <p class="step-description">You still have performances without a shift. Are you happy to look at other available roles, even if they weren't on your preference list?</p>
+        </div>
+        <div class="notice info" id="step5Summary"></div>
+        <div class="step-actions">
+          <div class="left">
+            <button class="secondary" id="step5Back">Back</button>
+          </div>
+          <div class="right">
+            <button class="secondary" id="step5No">No thanks</button>
+            <button class="primary" id="step5Yes">Yes, show me more</button>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <script type="application/json" id="wizardData">{{{wizardDataJson}}}</script>
+  <script>
+    const wizardData = JSON.parse(document.getElementById('wizardData').textContent);
+    const volunteerId = {{{volunteerIdJson}}};
+    const showId = {{{showIdJson}}};
+
+    const steps = [
+      document.getElementById('step-1'),
+      document.getElementById('step-2'),
+      document.getElementById('step-3'),
+      document.getElementById('step-4'),
+      document.getElementById('step-5')
+    ];
+    const progressSteps = Array.from(document.querySelectorAll('.progress-step'));
+
+    const state = {
+      step: 1,
+      selectedRoles: new Set(),
+      includeAnyRole: false,
+      selectedPerformances: new Set(),
+      performanceOrder: [],
+      performanceIndex: 0,
+      chosenShifts: new Map(),
+      editTarget: null,
+      fallbackMode: false,
+      confirmedPartial: false
+    };
+
+    const rolesGrid = document.getElementById('rolesGrid');
+    const noRolesNotice = document.getElementById('noRolesNotice');
+    const performanceList = document.getElementById('performanceList');
+    const noPerformancesNotice = document.getElementById('noPerformancesNotice');
+    const shiftOptions = document.getElementById('shiftOptions');
+    const shiftStepTitle = document.getElementById('shiftStepTitle');
+    const shiftStepSubtitle = document.getElementById('shiftStepSubtitle');
+    const noShiftsForPerformance = document.getElementById('noShiftsForPerformance');
+    const summaryList = document.getElementById('summaryList');
+    const missingPerformancesNotice = document.getElementById('missingPerformancesNotice');
+    const existingAssignmentsNotice = document.getElementById('existingAssignmentsNotice');
+    const submissionSuccess = document.getElementById('submissionSuccess');
+    const submissionWarning = document.getElementById('submissionWarning');
+    const fallbackContainer = document.getElementById('fallbackContainer');
+    const postSubmitActions = document.getElementById('postSubmitActions');
+    const downloadScheduleLink = document.getElementById('downloadScheduleLink');
+    const step5Summary = document.getElementById('step5Summary');
+
+    const ANY_ROLE_KEY = '__ANY__';
+
+    function updateProgress(step) {
+      progressSteps.forEach((el) => {
+        const stepNumber = Number(el.dataset.step);
+        el.classList.toggle('active', stepNumber === step);
+        el.classList.toggle('completed', stepNumber < step);
+      });
+    }
+
+    function showStep(step) {
+      state.step = step;
+      steps.forEach((section, index) => {
+        section.classList.toggle('active', index === step - 1);
+      });
+      updateProgress(step);
+      if (step === 1) {
+        renderRolesStep();
+      } else if (step === 2) {
+        renderPerformancesStep();
+      } else if (step === 3) {
+        renderShiftStep();
+      } else if (step === 4) {
+        renderSummaryStep();
+      } else if (step === 5) {
+        renderStep5();
+      }
+    }
+
+    function renderRolesStep() {
+      rolesGrid.innerHTML = '';
+      const roles = Array.isArray(wizardData.roles) ? wizardData.roles : [];
+      if (!roles || roles.length === 0) {
+        noRolesNotice.classList.remove('hidden');
+      } else {
+        noRolesNotice.classList.add('hidden');
+        roles.forEach((role) => {
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.className = 'role-pill';
+          button.textContent = role;
+          button.dataset.role = role;
+          button.dataset.selected = state.selectedRoles.has(role) ? 'true' : 'false';
+          button.addEventListener('click', () => {
+            toggleRole(role);
+            button.dataset.selected = state.selectedRoles.has(role) ? 'true' : 'false';
+          });
+          rolesGrid.appendChild(button);
+        });
+      }
+      const anyButton = document.createElement('button');
+      anyButton.type = 'button';
+      anyButton.className = 'role-pill';
+      anyButton.textContent = "I don't mind";
+      anyButton.dataset.role = ANY_ROLE_KEY;
+      anyButton.dataset.selected = state.includeAnyRole ? 'true' : 'false';
+      anyButton.addEventListener('click', () => {
+        state.includeAnyRole = !state.includeAnyRole;
+        if (state.includeAnyRole) {
+          state.selectedRoles.clear();
+          rolesGrid.querySelectorAll('.role-pill').forEach((node) => {
+            if (node.dataset.role !== ANY_ROLE_KEY) {
+              node.dataset.selected = 'false';
+            }
+          });
+        }
+        anyButton.dataset.selected = state.includeAnyRole ? 'true' : 'false';
+      });
+      rolesGrid.appendChild(anyButton);
+    }
+
+    function toggleRole(role) {
+      if (state.includeAnyRole) {
+        state.includeAnyRole = false;
+        rolesGrid.querySelectorAll('.role-pill[data-role="'+ANY_ROLE_KEY+'"]').forEach((node) => {
+          node.dataset.selected = 'false';
+        });
+      }
+      if (state.selectedRoles.has(role)) {
+        state.selectedRoles.delete(role);
+      } else {
+        state.selectedRoles.add(role);
+      }
+    }
+
+    function getFilteredPerformances() {
+      const filters = state.includeAnyRole ? null : state.selectedRoles;
+      return wizardData.performances.filter((perf) => {
+        if (perf.existingAssignment) {
+          return false;
+        }
+        if (!perf.availableShifts || perf.availableShifts.length === 0) {
+          return false;
+        }
+        if (!filters || filters.size === 0) {
+          return true;
+        }
+        return perf.availableShifts.some((shift) => filters.has(shift.role));
+      });
+    }
+
+    function renderPerformancesStep() {
+      performanceList.innerHTML = '';
+      state.selectedPerformances.forEach((id) => {
+        const matching = wizardData.performances.find((perf) => perf.showDateId === id);
+        if (!matching || matching.existingAssignment || !matching.availableShifts.length) {
+          state.selectedPerformances.delete(id);
+          state.chosenShifts.delete(id);
+        }
+      });
+      const performances = getFilteredPerformances();
+      if (performances.length === 0) {
+        noPerformancesNotice.classList.remove('hidden');
+        return;
+      }
+      noPerformancesNotice.classList.add('hidden');
+      performances.forEach((perf) => {
+        const card = document.createElement('label');
+        card.className = 'performance-card';
+        const checked = state.selectedPerformances.has(perf.showDateId);
+        card.innerHTML = `
+          <div class="performance-header">
+            <div>
+              <div style="font-weight:600;">${formatPerformanceDate(perf.startTime)}</div>
+              <div class="performance-meta">${formatPerformanceRange(perf.startTime, perf.endTime)}</div>
+            </div>
+            <div class="performance-meta">${perf.availableShifts.length} available shift${perf.availableShifts.length === 1 ? '' : 's'}</div>
+          </div>
+          <div class="performance-meta">Roles: ${perf.availableShifts.map((s) => s.role).filter((value, index, arr) => arr.indexOf(value) === index).join(', ')}</div>
+          <div>
+            <input type="checkbox" data-show-date="${perf.showDateId}" ${checked ? 'checked' : ''} /> Include this performance
+          </div>
+        `;
+        const checkbox = card.querySelector('input');
+        checkbox.addEventListener('change', () => {
+          if (checkbox.checked) {
+            state.selectedPerformances.add(perf.showDateId);
+          } else {
+            state.selectedPerformances.delete(perf.showDateId);
+            state.chosenShifts.delete(perf.showDateId);
+          }
+        });
+        performanceList.appendChild(card);
+      });
+    }
+
+    function getShiftChoices(showDateId, includeAllRoles = false) {
+      const performance = wizardData.performances.find((p) => p.showDateId === showDateId);
+      if (!performance) {
+        return [];
+      }
+      if (includeAllRoles) {
+        return performance.availableShifts;
+      }
+      if (state.includeAnyRole || state.fallbackMode) {
+        return performance.availableShifts;
+      }
+      if (!state.selectedRoles.size) {
+        return performance.availableShifts;
+      }
+      return performance.availableShifts.filter((shift) => state.selectedRoles.has(shift.role));
+    }
+
+    function renderShiftStep() {
+      submissionWarning.classList.add('hidden');
+      submissionSuccess.classList.add('hidden');
+      fallbackContainer.classList.add('hidden');
+      fallbackContainer.innerHTML = '';
+      const activePerformanceId = state.editTarget ?? state.performanceOrder[state.performanceIndex];
+      const performance = wizardData.performances.find((p) => p.showDateId === activePerformanceId);
+      if (!performance) {
+        showStep(4);
+        return;
+      }
+      shiftStepTitle.textContent = `Step 3. Pick your shift (${formatPerformanceDate(performance.startTime)})`;
+      shiftStepSubtitle.textContent = state.editTarget ? 'Update your shift for this performance.' : `Shift ${state.performanceIndex + 1} of ${state.performanceOrder.length}`;
+      shiftOptions.innerHTML = '';
+      const shifts = getShiftChoices(activePerformanceId, state.editTarget !== null);
+      if (!shifts.length) {
+        noShiftsForPerformance.classList.remove('hidden');
+      } else {
+        noShiftsForPerformance.classList.add('hidden');
+      }
+      const selectedShift = state.chosenShifts.get(activePerformanceId);
+      shifts.forEach((shift) => {
+        const option = document.createElement('label');
+        option.className = 'shift-option';
+        option.dataset.selected = selectedShift && selectedShift.shiftId === shift.id ? 'true' : 'false';
+        option.innerHTML = `
+          <div style="display:flex;justify-content:space-between;gap:0.75rem;flex-wrap:wrap;align-items:center;">
+            <div class="shift-info">
+              <div class="shift-role">${shift.role}</div>
+              <div class="shift-time">${formatShiftRange(shift.arriveTime, shift.departTime)}</div>
+            </div>
+            <input type="radio" name="shiftChoice" value="${shift.id}" ${selectedShift && selectedShift.shiftId === shift.id ? 'checked' : ''} />
+          </div>
+        `;
+        option.addEventListener('click', (event) => {
+          if (event.target instanceof HTMLInputElement && event.target.type === 'radio') {
+            // handled by change below
+          }
+        });
+        const radio = option.querySelector('input');
+        radio.addEventListener('change', () => {
+          shiftOptions.querySelectorAll('.shift-option').forEach((node) => node.dataset.selected = 'false');
+          option.dataset.selected = 'true';
+        });
+        shiftOptions.appendChild(option);
+      });
+    }
+
+    function renderSummaryStep() {
+      summaryList.innerHTML = '';
+      submissionSuccess.classList.add('hidden');
+      submissionWarning.classList.add('hidden');
+      fallbackContainer.classList.add('hidden');
+      fallbackContainer.innerHTML = '';
+      postSubmitActions.classList.add('hidden');
+      state.confirmedPartial = false;
+      const chosenEntries = Array.from(state.chosenShifts.entries());
+      const existingAssignments = wizardData.performances
+        .filter((perf) => perf.existingAssignment)
+        .map((perf) => ({
+          showDateId: perf.showDateId,
+          assignment: perf.existingAssignment!
+        }));
+
+      if (!chosenEntries.length && !existingAssignments.length) {
+        const empty = document.createElement('div');
+        empty.className = 'notice info';
+        empty.textContent = 'No shifts selected yet. Go back to choose performances and shifts.';
+        summaryList.appendChild(empty);
+      } else {
+        chosenEntries.sort((a, b) => a[0] - b[0]);
+        chosenEntries.forEach(([showDateId, shift]) => {
+          const perf = wizardData.performances.find((p) => p.showDateId === showDateId);
+          if (!perf) return;
+          const item = document.createElement('div');
+          item.className = 'summary-item';
+          item.innerHTML = `
+            <div class="summary-info">
+              <div style="font-weight:600;">${formatPerformanceDate(perf.startTime)}</div>
+              <div class="shift-role">${shift.role}</div>
+              <div class="shift-time">${formatShiftRange(shift.arriveTime, shift.departTime)}</div>
+            </div>
+            <div class="summary-actions">
+              <button class="secondary" data-action="edit" data-show-date="${showDateId}">Edit</button>
+            </div>
+          `;
+          const editButton = item.querySelector('button[data-action="edit"]');
+          editButton.addEventListener('click', () => {
+            state.editTarget = showDateId;
+            showStep(3);
+          });
+          summaryList.appendChild(item);
+        });
+      }
+
+      existingAssignments.forEach(({ showDateId, assignment }) => {
+        const perf = wizardData.performances.find((p) => p.showDateId === showDateId);
+        if (!perf) {
+          return;
+        }
+        const item = document.createElement('div');
+        item.className = 'summary-item existing';
+        item.innerHTML = `
+          <div class="summary-info">
+            <div style="font-weight:600;">${formatPerformanceDate(perf.startTime)}</div>
+            <div class="shift-role">${assignment.role}</div>
+            <div class="shift-time">${formatShiftRange(assignment.arriveTime, assignment.departTime)}</div>
+            <div class="performance-meta">Already rostered (locked)</div>
+          </div>
+        `;
+        summaryList.appendChild(item);
+      });
+      const remaining = getRemainingPerformances();
+      if (remaining.length > 0) {
+        missingPerformancesNotice.classList.remove('hidden');
+        const labels = remaining.map((perf) => formatPerformanceDate(perf.startTime));
+        missingPerformancesNotice.textContent = `Still available performances without a shift: ${labels.join(', ')}.`;
+      } else {
+        missingPerformancesNotice.classList.add('hidden');
+      }
+      const hasExistingAssignments = wizardData.performances.some((perf) => perf.existingAssignment);
+      existingAssignmentsNotice.classList.toggle('hidden', !hasExistingAssignments);
+      downloadScheduleLink.href = `/volunteer/signup/${volunteerId}/schedule-pdf`;
+    }
+
+    function renderStep5() {
+      const remaining = getRemainingPerformances();
+      if (!remaining.length) {
+        showStep(4);
+        return;
+      }
+      const labels = remaining.map((perf) => formatPerformanceDate(perf.startTime));
+      step5Summary.textContent = `Performances still needing help: ${labels.join(', ')}.`;
+    }
+
+    function getRemainingPerformances() {
+      return wizardData.performances.filter((perf) => {
+        if (perf.existingAssignment) {
+          return false;
+        }
+        return !state.chosenShifts.has(perf.showDateId) && (!state.selectedPerformances.size || state.selectedPerformances.has(perf.showDateId));
+      });
+    }
+
+    function formatPerformanceDate(iso) {
+      const formatter = window.DateTimeFormat;
+      if (formatter && typeof formatter.formatDate === 'function') {
+        return `${formatter.formatDate(iso)} (${new Date(iso).toLocaleDateString('en-AU', { weekday: 'short' })})`;
+      }
+      const date = new Date(iso);
+      return date.toLocaleDateString('en-AU', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' });
+    }
+
+    function formatPerformanceRange(startIso, endIso) {
+      const formatter = window.DateTimeFormat;
+      if (formatter && typeof formatter.formatShowTimeRange === 'function') {
+        return formatter.formatShowTimeRange(startIso, endIso);
+      }
+      const start = new Date(startIso);
+      const end = new Date(endIso);
+      const startStr = start.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit', hour12: true });
+      const endStr = end.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit', hour12: true });
+      return `${startStr} - ${endStr}`;
+    }
+
+    function formatShiftRange(startIso, endIso) {
+      const formatter = window.DateTimeFormat;
+      if (formatter && typeof formatter.formatShiftTime === 'function') {
+        return formatter.formatShiftTime(startIso, endIso);
+      }
+      return formatPerformanceRange(startIso, endIso);
+    }
+
+    document.getElementById('rolesNext').addEventListener('click', () => {
+      const availableRoleCount = Array.isArray(wizardData.roles) ? wizardData.roles.length : 0;
+      if (!state.includeAnyRole && state.selectedRoles.size === 0 && availableRoleCount > 0) {
+        alert('Select at least one role or choose "I don\'t mind".');
+        return;
+      }
+      showStep(2);
+    });
+
+    document.getElementById('performancesBack').addEventListener('click', () => {
+      showStep(1);
+    });
+
+    document.getElementById('performancesNext').addEventListener('click', () => {
+      if (state.selectedPerformances.size === 0) {
+        alert('Select at least one performance to continue.');
+        return;
+      }
+      state.performanceOrder = Array.from(state.selectedPerformances);
+      state.performanceIndex = 0;
+      state.editTarget = null;
+      showStep(3);
+    });
+
+    document.getElementById('shiftBack').addEventListener('click', () => {
+      if (state.editTarget !== null) {
+        state.editTarget = null;
+        showStep(4);
+        return;
+      }
+      if (state.performanceIndex > 0) {
+        state.performanceIndex -= 1;
+        showStep(3);
+      } else {
+        showStep(2);
+      }
+    });
+
+    document.getElementById('shiftNext').addEventListener('click', () => {
+      const activePerformanceId = state.editTarget ?? state.performanceOrder[state.performanceIndex];
+      const selectedRadio = shiftOptions.querySelector('input[name="shiftChoice"]:checked');
+      if (!selectedRadio) {
+        alert('Pick a shift to continue.');
+        return;
+      }
+      const shiftId = Number(selectedRadio.value);
+      const performance = wizardData.performances.find((p) => p.showDateId === activePerformanceId);
+      if (!performance) {
+        showStep(4);
+        return;
+      }
+      const shifts = performance.availableShifts || [];
+      const chosen = shifts.find((shift) => shift.id === shiftId);
+      if (!chosen) {
+        alert('The selected shift is no longer available. Please choose another.');
+        return;
+      }
+      state.chosenShifts.set(activePerformanceId, {
+        shiftId: chosen.id,
+        role: chosen.role,
+        arriveTime: chosen.arriveTime,
+        departTime: chosen.departTime
+      });
+      if (state.editTarget !== null) {
+        state.editTarget = null;
+        showStep(4);
+        return;
+      }
+      if (state.performanceIndex < state.performanceOrder.length - 1) {
+        state.performanceIndex += 1;
+        showStep(3);
+      } else {
+        showStep(4);
+      }
+    });
+
+    document.getElementById('summaryBack').addEventListener('click', () => {
+      state.editTarget = null;
+      showStep(2);
+    });
+
+    document.getElementById('submitWizard').addEventListener('click', async () => {
+      const remaining = getRemainingPerformances();
+      if (remaining.length > 0 && !state.confirmedPartial) {
+        showStep(5);
+        return;
+      }
+      await submitSelections();
+    });
+
+    document.getElementById('step5Back').addEventListener('click', () => {
+      showStep(4);
+    });
+
+    document.getElementById('step5Yes').addEventListener('click', () => {
+      const remaining = getRemainingPerformances();
+      if (!remaining.length) {
+        showStep(4);
+        return;
+      }
+      state.includeAnyRole = true;
+      state.fallbackMode = true;
+      state.selectedRoles.clear();
+      state.performanceOrder = remaining.map((perf) => perf.showDateId);
+      state.performanceIndex = 0;
+      state.editTarget = null;
+      showStep(3);
+    });
+
+    document.getElementById('step5No').addEventListener('click', async () => {
+      state.confirmedPartial = true;
+      await submitSelections();
+    });
+
+    async function submitSelections() {
+      const selections = Array.from(state.chosenShifts.entries()).map(([showDateId, shift]) => ({
+        showDateId,
+        shiftId: shift.shiftId
+      }));
+
+      const payload = {
+        showId,
+        selections
+      };
+
+      submissionSuccess.classList.add('hidden');
+      submissionWarning.classList.add('hidden');
+      fallbackContainer.classList.add('hidden');
+      fallbackContainer.innerHTML = '';
+
+      const submitButton = document.getElementById('submitWizard');
+      submitButton.disabled = true;
+      submitButton.textContent = 'Submitting...';
+
+      try {
+        const response = await fetch(`/volunteer/signup/${volunteerId}/wizard/submit`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(payload)
+        });
+        const result = await response.json();
+        if (result.success) {
+          submissionSuccess.classList.remove('hidden');
+          submissionSuccess.textContent = 'Success! Your shifts are saved. A confirmation email with your schedule has been sent.';
+          postSubmitActions.classList.remove('hidden');
+          state.confirmedPartial = false;
+          state.fallbackMode = false;
+        } else {
+          submissionWarning.classList.remove('hidden');
+          submissionWarning.textContent = 'Some shifts were unavailable. We saved the rest and refreshed the options below.';
+        }
+        if (Array.isArray(result.assigned)) {
+          result.assigned.forEach((assignment) => {
+            const perf = wizardData.performances.find((p) => p.showDateId === assignment.showDateId);
+            if (perf) {
+              perf.existingAssignment = {
+                shiftId: assignment.shiftId,
+                role: assignment.role,
+                arriveTime: assignment.arriveTime,
+                departTime: assignment.departTime
+              };
+              perf.availableShifts = (perf.availableShifts || []).filter((shift) => shift.id !== assignment.shiftId);
+            }
+            state.chosenShifts.delete(assignment.showDateId);
+          });
+        }
+        if (Array.isArray(result.conflicts) && result.conflicts.length) {
+          result.conflicts.forEach((conflict) => {
+            state.chosenShifts.delete(conflict.showDateId);
+          });
+        }
+        if (Array.isArray(result.fallbackOptions) && result.fallbackOptions.length) {
+          fallbackContainer.classList.remove('hidden');
+          result.fallbackOptions.forEach((item) => {
+            const perf = wizardData.performances.find((p) => p.showDateId === item.showDateId);
+            if (!perf) return;
+            perf.availableShifts = item.shifts.map((shift) => ({
+              id: shift.shiftId,
+              role: shift.role,
+              arriveTime: shift.arriveTime,
+              departTime: shift.departTime
+            }));
+            const card = document.createElement('div');
+            card.className = 'fallback-card';
+            card.innerHTML = `
+              <div class="fallback-title">${formatPerformanceDate(perf.startTime)}</div>
+              <div>${item.shifts.length ? 'Choose another shift to continue:' : 'No shifts remain for this performance.'}</div>
+            `;
+            if (item.shifts.length) {
+              const list = document.createElement('ul');
+              list.style.marginTop = '0.5rem';
+              list.style.marginBottom = '0';
+              list.style.paddingLeft = '1.25rem';
+              item.shifts.forEach((shift) => {
+                const li = document.createElement('li');
+                li.textContent = `${shift.role} • ${formatShiftRange(shift.arriveTime, shift.departTime)}`;
+                list.appendChild(li);
+              });
+              card.appendChild(list);
+            }
+            fallbackContainer.appendChild(card);
+          });
+          const firstConflict = result.conflicts && result.conflicts.length ? result.conflicts[0].showDateId : result.fallbackOptions[0].showDateId;
+          state.editTarget = firstConflict;
+          state.fallbackMode = true;
+          state.includeAnyRole = true;
+          showStep(3);
+          return;
+        }
+        renderSummaryStep();
+      } catch (error) {
+        console.error('Wizard submission failed', error);
+        submissionWarning.classList.remove('hidden');
+        submissionWarning.textContent = 'Something went wrong while saving your shifts. Please try again.';
+      } finally {
+        submitButton.disabled = false;
+        submitButton.textContent = 'Submit';
+      }
+    }
+
+    // Initial render
+    renderRolesStep();
+  </script>
+  <script src="/src/utils/timezone-client.js"></script>
+</body>
+</html>

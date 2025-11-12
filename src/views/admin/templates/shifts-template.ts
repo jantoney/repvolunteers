@@ -1,25 +1,35 @@
 // TypeScript global declaration for DateTimeFormat to avoid implicit 'any' errors
 declare global {
   // eslint-disable-next-line no-var
-  var DateTimeFormat: {
-    formatDate: (date: Date | string) => string;
-    formatDateTime: (date: Date) => string;
-    formatShowTimeRange: (startTime: string, endTime: string) => string;
-    formatShiftTime: (arriveTime: string, departTime: string) => string;
-    ADELAIDE_TIMEZONE: string;
-  } | undefined;
+  var DateTimeFormat:
+    | {
+        formatDate: (date: Date | string) => string;
+        formatDateTime: (date: Date) => string;
+        formatShowTimeRange: (startTime: string, endTime: string) => string;
+        formatShiftTime: (arriveTime: string, departTime: string) => string;
+        ADELAIDE_TIMEZONE: string;
+      }
+    | undefined;
 }
-import { getAdminNavigation, getAdminStyles, getAdminScripts } from "../components/navigation.ts";
+import {
+  getAdminNavigation,
+  getAdminStyles,
+  getAdminScripts,
+} from "../components/navigation.ts";
 // Use formatDate from timezone-client.js if available (browser), else fallback for server-side
-let formatDate: (date: Date|string) => string;
-if (typeof globalThis !== 'undefined' && globalThis.DateTimeFormat && globalThis.DateTimeFormat.formatDate) {
+let formatDate: (date: Date | string) => string;
+if (
+  typeof globalThis !== "undefined" &&
+  globalThis.DateTimeFormat &&
+  globalThis.DateTimeFormat.formatDate
+) {
   formatDate = globalThis.DateTimeFormat.formatDate;
 } else {
   // Fallback for server-side: basic DD/MM/YYYY
-  formatDate = function(date: Date|string) {
-    const d = typeof date === 'string' ? new Date(date) : date;
-    const day = String(d.getDate()).padStart(2, '0');
-    const month = String(d.getMonth() + 1).padStart(2, '0');
+  formatDate = function (date: Date | string) {
+    const d = typeof date === "string" ? new Date(date) : date;
+    const day = String(d.getDate()).padStart(2, "0");
+    const month = String(d.getMonth() + 1).padStart(2, "0");
     const year = d.getFullYear();
     return `${day}/${month}/${year}`;
   };
@@ -49,11 +59,13 @@ export interface ShiftsPageData {
   groupedShifts: Map<string, Shift[]>;
   selectedShowIds: string[];
   selectedDate: string | null;
+  includePast: boolean;
 }
 
 export function renderShiftsTemplate(data: ShiftsPageData): string {
-  const { shows, groupedShifts, selectedShowIds, selectedDate } = data;
-  
+  const { shows, groupedShifts, selectedShowIds, selectedDate, includePast } =
+    data;
+
   return `
     <!DOCTYPE html>
     <html>
@@ -225,7 +237,7 @@ export function renderShiftsTemplate(data: ShiftsPageData): string {
       </style>
     </head>
     <body>
-      ${getAdminNavigation('shifts')}
+      ${getAdminNavigation("shifts")}
 
       <!-- Main Content -->
       <div class="main-content">
@@ -248,14 +260,24 @@ export function renderShiftsTemplate(data: ShiftsPageData): string {
             <div class="filter-section">
               <h4>Filter by Shows</h4>
               <div class="show-checkboxes">
-                ${shows.map(show => `
+                ${shows
+                  .map(
+                    (show) => `
                   <div class="show-checkbox">
-                    <input type="checkbox" name="shows" value="${show.id}" id="show-${show.id}" 
-                           ${selectedShowIds.includes(show.id.toString()) ? 'checked' : ''}
+                    <input type="checkbox" name="shows" value="${
+                      show.id
+                    }" id="show-${show.id}" 
+                           ${
+                             selectedShowIds.includes(show.id.toString())
+                               ? "checked"
+                               : ""
+                           }
                            onchange="updateShowFilter()">
                     <label for="show-${show.id}">${show.name}</label>
                   </div>
-                `).join('')}
+                `
+                  )
+                  .join("")}
               </div>
               
               <div class="filter-actions">
@@ -268,7 +290,18 @@ export function renderShiftsTemplate(data: ShiftsPageData): string {
               <div class="filters-row">
                 <div class="filter-group">
                   <label for="date">Date:</label>
-                  <input type="date" name="date" id="date" value="${selectedDate || ''}" class="form-control">
+                  <input type="date" name="date" id="date" value="${
+                    selectedDate || ""
+                  }" class="form-control">
+                </div>
+
+                <div class="filter-group" style="align-self: center;">
+                  <label for="includePast" style="display: flex; align-items: center; gap: 0.5rem; font-weight: 500;">
+                    <input type="checkbox" name="includePast" id="includePast" value="true" ${
+                      includePast ? "checked" : ""
+                    }>
+                    Include past performances
+                  </label>
                 </div>
                 
                 <div class="filter-group">
@@ -284,58 +317,85 @@ export function renderShiftsTemplate(data: ShiftsPageData): string {
         </div>
 
         <!-- Shifts -->
-        ${Array.from(groupedShifts.entries()).map(([_performanceKey, shifts]) => {
-          const firstShift = shifts[0];
-          return `
+        ${Array.from(groupedShifts.entries())
+          .map(([_performanceKey, shifts]) => {
+            const firstShift = shifts[0];
+            return `
             <div class="performance-section">
               <div class="performance-header">
                 <h3 class="performance-title">${firstShift.show_name}</h3>
                 <p class="performance-details">
                   ${formatDate(new Date(firstShift.date))} | 
-                  <span class="show-time" data-start-time="${firstShift.show_start}" data-end-time="${firstShift.show_end}">Loading...</span>
+                  <span class="show-time" data-start-time="${
+                    firstShift.show_start
+                  }" data-end-time="${firstShift.show_end}">Loading...</span>
                 </p>
               </div>
               
               <div class="shifts-grid">
-                ${shifts.map(shift => {
-                  const isFilled = shift.volunteer_count > 0;
-                  
-                  return `
+                ${shifts
+                  .map((shift) => {
+                    const isFilled = shift.volunteer_count > 0;
+
+                    return `
                     <div class="shift-card">
                       <div class="shift-header">
                         <div class="shift-role">${shift.role}</div>
-                        <span class="shift-status ${isFilled ? 'status-filled' : 'status-unfilled'}">
-                          ${isFilled ? `${shift.volunteer_count} assigned` : 'Unfilled'}
+                        <span class="shift-status ${
+                          isFilled ? "status-filled" : "status-unfilled"
+                        }">
+                          ${
+                            isFilled
+                              ? `${shift.volunteer_count} assigned`
+                              : "Unfilled"
+                          }
                         </span>
                       </div>
                       
                       <div class="shift-times">
-                        <span class="time-range shift-time" data-arrive-time="${shift.arrive_time}" data-depart-time="${shift.depart_time}">
+                        <span class="time-range shift-time" data-arrive-time="${
+                          shift.arrive_time
+                        }" data-depart-time="${shift.depart_time}">
                           Loading...
                         </span>
                       </div>
                       
                       <div class="table-actions">
-                        <a href="/admin/shifts/${shift.id}/edit" class="btn btn-sm btn-secondary">Edit</a>
-                        <button onclick="deleteShift(${shift.id}, '${shift.role.replace(/'/g, "\\'")}')" class="btn btn-sm btn-danger">Delete</button>
-                        <button onclick="viewShiftDetails(${shift.id})" class="btn btn-sm btn-info">Details</button>
+                        <a href="/admin/shifts/${
+                          shift.id
+                        }/edit" class="btn btn-sm btn-secondary">Edit</a>
+                        <button onclick="deleteShift(${
+                          shift.id
+                        }, '${shift.role.replace(
+                      /'/g,
+                      "\\'"
+                    )}')" class="btn btn-sm btn-danger">Delete</button>
+                        <button onclick="viewShiftDetails(${
+                          shift.id
+                        })" class="btn btn-sm btn-info">Details</button>
                       </div>
                     </div>
                   `;
-                }).join('')}
+                  })
+                  .join("")}
               </div>
             </div>
           `;
-        }).join('')}
+          })
+          .join("")}
         
-        ${groupedShifts.size === 0 ? `
+        ${
+          groupedShifts.size === 0
+            ? `
           <div class="content-card">
             <div style="text-align: center; padding: 2rem; color: #6c757d;">
               <h4>No shifts found</h4>
               <p>No shifts match your current filters. Try adjusting your filters or <a href="/admin/shifts/new">create a new shift</a>.</p>
             </div>
           </div>
-        ` : ''}
+        `
+            : ""
+        }
       </div>
 
       <script src="/src/utils/modal.js"></script>

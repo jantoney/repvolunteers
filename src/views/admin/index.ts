@@ -11,5 +11,6 @@ export { showEditVolunteerForm } from "./edit-volunteer.ts";
 export { showShiftsPage } from "./shifts.ts";
 export { showNewShiftForm } from "./new-shift.ts";
 export { showEditShiftForm } from "./edit-shift.ts";
+export { showBulkShiftTimesPage } from "./bulk-shift-times.ts";
 export { showUnfilledShiftsPage } from "./unfilled-shifts.ts";
 export { showBulkEmailPage } from "./bulk-email.ts";

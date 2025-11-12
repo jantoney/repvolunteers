@@ -1,4 +1,8 @@
-import { getAdminNavigation, getAdminStyles, getAdminScripts } from "../components/navigation.ts";
+import {
+  getAdminNavigation,
+  getAdminStyles,
+  getAdminScripts,
+} from "../components/navigation.ts";
 
 export function renderBulkEmailTemplate(): string {
   return `
@@ -94,6 +98,79 @@ export function renderBulkEmailTemplate(): string {
           color: #666;
         }
 
+        .volunteer-table-container {
+          padding: 0;
+          background: #ffffff;
+        }
+
+        .volunteer-search {
+          margin-bottom: 1.5rem;
+        }
+
+        .form-input {
+          width: 100%;
+          padding: 0.75rem;
+          border: 1px solid #ddd;
+          border-radius: 4px;
+          font-size: 1rem;
+          background: white;
+        }
+
+        .form-input:focus {
+          outline: none;
+          border-color: #007bff;
+          box-shadow: 0 0 0 2px rgba(0,123,255,0.25);
+        }
+
+        .volunteer-table-wrapper {
+          padding: 0.75rem;
+          overflow-x: auto;
+        }
+
+        .volunteer-table {
+          width: 100%;
+          border-collapse: collapse;
+          background: white;
+          min-width: 640px;
+        }
+
+        .volunteer-table th,
+        .volunteer-table td {
+          padding: 0.75rem 0.5rem;
+          border-bottom: 1px solid #e9ecef;
+          text-align: left;
+          vertical-align: middle;
+          font-size: 0.95rem;
+          color: #333;
+        }
+
+        .volunteer-table thead {
+          background: #f8f9fa;
+          position: sticky;
+          top: 0;
+          z-index: 1;
+        }
+
+        .volunteer-table tbody tr:hover {
+          background: #f1f5ff;
+        }
+
+        .volunteer-table .col-checkbox {
+          width: 48px;
+          text-align: center;
+        }
+
+        .volunteer-table .col-email,
+        .volunteer-table .col-phone {
+          word-break: break-word;
+        }
+
+        .volunteer-table .volunteer-checkbox {
+          margin: 0 auto;
+          display: block;
+          transform: scale(1.05);
+        }
+
         /* Action buttons */
         .volunteer-actions {
           display: flex;
@@ -137,6 +214,10 @@ export function renderBulkEmailTemplate(): string {
           display: block;
         }
 
+        .hidden {
+          display: none !important;
+        }
+
         /* Selection summary */
         .selection-summary {
           background: #e3f2fd;
@@ -149,6 +230,24 @@ export function renderBulkEmailTemplate(): string {
         .selection-count {
           font-weight: bold;
           color: #1976d2;
+        }
+
+        .info-message {
+          margin-bottom: 1rem;
+          padding: 1rem;
+          border-radius: 4px;
+          background: #fff3cd;
+          border: 1px solid #ffeeba;
+          color: #856404;
+        }
+
+        .empty-state {
+          padding: 1.5rem;
+          text-align: center;
+          color: #666;
+          background: #f8f9fa;
+          border: 1px dashed #d0d7de;
+          border-radius: 4px;
         }
 
         /* Responsive design */
@@ -171,7 +270,7 @@ export function renderBulkEmailTemplate(): string {
       </style>
     </head>
     <body>
-      ${getAdminNavigation('bulk-email')}
+      ${getAdminNavigation("bulk-email")}
 
       <!-- Main Content -->
       <div class="main-content">
@@ -191,6 +290,9 @@ export function renderBulkEmailTemplate(): string {
             <button class="email-tab active" data-email-type="show-week">
               📅 Show Week Email
             </button>
+            <button class="email-tab" data-email-type="wizard">
+              🧙 Wizard Invitations
+            </button>
             <button class="email-tab" data-email-type="unfilled-shifts">
               🚨 Unfilled Shifts Email
             </button>
@@ -198,8 +300,9 @@ export function renderBulkEmailTemplate(): string {
 
           <!-- Show Week Email Content -->
           <div class="email-content active" id="show-week-content">
-            <h3>Show Week Email</h3>
-            <p>Send "It's Show Week!" emails to volunteers who have shifts for a selected show. This includes their schedule PDF attachment.</p>
+            <h3 id="showEmailHeading">Show Week Email</h3>
+            <p id="showWeekDescription">Send "It's Show Week!" emails to volunteers who have shifts for a selected show. This includes their schedule PDF attachment.</p>
+            <p id="wizardDescription" class="hidden">Send the multi-step shift selection wizard invitation to selected volunteers. On local development servers the emails are simulated and logged instead of being sent.</p>
             
             <div class="form-group">
               <label class="form-label" for="showSelect">Select Show:</label>
@@ -213,15 +316,23 @@ export function renderBulkEmailTemplate(): string {
                 <div class="selection-count" id="showSelectionCount">0 volunteers selected</div>
               </div>
 
+              <div class="volunteer-search">
+                <label class="form-label" for="volunteerSearch">Search volunteers:</label>
+                <input type="search" class="form-input" id="volunteerSearch" placeholder="Search by name, email, phone">
+              </div>
+
               <div class="volunteer-actions">
                 <button class="btn btn-secondary" onclick="selectAllShowVolunteers()">Select All</button>
                 <button class="btn btn-secondary" onclick="deselectAllShowVolunteers()">Deselect All</button>
                 <button class="btn btn-primary" onclick="sendShowWeekEmails()" id="sendShowWeekBtn" disabled>
                   Send Show Week Emails
                 </button>
+                <button class="btn btn-secondary hidden" onclick="sendWizardEmails()" id="sendWizardBtn" disabled>
+                  Send Wizard Invitations
+                </button>
               </div>
 
-              <div class="volunteer-list" id="showVolunteersList">
+              <div class="volunteer-list volunteer-table-container" id="showVolunteersList">
                 <!-- Volunteers will be loaded here -->
               </div>
             </div>
@@ -261,14 +372,54 @@ export function renderBulkEmailTemplate(): string {
         let currentEmailType = 'show-week';
         let showVolunteers = [];
         let unfilledVolunteers = [];
+        let wizardVolunteers = [];
         let selectedShowVolunteers = new Set();
         let selectedUnfilledVolunteers = new Set();
+        let volunteerSearchTerm = '';
+
+        function getFirstName(name) {
+          if (!name) {
+            return '';
+          }
+          return name.trim().split(/\s+/)[0]?.toLowerCase() || '';
+        }
+
+        function sortVolunteersByFirstName(volunteers) {
+          return Array.isArray(volunteers)
+            ? [...volunteers].sort((a, b) => {
+                const firstA = getFirstName(a?.name);
+                const firstB = getFirstName(b?.name);
+                if (firstA === firstB) {
+                  return (a?.name || '').localeCompare(b?.name || '');
+                }
+                return firstA.localeCompare(firstB);
+              })
+            : [];
+        }
+
+        function formatVolunteerDetails(volunteer) {
+          if (!volunteer) {
+            return '';
+          }
+
+          if ('shift_count' in volunteer) {
+            const shiftCount = volunteer.shift_count ?? 0;
+            const nextShift = volunteer.next_shift_date || 'N/A';
+            const pluralSuffix = shiftCount === 1 ? '' : 's';
+            return shiftCount + ' shift' + pluralSuffix + ' • Next: ' + nextShift;
+          }
+
+          const totalShifts = volunteer.total_shifts ?? 0;
+          const upcomingShifts = volunteer.upcoming_shifts ?? 0;
+          return 'Total shifts: ' + totalShifts + ' • Upcoming: ' + upcomingShifts;
+        }
 
         // Initialize page
         document.addEventListener('DOMContentLoaded', function() {
           loadShows();
           loadUnfilledVolunteers();
           setupEventListeners();
+          switchEmailType(currentEmailType);
         });
 
         function setupEventListeners() {
@@ -287,8 +438,23 @@ export function renderBulkEmailTemplate(): string {
               loadShowVolunteers(showId);
             } else {
               document.getElementById('showVolunteersSection').style.display = 'none';
+              resetVolunteerSearch();
+              selectedShowVolunteers.clear();
+              updateShowSelectionCount();
+              const listContainer = document.getElementById('showVolunteersList');
+              if (listContainer) {
+                listContainer.innerHTML = '';
+              }
             }
           });
+
+          const searchInput = document.getElementById('volunteerSearch');
+          if (searchInput) {
+            searchInput.addEventListener('input', function() {
+              volunteerSearchTerm = this.value.trim().toLowerCase();
+              renderShowVolunteers({ preserveSelection: true });
+            });
+          }
         }
 
         function switchEmailType(emailType) {
@@ -300,9 +466,34 @@ export function renderBulkEmailTemplate(): string {
           });
 
           // Update content visibility
+          const contentId = emailType === 'wizard' ? 'show-week-content' : emailType + '-content';
           document.querySelectorAll('.email-content').forEach(content => {
-            content.classList.toggle('active', content.id === emailType + '-content');
+            content.classList.toggle('active', content.id === contentId);
           });
+
+          const heading = document.getElementById('showEmailHeading');
+          const showWeekDescription = document.getElementById('showWeekDescription');
+          const wizardDescription = document.getElementById('wizardDescription');
+          const showWeekButton = document.getElementById('sendShowWeekBtn');
+          const wizardButton = document.getElementById('sendWizardBtn');
+
+          if (heading) {
+            heading.textContent = emailType === 'wizard' ? 'Wizard Invitations' : 'Show Week Email';
+          }
+
+          if (showWeekDescription && wizardDescription && showWeekButton && wizardButton) {
+            const wizardMode = emailType === 'wizard';
+            showWeekDescription.classList.toggle('hidden', wizardMode);
+            wizardDescription.classList.toggle('hidden', !wizardMode);
+            showWeekButton.classList.toggle('hidden', wizardMode);
+            wizardButton.classList.toggle('hidden', !wizardMode);
+          }
+
+          updateShowSelectionCount();
+
+          if (document.getElementById('showVolunteersSection').style.display !== 'none') {
+            renderShowVolunteers({ preserveSelection: true });
+          }
         }
 
         async function loadShows() {
@@ -327,12 +518,14 @@ export function renderBulkEmailTemplate(): string {
 
         async function loadShowVolunteers(showId) {
           document.getElementById('loadingState').classList.add('active');
-          
+          resetVolunteerSearch();
+          selectedShowVolunteers.clear();
+
           try {
-            const response = await fetch(\`/admin/api/bulk-email/shows/\${showId}/volunteers\`);
+            const response = await fetch('/admin/api/bulk-email/shows/' + showId + '/volunteers');
             showVolunteers = await response.json();
-            
-            renderShowVolunteers();
+
+            renderShowVolunteers({ preserveSelection: false });
             document.getElementById('showVolunteersSection').style.display = 'block';
             updateShowSelectionCount();
           } catch (error) {
@@ -347,37 +540,176 @@ export function renderBulkEmailTemplate(): string {
           try {
             const response = await fetch('/admin/api/bulk-email/volunteers/unfilled-shifts');
             unfilledVolunteers = await response.json();
+            wizardVolunteers = sortVolunteersByFirstName(unfilledVolunteers);
             
             renderUnfilledVolunteers();
             updateUnfilledSelectionCount();
+
+            if (
+              currentEmailType === 'wizard' &&
+              document.getElementById('showVolunteersSection').style.display !== 'none' &&
+              (!showVolunteers || showVolunteers.length === 0)
+            ) {
+              renderShowVolunteers({ preserveSelection: false });
+            }
           } catch (error) {
             console.error('Error loading unfilled volunteers:', error);
             showStatus('Error loading volunteers', 'error');
           }
         }
 
-        function renderShowVolunteers() {
+        function resetVolunteerSearch() {
+          volunteerSearchTerm = '';
+          const searchInput = document.getElementById('volunteerSearch');
+          if (searchInput) {
+            searchInput.value = '';
+          }
+        }
+
+        function renderShowVolunteers({ preserveSelection = false } = {}) {
           const container = document.getElementById('showVolunteersList');
           container.innerHTML = '';
-          
-          showVolunteers.forEach(volunteer => {
-            const item = document.createElement('div');
-            item.className = 'volunteer-item';
-            item.innerHTML = \`
-              <input type="checkbox" class="volunteer-checkbox" 
-                     data-volunteer-id="\${volunteer.id}" 
-                     onchange="updateShowSelection('\${volunteer.id}', this.checked)">
-              <div class="volunteer-info">
-                <div class="volunteer-name">\${volunteer.name}</div>
-                <div class="volunteer-details">
-                  \${volunteer.email} • \${volunteer.shift_count} shifts • Next: \${volunteer.next_shift_date || 'N/A'}
-                </div>
-              </div>
-            \`;
-            container.appendChild(item);
+
+          const fragment = document.createDocumentFragment();
+
+          const usingWizardFallback =
+            currentEmailType === 'wizard' &&
+            (!showVolunteers || showVolunteers.length === 0) &&
+            wizardVolunteers.length > 0;
+
+          const sourceList = usingWizardFallback ? wizardVolunteers : showVolunteers;
+          const baseList = Array.isArray(sourceList) ? sourceList : [];
+          const sortedVolunteers = sortVolunteersByFirstName(baseList);
+
+          if (usingWizardFallback) {
+            const info = document.createElement('div');
+            info.className = 'info-message';
+            info.textContent =
+              'No volunteers currently have shifts for this show. Showing all approved volunteers instead.';
+            fragment.appendChild(info);
+          }
+
+          if (!preserveSelection) {
+            selectedShowVolunteers.clear();
+          } else {
+            const validIds = new Set(sortedVolunteers.map((volunteer) => String(volunteer.id)));
+            Array.from(selectedShowVolunteers).forEach((id) => {
+              if (!validIds.has(id)) {
+                selectedShowVolunteers.delete(id);
+              }
+            });
+          }
+
+          if (sortedVolunteers.length === 0) {
+            const empty = document.createElement('div');
+            empty.className = 'empty-state';
+            empty.textContent = 'No volunteers available to display.';
+            fragment.appendChild(empty);
+            container.appendChild(fragment);
+            updateShowSelectionCount();
+            return;
+          }
+
+          const loweredSearch = volunteerSearchTerm.trim().toLowerCase();
+          const hasSearch = loweredSearch.length > 0;
+          const filteredVolunteers = hasSearch
+            ? sortedVolunteers.filter((volunteer) => {
+                const haystack = [
+                  volunteer?.name || '',
+                  volunteer?.email || '',
+                  volunteer?.phone || '',
+                  formatVolunteerDetails(volunteer),
+                ]
+                  .join(' ')
+                  .toLowerCase();
+                return haystack.includes(loweredSearch);
+              })
+            : sortedVolunteers;
+
+          if (filteredVolunteers.length === 0) {
+            const noMatches = document.createElement('div');
+            noMatches.className = 'empty-state';
+            noMatches.textContent = 'No volunteers match your search.';
+            fragment.appendChild(noMatches);
+            container.appendChild(fragment);
+            updateShowSelectionCount();
+            return;
+          }
+
+          const tableWrapper = document.createElement('div');
+          tableWrapper.className = 'volunteer-table-wrapper';
+
+          const table = document.createElement('table');
+          table.className = 'volunteer-table';
+
+          const thead = document.createElement('thead');
+          const headerRow = document.createElement('tr');
+
+          const headers = [
+            { label: 'Select', className: 'col-checkbox' },
+            { label: 'Name', className: '' },
+            { label: 'Email', className: 'col-email' },
+            { label: 'Phone', className: 'col-phone' },
+            { label: 'Details', className: 'col-details' },
+          ];
+
+          headers.forEach(({ label, className }) => {
+            const th = document.createElement('th');
+            if (className) {
+              th.className = className;
+            }
+            th.textContent = label;
+            headerRow.appendChild(th);
           });
 
-          selectedShowVolunteers.clear();
+          thead.appendChild(headerRow);
+          table.appendChild(thead);
+
+          const tbody = document.createElement('tbody');
+
+          filteredVolunteers.forEach((volunteer) => {
+            const row = document.createElement('tr');
+            const volunteerId = String(volunteer.id);
+
+            const checkboxCell = document.createElement('td');
+            checkboxCell.className = 'col-checkbox';
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.className = 'volunteer-checkbox';
+            checkbox.dataset.volunteerId = volunteerId;
+            checkbox.checked = selectedShowVolunteers.has(volunteerId);
+            checkbox.addEventListener('change', function () {
+              updateShowSelection(volunteerId, this.checked);
+            });
+            checkboxCell.appendChild(checkbox);
+            row.appendChild(checkboxCell);
+
+            const nameCell = document.createElement('td');
+            nameCell.textContent = volunteer.name || 'Unnamed Volunteer';
+            row.appendChild(nameCell);
+
+            const emailCell = document.createElement('td');
+            emailCell.className = 'col-email';
+            emailCell.textContent = volunteer.email || '';
+            row.appendChild(emailCell);
+
+            const phoneCell = document.createElement('td');
+            phoneCell.className = 'col-phone';
+            phoneCell.textContent = volunteer.phone || '—';
+            row.appendChild(phoneCell);
+
+            const detailsCell = document.createElement('td');
+            detailsCell.textContent = formatVolunteerDetails(volunteer);
+            row.appendChild(detailsCell);
+
+            tbody.appendChild(row);
+          });
+
+          table.appendChild(tbody);
+          tableWrapper.appendChild(table);
+          fragment.appendChild(tableWrapper);
+
+          container.appendChild(fragment);
           updateShowSelectionCount();
         }
 
@@ -385,20 +717,39 @@ export function renderBulkEmailTemplate(): string {
           const container = document.getElementById('unfilledVolunteersList');
           container.innerHTML = '';
           
-          unfilledVolunteers.forEach(volunteer => {
+          unfilledVolunteers.forEach((volunteer) => {
             const item = document.createElement('div');
             item.className = 'volunteer-item';
-            item.innerHTML = \`
-              <input type="checkbox" class="volunteer-checkbox" 
-                     data-volunteer-id="\${volunteer.id}" 
-                     onchange="updateUnfilledSelection('\${volunteer.id}', this.checked)">
-              <div class="volunteer-info">
-                <div class="volunteer-name">\${volunteer.name}</div>
-                <div class="volunteer-details">
-                  \${volunteer.email} • Total shifts: \${volunteer.total_shifts} • Upcoming: \${volunteer.upcoming_shifts}
-                </div>
-              </div>
-            \`;
+
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.className = 'volunteer-checkbox';
+            checkbox.dataset.volunteerId = String(volunteer.id);
+            checkbox.addEventListener('change', function () {
+              updateUnfilledSelection(String(volunteer.id), this.checked);
+            });
+
+            const info = document.createElement('div');
+            info.className = 'volunteer-info';
+
+            const name = document.createElement('div');
+            name.className = 'volunteer-name';
+            name.textContent = volunteer.name;
+
+            const details = document.createElement('div');
+            details.className = 'volunteer-details';
+            details.textContent =
+              volunteer.email +
+              ' • Total shifts: ' +
+              (volunteer.total_shifts ?? 0) +
+              ' • Upcoming: ' +
+              (volunteer.upcoming_shifts ?? 0);
+
+            info.appendChild(name);
+            info.appendChild(details);
+
+            item.appendChild(checkbox);
+            item.appendChild(info);
             container.appendChild(item);
           });
 
@@ -407,19 +758,21 @@ export function renderBulkEmailTemplate(): string {
         }
 
         function updateShowSelection(volunteerId, checked) {
+          const id = String(volunteerId);
           if (checked) {
-            selectedShowVolunteers.add(volunteerId);
+            selectedShowVolunteers.add(id);
           } else {
-            selectedShowVolunteers.delete(volunteerId);
+            selectedShowVolunteers.delete(id);
           }
           updateShowSelectionCount();
         }
 
         function updateUnfilledSelection(volunteerId, checked) {
+          const id = String(volunteerId);
           if (checked) {
-            selectedUnfilledVolunteers.add(volunteerId);
+            selectedUnfilledVolunteers.add(id);
           } else {
-            selectedUnfilledVolunteers.delete(volunteerId);
+            selectedUnfilledVolunteers.delete(id);
           }
           updateUnfilledSelectionCount();
         }
@@ -427,7 +780,14 @@ export function renderBulkEmailTemplate(): string {
         function updateShowSelectionCount() {
           const count = selectedShowVolunteers.size;
           document.getElementById('showSelectionCount').textContent = \`\${count} volunteers selected\`;
-          document.getElementById('sendShowWeekBtn').disabled = count === 0;
+          const showWeekButton = document.getElementById('sendShowWeekBtn');
+          const wizardButton = document.getElementById('sendWizardBtn');
+          if (showWeekButton) {
+            showWeekButton.disabled = count === 0;
+          }
+          if (wizardButton) {
+            wizardButton.disabled = count === 0;
+          }
         }
 
         function updateUnfilledSelectionCount() {
@@ -515,6 +875,60 @@ export function renderBulkEmailTemplate(): string {
           } finally {
             btn.disabled = false;
             btn.textContent = 'Send Show Week Emails';
+          }
+        }
+
+        async function sendWizardEmails() {
+          if (selectedShowVolunteers.size === 0) {
+            showStatus('Please select at least one volunteer', 'error');
+            return;
+          }
+
+          const showId = document.getElementById('showSelect').value;
+          if (!showId) {
+            showStatus('Please select a show', 'error');
+            return;
+          }
+
+          const btn = document.getElementById('sendWizardBtn');
+          if (!btn) {
+            showStatus('Wizard button not available', 'error');
+            return;
+          }
+
+          btn.disabled = true;
+          const originalText = btn.textContent;
+          btn.textContent = 'Sending...';
+
+          try {
+            const response = await fetch('/admin/api/bulk-email/send-upcoming-wizard', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                showId: parseInt(showId),
+                volunteerIds: Array.from(selectedShowVolunteers)
+              })
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+              const deliveryMode = result.deliveryMode === 'simulated' ? ' (simulated)' : '';
+              showStatus(\`\${result.message}\${deliveryMode}\`, 'success');
+              if (result.deliveryMode === 'simulated') {
+                console.info('Wizard invitations simulated. Check server logs for the rendered email preview.');
+              }
+            } else {
+              showStatus(result.error || 'Failed to send wizard invitations', 'error');
+            }
+          } catch (error) {
+            console.error('Error sending wizard invitations:', error);
+            showStatus('Error sending wizard invitations', 'error');
+          } finally {
+            btn.disabled = selectedShowVolunteers.size === 0;
+            btn.textContent = originalText;
           }
         }
 

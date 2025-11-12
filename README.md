@@ -24,6 +24,10 @@ This is a simple full-stack application built with **Deno** and **TypeScript**. 
    deno run -A src/main.ts
    ```
 
+### Sending emails while developing locally
+
+By default, running on `localhost` leaves email sends in simulated mode so nothing goes out. When you really need to send an email from your local environment (for example, to test templates in production), append `?force=true` to the request URL in the admin UI. That query string bypasses the safeguard and delivers the message via Resend.
+
 ## Docker
 
 A basic Dockerfile is provided. Build and run with:

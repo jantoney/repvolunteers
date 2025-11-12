@@ -9,7 +9,7 @@ const router = new Router();
 // Serve JavaScript and CSS files from utils and admin directories
 router.get("/src/utils/:filename", async (ctx) => {
   const filename = ctx.params.filename;
-  if (filename && filename.endsWith('.js')) {
+  if (filename && (filename.endsWith(".js") || filename.endsWith(".css"))) {
     try {
       await send(ctx, `src/utils/${filename}`, {
         root: Deno.cwd(),
@@ -24,7 +24,7 @@ router.get("/src/utils/:filename", async (ctx) => {
 
 router.get("/src/views/admin/:filename", async (ctx) => {
   const filename = ctx.params.filename;
-  if (filename && (filename.endsWith('.js') || filename.endsWith('.css'))) {
+  if (filename && (filename.endsWith(".js") || filename.endsWith(".css"))) {
     try {
       await send(ctx, `src/views/admin/${filename}`, {
         root: Deno.cwd(),
@@ -687,7 +687,11 @@ router.get("/", (ctx) => {
 });
 
 router.use("/admin", adminRouter.routes(), adminRouter.allowedMethods());
-router.use("/volunteer", volunteerRouter.routes(), volunteerRouter.allowedMethods());
+router.use(
+  "/volunteer",
+  volunteerRouter.routes(),
+  volunteerRouter.allowedMethods()
+);
 router.use("/api", authRouter.routes(), authRouter.allowedMethods());
 
 export default router;

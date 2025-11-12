@@ -1,4 +1,8 @@
-import { getAdminNavigation, getAdminStyles, getAdminScripts } from "../components/navigation.ts";
+import {
+  getAdminNavigation,
+  getAdminStyles,
+  getAdminScripts,
+} from "../components/navigation.ts";
 
 export interface Volunteer {
   id: number;
@@ -187,10 +191,192 @@ export function renderVolunteersTemplate(data: VolunteersPageData): string {
             box-shadow: 0 6px 12px rgba(255, 107, 53, 0.4);
           }
         }
+
+        .volunteers-toolbar {
+          display: flex;
+          flex-wrap: wrap;
+          align-items: center;
+          justify-content: space-between;
+          gap: 1rem;
+          margin-bottom: 1.5rem;
+        }
+
+        .toolbar-left {
+          flex: 1 1 240px;
+        }
+
+        .toolbar-search-label {
+          font-size: 0.85rem;
+          color: #6c757d;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+          margin-bottom: 0.35rem;
+          display: block;
+        }
+
+        .toolbar-search-input {
+          width: 100%;
+          padding: 0.65rem 0.75rem;
+          border: 1px solid #dee2e6;
+          border-radius: 6px;
+          font-size: 0.95rem;
+          transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        .toolbar-search-input:focus {
+          outline: none;
+          border-color: #007bff;
+          box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.15);
+        }
+
+        .volunteer-count-badge {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.35rem;
+          padding: 0.4rem 0.75rem;
+          border-radius: 999px;
+          background: #e9f2ff;
+          color: #0b5ed7;
+          font-size: 0.85rem;
+          font-weight: 600;
+        }
+
+        .volunteer-table {
+          width: 100%;
+          border-collapse: separate;
+          border-spacing: 0;
+          background: #ffffff;
+          border: 1px solid #dee2e6;
+          border-radius: 8px;
+          overflow: hidden;
+        }
+
+        .volunteer-table thead {
+          background: #f8f9fa;
+        }
+
+        .volunteer-table th,
+        .volunteer-table td {
+          padding: 0.85rem 1rem;
+          border-bottom: 1px solid #edf1f5;
+          vertical-align: middle;
+        }
+
+        .volunteer-table th {
+          text-transform: uppercase;
+          letter-spacing: 0.04em;
+          font-size: 0.75rem;
+          color: #6c757d;
+          font-weight: 600;
+        }
+
+        .volunteer-table tbody tr:hover {
+          background: #f5f8ff;
+        }
+
+        .volunteer-name-cell strong {
+          font-size: 1rem;
+          color: #0d1c2e;
+        }
+
+        .volunteer-meta {
+          font-size: 0.85rem;
+          color: #6c757d;
+        }
+
+        .table-actions {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 0.5rem;
+          align-items: center;
+        }
+
+        .table-actions .btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.35rem;
+        }
+
+        .hidden {
+          display: none !important;
+        }
+
+        .table-actions .btn-icon {
+          font-size: 0.95rem;
+        }
+
+        .action-secondary {
+          background: #f8f9fa;
+          border: 1px solid #dee2e6;
+          color: #343a40;
+        }
+
+        .action-secondary:hover {
+          background: #e9ecef;
+          border-color: #ced4da;
+        }
+
+        .action-danger {
+          background: #dc3545;
+          color: #ffffff;
+        }
+
+        .action-danger:hover {
+          background: #bb2d3b;
+        }
+
+        .action-primary {
+          background: #0d6efd;
+          color: #ffffff;
+        }
+
+        .action-primary:hover {
+          background: #0a58ca;
+        }
+
+        .action-outline {
+          background: transparent;
+          border: 1px solid #dee2e6;
+          color: #495057;
+        }
+
+        .action-outline:hover {
+          background: #f8f9fa;
+          border-color: #ced4da;
+        }
+
+        .action-link {
+          color: #0d6efd;
+          background: transparent;
+          border: none;
+        }
+
+        .action-link:hover {
+          color: #0a58ca;
+          text-decoration: underline;
+        }
+
+        .table-empty-state {
+          text-align: center;
+          padding: 2rem 1rem;
+          color: #6c757d;
+          font-size: 0.95rem;
+        }
+
+        @media (max-width: 768px) {
+          .table-actions {
+            flex-direction: column;
+            align-items: stretch;
+          }
+          .table-actions .btn {
+            width: 100%;
+            justify-content: center;
+          }
+        }
       </style>
     </head>
     <body>
-      ${getAdminNavigation('volunteers')}
+      ${getAdminNavigation("volunteers")}
       
       <!-- Main Content -->
       <div class="main-content">
@@ -212,8 +398,22 @@ export function renderVolunteersTemplate(data: VolunteersPageData): string {
           </div>
         </div>
 
+        <div class="volunteers-toolbar">
+          <div class="toolbar-left">
+            <label class="toolbar-search-label" for="volunteerSearch">Search participants</label>
+            <input type="search" id="volunteerSearch" class="toolbar-search-input" placeholder="Search by name, email, or phone">
+          </div>
+          <div class="toolbar-right">
+            <span class="volunteer-count-badge" id="volunteerCount" data-total="${
+              volunteers.length
+            }">👥 ${volunteers.length} participant${
+    volunteers.length === 1 ? "" : "s"
+  }</span>
+          </div>
+        </div>
+
         <div class="table-container">
-          <table class="table">
+          <table class="volunteer-table">
             <thead>
               <tr>
                 <th>Name</th>
@@ -224,43 +424,93 @@ export function renderVolunteersTemplate(data: VolunteersPageData): string {
                 <th>Actions</th>
               </tr>
             </thead>
-            <tbody>
-              ${volunteers.map(volunteer => `
-                <tr>
-                  <td><strong>${volunteer.name}</strong></td>
-                  <td>${volunteer.email || 'N/A'}</td>
-                  <td>${volunteer.phone || 'N/A'}</td>
+            <tbody id="volunteersTableBody">
+              ${volunteers
+                .map(
+                  (volunteer) => `
+                      <button class="btn btn-sm action-primary email-action-btn" data-volunteer-id="${
+                        volunteer.id
+                      }" data-volunteer-name="${volunteer.name.replace(
+                    /"/g,
+                    "&quot;"
+                  )}" data-volunteer-email="${volunteer.email || ""}" ${
+                    !volunteer.email ? 'disabled title="No email address"' : ""
+                  }><span class="btn-icon">📤</span> Send Email</button>
+                      <button class="btn btn-sm action-outline email-history-btn" data-volunteer-id="${
+                        volunteer.id
+                      }" data-volunteer-name="${volunteer.name.replace(
+                    /"/g,
+                    "&quot;"
+                  )}"><span class="btn-icon">📜</span> History</button>
+                    <strong>${volunteer.name}</strong>
+                    <div class="volunteer-meta">ID #${volunteer.id}</div>
+                  </td>
+                  <td>${volunteer.email || "N/A"}</td>
+                  <td>${volunteer.phone || "N/A"}</td>
                   <td>
                     <div class="approval-toggle">
                       <label class="switch">
-                        <input type="checkbox" ${volunteer.approved ? 'checked' : ''} 
-                               onchange="toggleApproval('${volunteer.id}', this.checked, '${volunteer.name.replace(/'/g, "\\'").replace(/"/g, '\\"').replace(/\\/g, '\\\\')}')">
+                        <input type="checkbox" ${
+                          volunteer.approved ? "checked" : ""
+                        } 
+                               onchange="toggleApproval('${
+                                 volunteer.id
+                               }', this.checked, '${volunteer.name
+                    .replace(/'/g, "\\'")
+                    .replace(/"/g, '\\"')
+                    .replace(/\\/g, "\\\\")}')">
                         <span class="slider"></span>
                       </label>
                     </div>
                   </td>
                   <td>
                     <div class="signup-url-container">
-                      <input type="text" class="signup-url" value="/volunteer/signup/${volunteer.id}" readonly id="url-${volunteer.id}" data-full-url="">
-                      <button class="copy-btn" onclick="copySignupUrl('${volunteer.id}')" id="copy-btn-${volunteer.id}">Copy</button>
-                      <button class="open-btn" onclick="openSignupUrl('${volunteer.id}')" id="open-btn-${volunteer.id}">Open</button>
+                      <input type="text" class="signup-url" value="/volunteer/signup/${
+                        volunteer.id
+                      }" readonly id="url-${volunteer.id}" data-full-url="">
+                      <button class="copy-btn" onclick="copySignupUrl('${
+                        volunteer.id
+                      }')" id="copy-btn-${volunteer.id}">Copy</button>
+                      <button class="open-btn" onclick="openSignupUrl('${
+                        volunteer.id
+                      }')" id="open-btn-${volunteer.id}">Open</button>
                     </div>
                   </td>
                   <td>
                     <div class="table-actions">
-                      <a href="/admin/volunteers/${volunteer.id}/shifts" class="btn btn-sm btn-info">Shifts</a>
-                      <a href="/admin/volunteers/${volunteer.id}/edit" class="btn btn-sm btn-secondary">Edit</a>
-                      <button class="send-pdf-btn btn btn-sm btn-success" data-volunteer-id="${volunteer.id}" data-volunteer-name="${volunteer.name}" data-volunteer-email="${volunteer.email || ''}" ${!volunteer.email ? 'disabled title="No email address"' : ''}>📧 Send PDF</button>
-                      <button class="send-show-week-btn btn btn-sm btn-warning" data-volunteer-id="${volunteer.id}" data-volunteer-name="${volunteer.name}" data-volunteer-email="${volunteer.email || ''}" ${!volunteer.email ? 'disabled title="No email address"' : ''}>🎭 Show Week</button>
-                      <button class="send-last-minute-btn btn btn-sm" style="background-color:#ff6b35;color:white;" data-volunteer-id="${volunteer.id}" data-volunteer-name="${volunteer.name}" data-volunteer-email="${volunteer.email || ''}" ${!volunteer.email ? 'disabled title="No email address"' : ''}>🚨 Last Minute</button>
-                      <button class="email-history-btn btn btn-sm btn-info" data-volunteer-id="${volunteer.id}" data-volunteer-name="${volunteer.name}">📧 History</button>
-                      <button onclick="deleteVolunteer('${volunteer.id}', '${volunteer.name.replace(/'/g, "\\'")}')" class="btn btn-sm btn-danger">Delete</button>
+                      <a href="/admin/volunteers/${
+                        volunteer.id
+                      }/shifts" class="btn btn-sm action-outline"><span class="btn-icon">🗂️</span> Shifts</a>
+                      <a href="/admin/volunteers/${
+                        volunteer.id
+                      }/edit" class="btn btn-sm action-secondary"><span class="btn-icon">✏️</span> Edit</a>
+                      <button class="btn btn-sm action-primary email-action-btn" data-volunteer-id="${
+                        volunteer.id
+                      }" data-volunteer-name="${
+                    volunteer.name
+                  }" data-volunteer-email="${volunteer.email || ""}" ${
+                    !volunteer.email ? 'disabled title="No email address"' : ""
+                  }><span class="btn-icon">📤</span> Send Email</button>
+                      <button class="btn btn-sm action-outline email-history-btn" data-volunteer-id="${
+                        volunteer.id
+                      }" data-volunteer-name="${
+                    volunteer.name
+                  }"><span class="btn-icon">�</span> History</button>
+                      <button onclick="deleteVolunteer('${
+                        volunteer.id
+                      }', '${volunteer.name.replace(
+                    /'/g,
+                    "\\'"
+                  )}')" class="btn btn-sm action-danger"><span class="btn-icon">🗑️</span> Delete</button>
                     </div>
                   </td>
                 </tr>
-              `).join('')}
+              `
+                )
+                .join("")}
             </tbody>
           </table>
+          <div class="table-empty-state hidden" id="volunteersEmptyState">No participants match your search.</div>
         </div>
       </div>
 
@@ -303,80 +553,155 @@ export function renderVolunteersTemplate(data: VolunteersPageData): string {
         
         // Set full URLs and copy function
         document.addEventListener('DOMContentLoaded', function() {
-          // Check and show force mode notification
           checkForceMode();
-          // Set full URLs for all signup links
+
           const urlInputs = document.querySelectorAll('.signup-url');
-          urlInputs.forEach(input => {
+          urlInputs.forEach(function(input) {
             const relativeUrl = input.value;
             const fullUrl = globalThis.location.origin + relativeUrl;
             input.setAttribute('data-full-url', fullUrl);
             input.value = fullUrl;
           });
 
-          // Add event listeners for Send PDF buttons
-          const sendPdfButtons = document.querySelectorAll('.send-pdf-btn');
-          sendPdfButtons.forEach(button => {
-            button.addEventListener('click', function() {
-              const volunteerId = this.getAttribute('data-volunteer-id');
-              const volunteerName = this.getAttribute('data-volunteer-name');
-              const volunteerEmail = this.getAttribute('data-volunteer-email');
-              
-              console.log('Send PDF clicked:', { volunteerId, volunteerName, volunteerEmail });
-              
-              if (volunteerId && volunteerName) {
-                sendSchedulePDF(volunteerId, volunteerName, volunteerEmail);
+          setupVolunteerSearch();
+          setupEmailActionButtons();
+          setupEmailHistoryButtons();
+        });
+
+        function setupVolunteerSearch() {
+          const searchInput = document.getElementById('volunteerSearch');
+          const rows = Array.from(document.querySelectorAll('[data-volunteer-row]'));
+          const countBadge = document.getElementById('volunteerCount');
+          const emptyState = document.getElementById('volunteersEmptyState');
+
+          if (!searchInput || !countBadge || !emptyState) {
+            return;
+          }
+
+          const total = Number(countBadge.getAttribute('data-total') || rows.length || 0);
+
+          function updateVisibility() {
+            const term = searchInput.value.trim().toLowerCase();
+            let visible = 0;
+
+            rows.forEach(function(row) {
+              const text = row.textContent ? row.textContent.toLowerCase() : '';
+              const matches = term === '' || text.indexOf(term) !== -1;
+              row.style.display = matches ? '' : 'none';
+              if (matches) {
+                visible += 1;
               }
             });
-          });
-          
-          // Add event listeners for Show Week buttons
-          const sendShowWeekButtons = document.querySelectorAll('.send-show-week-btn');
-          sendShowWeekButtons.forEach(button => {
+
+            let label;
+            if (total === 0) {
+              label = '👥 0 participants';
+            } else if (term === '' || visible === total) {
+              label = '👥 ' + total + ' participant' + (total === 1 ? '' : 's');
+            } else {
+              label = '👥 ' + visible + ' of ' + total + ' participant' + (total === 1 ? '' : 's');
+            }
+            countBadge.textContent = label;
+
+            emptyState.classList.toggle('hidden', visible > 0);
+          }
+
+          searchInput.addEventListener('input', updateVisibility);
+          updateVisibility();
+        }
+
+        function setupEmailActionButtons() {
+          const emailButtons = document.querySelectorAll('.email-action-btn');
+          emailButtons.forEach(function(button) {
             button.addEventListener('click', function() {
               const volunteerId = this.getAttribute('data-volunteer-id');
-              const volunteerName = this.getAttribute('data-volunteer-name');
-              const volunteerEmail = this.getAttribute('data-volunteer-email');
-              
-              console.log('Send Show Week clicked:', { volunteerId, volunteerName, volunteerEmail });
-              
-              if (volunteerId && volunteerName) {
-                sendShowWeekEmail(volunteerId, volunteerName, volunteerEmail);
-              }
+              const storedName = this.getAttribute('data-volunteer-name') || 'Volunteer';
+              const volunteerName = storedName.replace(/&quot;/g, '"');
+              const volunteerEmail = this.getAttribute('data-volunteer-email') || '';
+              openSendEmailSelector(volunteerId, volunteerName, volunteerEmail);
             });
           });
-          
-          // Add event listeners for Last Minute Shifts buttons
-          const sendLastMinuteButtons = document.querySelectorAll('.send-last-minute-btn');
-          sendLastMinuteButtons.forEach(button => {
-            button.addEventListener('click', function() {
-              const volunteerId = this.getAttribute('data-volunteer-id');
-              const volunteerName = this.getAttribute('data-volunteer-name');
-              const volunteerEmail = this.getAttribute('data-volunteer-email');
-              
-              console.log('Send Last Minute clicked:', { volunteerId, volunteerName, volunteerEmail });
-              
-              if (volunteerId && volunteerName) {
-                sendLastMinuteShiftsEmail(volunteerId, volunteerName, volunteerEmail);
-              }
-            });
-          });
-          
-          // Add event listeners for Email History buttons
+        }
+
+        function setupEmailHistoryButtons() {
           const emailHistoryButtons = document.querySelectorAll('.email-history-btn');
-          emailHistoryButtons.forEach(button => {
+          emailHistoryButtons.forEach(function(button) {
             button.addEventListener('click', function() {
               const volunteerId = this.getAttribute('data-volunteer-id');
-              const volunteerName = this.getAttribute('data-volunteer-name');
-              
-              console.log('Email History clicked:', { volunteerId, volunteerName });
-              
+              const storedName = this.getAttribute('data-volunteer-name') || '';
+              const volunteerName = storedName.replace(/&quot;/g, '"');
               if (volunteerId && volunteerName) {
                 showEmailHistory(volunteerId, volunteerName);
               }
             });
           });
-        });
+        }
+
+        function openSendEmailSelector(volunteerId, volunteerName, volunteerEmail) {
+          if (!volunteerEmail) {
+            if (typeof Modal !== 'undefined') {
+              Modal.error('No Email Address', volunteerName + ' does not have an email address on file.');
+            } else {
+              alert('Cannot send email: no email address on file.');
+            }
+            return;
+          }
+
+          if (typeof Modal === 'undefined') {
+            const choice = globalThis.prompt('Send email to ' + volunteerName + '. Type one of: schedule, show-week, last-minute');
+            if (!choice) {
+              return;
+            }
+            const normalized = choice.trim().toLowerCase();
+            if (normalized === 'schedule') {
+              sendSchedulePDF(volunteerId, volunteerName, volunteerEmail);
+            } else if (normalized === 'show-week' || normalized === 'showweek') {
+              sendShowWeekEmail(volunteerId, volunteerName, volunteerEmail);
+            } else if (normalized === 'last-minute' || normalized === 'lastminute') {
+              sendLastMinuteShiftsEmail(volunteerId, volunteerName, volunteerEmail);
+            }
+            return;
+          }
+
+          Modal.showModal('send-email', {
+            title: 'Send Email',
+            body: '<p>Select the email to send to <strong>' + volunteerName + '</strong><br><span style="color:#6c757d;font-size:0.9rem;">' + volunteerEmail + '</span></p>',
+            buttons: [
+              {
+                text: 'Cancel',
+                className: 'modal-btn-outline',
+                action: 'cancel'
+              },
+              {
+                text: 'Schedule PDF',
+                className: 'modal-btn-primary',
+                action: 'schedule',
+                handler: function() {
+                  Modal.closeModal('send-email');
+                  sendSchedulePDF(volunteerId, volunteerName, volunteerEmail);
+                }
+              },
+              {
+                text: "It's Show Week",
+                className: 'modal-btn-primary',
+                action: 'show-week',
+                handler: function() {
+                  Modal.closeModal('send-email');
+                  sendShowWeekEmail(volunteerId, volunteerName, volunteerEmail);
+                }
+              },
+              {
+                text: 'Last Minute Shifts',
+                className: 'modal-btn-secondary',
+                action: 'last-minute',
+                handler: function() {
+                  Modal.closeModal('send-email');
+                  sendLastMinuteShiftsEmail(volunteerId, volunteerName, volunteerEmail);
+                }
+              }
+            ]
+          });
+        }
         
         async function copySignupUrl(volunteerId) {
           const input = document.getElementById(\`url-\${volunteerId}\`);

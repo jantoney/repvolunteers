@@ -320,6 +320,10 @@
       display: block;
     }
 
+    .hidden {
+      display: none !important;
+    }
+
     /* Selection summary */
     .selection-summary {
       background: #e3f2fd;
@@ -411,6 +415,9 @@
           <button class="email-tab active" data-email-type="show-week">
             📅 Show Week Email
           </button>
+          <button class="email-tab" data-email-type="wizard">
+            🧙 Wizard Invitations
+          </button>
           <button class="email-tab" data-email-type="unfilled-shifts">
             🚨 Unfilled Shifts Email
           </button>
@@ -418,8 +425,9 @@
 
         <!-- Show Week Email Content -->
         <div class="email-content active" id="show-week-content">
-          <h3>Show Week Email</h3>
-          <p>Send "It's Show Week!" emails to volunteers who have shifts for a selected show. This includes their schedule PDF attachment.</p>
+          <h3 id="showEmailHeading">Show Week Email</h3>
+          <p id="showWeekDescription">Send "It's Show Week!" emails to volunteers who have shifts for a selected show. This includes their schedule PDF attachment.</p>
+          <p id="wizardDescription" class="hidden">Send the multi-step shift selection wizard invitation to selected volunteers. On local development servers the emails are simulated and logged instead of being sent.</p>
           
           <div class="form-group">
             <label class="form-label" for="showSelect">Select Show:</label>
@@ -438,6 +446,9 @@
               <button class="btn btn-secondary" onclick="deselectAllShowVolunteers()">Deselect All</button>
               <button class="btn btn-primary" onclick="sendShowWeekEmails()" id="sendShowWeekBtn" disabled>
                 Send Show Week Emails
+              </button>
+              <button class="btn btn-secondary hidden" onclick="sendWizardEmails()" id="sendWizardBtn" disabled>
+                Send Wizard Invitations
               </button>
             </div>
 
@@ -490,6 +501,7 @@
       loadShows();
       loadUnfilledVolunteers();
       setupEventListeners();
+      switchEmailType(currentEmailType);
     });
 
     function setupEventListeners() {
@@ -514,16 +526,34 @@
 
     function switchEmailType(emailType) {
       currentEmailType = emailType;
-      
-      // Update tab styles
+
       document.querySelectorAll('.email-tab').forEach(tab => {
         tab.classList.toggle('active', tab.dataset.emailType === emailType);
       });
 
-      // Update content visibility
+      const contentId = emailType === 'wizard' ? 'show-week-content' : `${emailType}-content`;
       document.querySelectorAll('.email-content').forEach(content => {
-        content.classList.toggle('active', content.id === emailType + '-content');
+        content.classList.toggle('active', content.id === contentId);
       });
+
+      const heading = document.getElementById('showEmailHeading');
+      const showWeekDescription = document.getElementById('showWeekDescription');
+      const wizardDescription = document.getElementById('wizardDescription');
+      const showWeekButton = document.getElementById('sendShowWeekBtn');
+      const wizardButton = document.getElementById('sendWizardBtn');
+
+      if (heading) {
+        heading.textContent = emailType === 'wizard' ? 'Wizard Invitations' : 'Show Week Email';
+      }
+      if (showWeekDescription && wizardDescription && showWeekButton && wizardButton) {
+        const wizardMode = emailType === 'wizard';
+        showWeekDescription.classList.toggle('hidden', wizardMode);
+        wizardDescription.classList.toggle('hidden', !wizardMode);
+        showWeekButton.classList.toggle('hidden', wizardMode);
+        wizardButton.classList.toggle('hidden', !wizardMode);
+      }
+
+      updateShowSelectionCount();
     }
 
     async function loadShows() {
@@ -649,6 +679,7 @@
       const count = selectedShowVolunteers.size;
       document.getElementById('showSelectionCount').textContent = `${count} volunteers selected`;
       document.getElementById('sendShowWeekBtn').disabled = count === 0;
+      document.getElementById('sendWizardBtn').disabled = count === 0;
     }
 
     function updateUnfilledSelectionCount() {
@@ -736,6 +767,55 @@
       } finally {
         btn.disabled = false;
         btn.textContent = 'Send Show Week Emails';
+      }
+    }
+
+    async function sendWizardEmails() {
+      if (selectedShowVolunteers.size === 0) {
+        showStatus('Please select at least one volunteer', 'error');
+        return;
+      }
+
+      const showId = document.getElementById('showSelect').value;
+      if (!showId) {
+        showStatus('Please select a show', 'error');
+        return;
+      }
+
+      const btn = document.getElementById('sendWizardBtn');
+      btn.disabled = true;
+      const originalText = btn.textContent;
+      btn.textContent = 'Sending...';
+
+      try {
+        const response = await fetch('/admin/api/bulk-email/send-upcoming-wizard', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            showId: parseInt(showId),
+            volunteerIds: Array.from(selectedShowVolunteers)
+          })
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+          const deliveryMode = result.deliveryMode === 'simulated' ? ' (simulated)' : '';
+          showStatus(`${result.message}${deliveryMode}`, 'success');
+          if (result.deliveryMode === 'simulated') {
+            console.info('Wizard invitations simulated. Check server logs for the rendered email preview.');
+          }
+        } else {
+          showStatus(result.error || 'Failed to send wizard invitations', 'error');
+        }
+      } catch (error) {
+        console.error('Error sending wizard invitations:', error);
+        showStatus('Error sending wizard invitations', 'error');
+      } finally {
+        btn.disabled = selectedShowVolunteers.size === 0;
+        btn.textContent = originalText;
       }
     }
 

@@ -7,9 +7,9 @@ class ModalSystem {
 
   setupGlobalStyles() {
     // Add modal CSS if not already present
-    if (!document.getElementById('modal-system-styles')) {
-      const style = document.createElement('style');
-      style.id = 'modal-system-styles';
+    if (!document.getElementById("modal-system-styles")) {
+      const style = document.createElement("style");
+      style.id = "modal-system-styles";
       style.textContent = `
         /* Modal System CSS */
         .modal-overlay {
@@ -168,61 +168,81 @@ class ModalSystem {
 
   createModal(id, options = {}) {
     const {
-      title = 'Modal',
-      body = '',
+      title = "Modal",
+      body = "",
       buttons = [],
       closable = true,
-      className = '',
-      size = 'normal' // 'normal' or 'large'
+      className = "",
+      size = "normal", // 'normal' or 'large'
     } = options;
 
     // Remove existing modal with same ID
     this.destroyModal(id);
 
-    const overlay = document.createElement('div');
+    const overlay = document.createElement("div");
     overlay.className = `modal-overlay ${className}`;
     overlay.id = `modal-${id}`;
 
-    const contentClass = size === 'large' ? 'modal-content large' : 'modal-content';
+    const contentClass =
+      size === "large" ? "modal-content large" : "modal-content";
 
     overlay.innerHTML = `
       <div class="${contentClass}">
         <div class="modal-header">
           <h3 class="modal-title">${title}</h3>
-          ${closable ? '<button class="modal-close" data-action="close">&times;</button>' : ''}
+          ${
+            closable
+              ? '<button class="modal-close" data-action="close">&times;</button>'
+              : ""
+          }
         </div>
         <div class="modal-body">
           ${body}
         </div>
-        ${buttons.length > 0 ? `
+        ${
+          buttons.length > 0
+            ? `
           <div class="modal-footer">
-            ${buttons.map(btn => `
-              <button class="modal-btn ${btn.className || 'modal-btn-outline'}" 
-                      data-action="${btn.action || 'close'}"
-                      ${btn.disabled ? 'disabled' : ''}>
+            ${buttons
+              .map(
+                (btn) => `
+              <button class="modal-btn ${btn.className || "modal-btn-outline"}" 
+                      data-action="${btn.action || "close"}"
+                      ${btn.disabled ? "disabled" : ""}>
                 ${btn.text}
               </button>
-            `).join('')}
+            `
+              )
+              .join("")}
           </div>
-        ` : ''}
+        `
+            : ""
+        }
       </div>
     `;
 
     // Add click handlers
-    overlay.addEventListener('click', (e) => {
+    overlay.addEventListener("click", (e) => {
       if (e.target === overlay && closable) {
         this.closeModal(id);
       }
     });
 
-    overlay.addEventListener('click', (e) => {
+    overlay.addEventListener("click", (e) => {
       const action = e.target.dataset.action;
       if (action) {
-        const button = buttons.find(btn => btn.action === action) || { action: 'close' };
+        const button = buttons.find((btn) => btn.action === action) || {
+          action: "close",
+        };
         if (button.handler) {
           button.handler(e, this);
         }
-        if (action === 'close' || action === 'ok' || action === 'cancel' || action === 'confirm') {
+        if (
+          action === "close" ||
+          action === "ok" ||
+          action === "cancel" ||
+          action === "confirm"
+        ) {
           this.closeModal(id);
         }
       }
@@ -235,14 +255,16 @@ class ModalSystem {
   }
 
   showModal(id, options = {}) {
+    const hasNewOptions = options && Object.keys(options).length > 0;
     let modal = this.modals.get(id);
-    if (!modal && options) {
+    if (!modal || hasNewOptions) {
+      // Rebuild modal when new configuration is provided so content stays in sync
       modal = this.createModal(id, options);
     }
     if (modal) {
-      modal.classList.add('show');
+      modal.classList.add("show");
       // Focus trap
-      const firstButton = modal.querySelector('button');
+      const firstButton = modal.querySelector("button");
       if (firstButton) firstButton.focus();
     }
     return modal;
@@ -251,7 +273,7 @@ class ModalSystem {
   closeModal(id) {
     const modal = this.modals.get(id);
     if (modal) {
-      modal.classList.remove('show');
+      modal.classList.remove("show");
     }
   }
 
@@ -266,7 +288,7 @@ class ModalSystem {
   updateModalBody(id, body) {
     const modal = this.modals.get(id);
     if (modal) {
-      const bodyEl = modal.querySelector('.modal-body');
+      const bodyEl = modal.querySelector(".modal-body");
       if (bodyEl) {
         bodyEl.innerHTML = body;
       }
@@ -275,100 +297,100 @@ class ModalSystem {
 
   // Convenience methods
   confirm(title, message, onConfirm, onCancel = null) {
-    return this.showModal('confirm', {
+    return this.showModal("confirm", {
       title,
       body: `<p>${message}</p>`,
       buttons: [
         {
-          text: 'Cancel',
-          className: 'modal-btn-outline',
-          action: 'cancel',
-          handler: onCancel || (() => {})
+          text: "Cancel",
+          className: "modal-btn-outline",
+          action: "cancel",
+          handler: onCancel || (() => {}),
         },
         {
-          text: 'Confirm',
-          className: 'modal-btn-primary',
-          action: 'confirm',
-          handler: onConfirm
-        }
-      ]
+          text: "Confirm",
+          className: "modal-btn-primary",
+          action: "confirm",
+          handler: onConfirm,
+        },
+      ],
     });
   }
 
   alert(title, message, onOk = null) {
-    return this.showModal('alert', {
+    return this.showModal("alert", {
       title,
       body: `<p>${message}</p>`,
       buttons: [
         {
-          text: 'OK',
-          className: 'modal-btn-primary',
-          action: 'ok',
-          handler: onOk || (() => {})
-        }
-      ]
+          text: "OK",
+          className: "modal-btn-primary",
+          action: "ok",
+          handler: onOk || (() => {}),
+        },
+      ],
     });
   }
 
   error(title, message, onOk = null) {
-    return this.showModal('error', {
-      title: title || 'Error',
+    return this.showModal("error", {
+      title: title || "Error",
       body: `<p style="color: #dc3545;">${message}</p>`,
       buttons: [
         {
-          text: 'OK',
-          className: 'modal-btn-danger',
-          action: 'ok',
-          handler: onOk || (() => {})
-        }
-      ]
+          text: "OK",
+          className: "modal-btn-danger",
+          action: "ok",
+          handler: onOk || (() => {}),
+        },
+      ],
     });
   }
 
   success(title, message, onOk = null) {
-    return this.showModal('success', {
-      title: title || 'Success',
+    return this.showModal("success", {
+      title: title || "Success",
       body: `<p style="color: #28a745;">${message}</p>`,
       buttons: [
         {
-          text: 'OK',
-          className: 'modal-btn-primary',
-          action: 'ok',
-          handler: onOk || (() => {})
-        }
-      ]
+          text: "OK",
+          className: "modal-btn-primary",
+          action: "ok",
+          handler: onOk || (() => {}),
+        },
+      ],
     });
   }
 
   info(title, message, onOk = null) {
-    return this.showModal('info', {
-      title: title || 'Information',
+    return this.showModal("info", {
+      title: title || "Information",
       body: `<p>${message}</p>`,
       buttons: [
         {
-          text: 'OK',
-          className: 'modal-btn-primary',
-          action: 'ok',
-          handler: onOk || (() => {})
-        }
-      ]
+          text: "OK",
+          className: "modal-btn-primary",
+          action: "ok",
+          handler: onOk || (() => {}),
+        },
+      ],
     });
   }
 
   // Method for displaying raw HTML content without wrapping in <p> tags
-  html(title, htmlContent, onOk = null, size = 'normal') {
-    return this.showModal('html', {
-      title: title || 'Information',
+  html(title, htmlContent, onOk = null, size = "normal") {
+    return this.showModal("html", {
+      title: title || "Information",
       body: htmlContent,
       size: size,
       buttons: [
         {
-          text: 'OK',
-          className: 'modal-btn-primary',
-          action: 'ok',
-          handler: onOk || (() => {})
-        }
-      ]
+          text: "OK",
+          className: "modal-btn-primary",
+          action: "ok",
+          handler: onOk || (() => {}),
+        },
+      ],
     });
   }
 }
@@ -378,17 +400,17 @@ window.Modal = new ModalSystem();
 
 // Global helper functions for backward compatibility
 window.modalConfirm = (message, onConfirm, onCancel) => {
-  return window.Modal.confirm('Confirm', message, onConfirm, onCancel);
+  return window.Modal.confirm("Confirm", message, onConfirm, onCancel);
 };
 
 window.modalAlert = (message, onOk) => {
-  return window.Modal.alert('Alert', message, onOk);
+  return window.Modal.alert("Alert", message, onOk);
 };
 
 window.modalError = (message, onOk) => {
-  return window.Modal.error('Error', message, onOk);
+  return window.Modal.error("Error", message, onOk);
 };
 
 window.modalSuccess = (message, onOk) => {
-  return window.Modal.success('Success', message, onOk);
+  return window.Modal.success("Success", message, onOk);
 };
