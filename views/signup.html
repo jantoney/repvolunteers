@@ -785,6 +785,23 @@
     const assignedContainer = document.getElementById('assignedShifts');
     const availableContainer = document.getElementById('availableShifts');
     const submitBtn = document.getElementById('submitBtn');
+    const signupForm = document.getElementById('signupForm');
+
+    // Automatically rerun signup flow for any remaining selections
+    function resubmitRemainingSelections() {
+      const remainingSelected = document.querySelectorAll('#availableShifts input[type=checkbox]:checked');
+      const remainingCount = remainingSelected.length;
+      if (remainingCount > 0) {
+        setTimeout(() => {
+          if (typeof signupForm.requestSubmit === 'function') {
+            signupForm.requestSubmit();
+          } else {
+            signupForm.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+          }
+        }, 0);
+      }
+      return remainingCount;
+    }
 
     // Calendar state - initialize in Adelaide timezone
     let currentCalendarDate = new Date();
@@ -1435,7 +1452,7 @@
     });
 
     // Handle form submission for new shifts
-    document.getElementById('signupForm').addEventListener('submit', async (e) => {
+    signupForm.addEventListener('submit', async (e) => {
       e.preventDefault();
 
       const selectedShifts = Array.from(document.querySelectorAll('#availableShifts input[type=checkbox]:checked'));
@@ -1487,7 +1504,14 @@
                 {
                   text: 'Keep Current',
                   className: 'modal-btn-outline',
-                  action: 'keep'
+                  action: 'keep',
+                  handler: () => {
+                    if (requestedCheckbox) {
+                      requestedCheckbox.checked = false;
+                    }
+                    Modal.closeModal('conflict-resolution');
+                    resubmitRemainingSelections();
+                  }
                 },
                 {
                   text: 'Swap Shifts',
@@ -1505,16 +1529,25 @@
                       });
 
                       if (swapResponse.ok) {
-                        Modal.success('Success', 'Shift swapped successfully!', () => {
-                          location.reload();
-                        });
+                        if (requestedCheckbox) {
+                          requestedCheckbox.checked = false;
+                        }
+                        const remainingCount = resubmitRemainingSelections();
+                        if (remainingCount === 0) {
+                          Modal.success('Success', 'Shift swapped successfully!', () => {
+                            location.reload();
+                          });
+                        }
+                        return;
                       } else {
                         Modal.error('Error', 'Failed to swap shifts. Please try again.');
+                        return;
                       }
                     } catch (error) {
                       Modal.error('Error', 'Failed to swap shifts. Please try again.');
+                    } finally {
+                      Modal.closeModal('conflict-resolution');
                     }
-                    Modal.closeModal('conflict-resolution');
                   }
                 }
               ]
