@@ -1,4 +1,8 @@
-import { getAdminNavigation, getAdminStyles, getAdminScripts } from "../components/navigation.ts";
+import {
+  getAdminNavigation,
+  getAdminStyles,
+  getAdminScripts,
+} from "../components/navigation.ts";
 
 export interface Volunteer {
   id: number;
@@ -14,6 +18,154 @@ export interface VolunteersPageData {
 
 export function renderVolunteersTemplate(data: VolunteersPageData): string {
   const { volunteers } = data;
+  const escapeHtmlContent = (value: string | null | undefined): string => {
+    if (value === null || value === undefined) {
+      return "";
+    }
+    return String(value)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+  };
+
+  const escapeAttributeValue = (value: string | null | undefined): string => {
+    if (value === null || value === undefined) {
+      return "";
+    }
+    return String(value)
+      .replace(/&/g, "&amp;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+  };
+
+  const normalizeSearchTokens = (input: string): string => {
+    if (!input) {
+      return "";
+    }
+    let normalized = input;
+    try {
+      normalized = normalized.normalize("NFD");
+    } catch (_error) {
+      // ignore - normalize may not exist in some environments
+    }
+    normalized = normalized.replace(/[\u0300-\u036f]/g, "");
+    return normalized.toLowerCase().replace(/\s+/g, " ").trim();
+  };
+
+  const tableRows = volunteers
+    .map((volunteer) => {
+      const name = volunteer.name ?? "";
+      const email = volunteer.email ?? "";
+      const phone = volunteer.phone ?? "";
+      const displayName = escapeHtmlContent(name);
+      const displayEmail = email ? escapeHtmlContent(email) : "N/A";
+      const displayPhone = phone ? escapeHtmlContent(phone) : "N/A";
+      const approvalName = name
+        .replace(/'/g, "\\'")
+        .replace(/"/g, '\\"')
+        .replace(/\\/g, "\\\\");
+      const deleteName = name.replace(/'/g, "\\'").replace(/\\/g, "\\\\");
+      const ariaName = escapeAttributeValue(name);
+      const emailAttr = escapeAttributeValue(email);
+      const searchTokens = normalizeSearchTokens(`${name} ${email} ${phone}`);
+      const searchAttr = escapeAttributeValue(searchTokens);
+
+      return `
+                <tr data-search="${searchAttr}">
+                  <td data-label="Name">
+                    <strong>${displayName}</strong>
+                  </td>
+                  <td data-label="Email" class="cell-email">
+                    ${displayEmail}
+                  </td>
+                  <td data-label="Phone">
+                    ${displayPhone}
+                  </td>
+                  <td data-label="Login Enabled">
+                    <div class="approval-toggle">
+                      <label class="switch">
+                        <input type="checkbox" ${
+                          volunteer.approved ? "checked" : ""
+                        } 
+                               onchange="toggleApproval('${
+                                 volunteer.id
+                               }', this.checked, '${approvalName}')">
+                        <span class="slider" aria-hidden="true"></span>
+                      </label>
+                      <span class="approval-status ${
+                        volunteer.approved ? "approved" : "pending"
+                      }" data-volunteer-id="${volunteer.id}">${
+        volunteer.approved ? "Enabled" : "Disabled"
+      }</span>
+                    </div>
+                  </td>
+                  <td data-label="Actions">
+                    <div class="table-actions">
+                      <input type="hidden" class="signup-url" value="/volunteer/signup/${
+                        volunteer.id
+                      }" readonly id="url-${volunteer.id}" data-full-url="">
+                      <button type="button" class="actions-toggle" aria-haspopup="true" aria-expanded="false" aria-label='Toggle actions menu for ${ariaName}' aria-controls="actions-menu-${
+        volunteer.id
+      }">
+                        <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+                          <circle cx="8" cy="2" r="1.5"></circle>
+                          <circle cx="8" cy="8" r="1.5"></circle>
+                          <circle cx="8" cy="14" r="1.5"></circle>
+                        </svg>
+                        <span>Actions</span>
+                      </button>
+                      <div class="table-actions-list" id="actions-menu-${
+                        volunteer.id
+                      }" role="menu" aria-hidden="true">
+                        <a href="/admin/volunteers/${
+                          volunteer.id
+                        }/shifts" class="menu-item" role="menuitem">Shifts</a>
+                        <a href="/admin/volunteers/${
+                          volunteer.id
+                        }/edit" class="menu-item" role="menuitem">Edit</a>
+                        <button class="menu-item send-pdf-btn" type="button" data-volunteer-id="${
+                          volunteer.id
+                        }" data-volunteer-name="${ariaName}" data-volunteer-email="${emailAttr}" role="menuitem" ${
+        !volunteer.email ? 'disabled title="No email address"' : ""
+      }>📧 Send PDF</button>
+                        <button class="menu-item send-show-week-btn" type="button" data-volunteer-id="${
+                          volunteer.id
+                        }" data-volunteer-name="${ariaName}" data-volunteer-email="${emailAttr}" role="menuitem" ${
+        !volunteer.email ? 'disabled title="No email address"' : ""
+      }>🎭 Show Week</button>
+                        <button class="menu-item send-last-minute-btn" type="button" data-volunteer-id="${
+                          volunteer.id
+                        }" data-volunteer-name="${ariaName}" data-volunteer-email="${emailAttr}" role="menuitem" ${
+        !volunteer.email ? 'disabled title="No email address"' : ""
+      }>🚨 Last Minute</button>
+                        <button class="menu-item email-history-btn" type="button" data-volunteer-id="${
+                          volunteer.id
+                        }" data-volunteer-name="${ariaName}" role="menuitem">📧 History</button>
+                        <button onclick="deleteVolunteer('${
+                          volunteer.id
+                        }', '${deleteName}')" class="menu-item danger" type="button" role="menuitem">Delete</button>
+                        <div class="actions-separator" role="separator"></div>
+                        <button class="menu-item" type="button" onclick="copySignupUrl('${
+                          volunteer.id
+                        }')" id="copy-btn-${
+        volunteer.id
+      }" aria-label='Copy signup link for ${ariaName}' role="menuitem">Copy Signup Link</button>
+                        <button class="menu-item" type="button" onclick="openSignupUrl('${
+                          volunteer.id
+                        }')" id="open-btn-${
+        volunteer.id
+      }" aria-label='Open signup link for ${ariaName}' role="menuitem">Open Signup Link</button>
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              `;
+    })
+    .join("");
+
+  const totalVolunteers = volunteers.length;
 
   return `
     <!DOCTYPE html>
@@ -30,39 +182,6 @@ export function renderVolunteersTemplate(data: VolunteersPageData): string {
       <link rel="apple-touch-icon" href="/icons/ios/180.png">
       <meta name="theme-color" content="#007bff">
       ${getAdminStyles()}      <style>
-        .signup-link { font-family: monospace; background: #f8f9fa; padding: 0.25rem; border-radius: 4px; font-size: 0.875rem; }
-        .signup-url-container { 
-          display: flex; 
-          align-items: center; 
-          gap: 0.5rem; 
-        }
-        .signup-url { 
-          display: none; /* Hide the input box */
-        }
-        .copy-btn, .open-btn {
-          background: #28a745;
-          color: white;
-          border: none;
-          padding: 0.5rem;
-          border-radius: 4px;
-          cursor: pointer;
-          font-size: 0.75rem;
-          transition: background-color 0.2s;
-          white-space: nowrap;
-        }
-        .copy-btn:hover, .open-btn:hover {
-          background: #218838;
-        }
-        .copy-btn.copied {
-          background: #17a2b8;
-        }
-        .open-btn {
-          background: #007bff;
-        }
-        .open-btn:hover {
-          background: #0056b3;
-        }
-        
         /* Toggle switch styles */
         .approval-toggle {
           display: flex;
@@ -187,10 +306,359 @@ export function renderVolunteersTemplate(data: VolunteersPageData): string {
             box-shadow: 0 6px 12px rgba(255, 107, 53, 0.4);
           }
         }
+
+        .table-toolbar {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          gap: 1rem;
+          margin: 1.5rem 0 1rem;
+          flex-wrap: wrap;
+        }
+
+        .toolbar-search {
+          position: relative;
+          flex: 1 1 320px;
+          max-width: 420px;
+        }
+
+        .toolbar-search input {
+          width: 100%;
+          padding: 0.65rem 1rem 0.65rem 2.5rem;
+          border: 1px solid #d1d5db;
+          border-radius: 999px;
+          font-size: 0.95rem;
+          transition: border-color 0.2s ease, box-shadow 0.2s ease;
+          background: #ffffff;
+          color: #1f2937;
+        }
+
+        .toolbar-search input::placeholder {
+          color: #9ca3af;
+        }
+
+        .toolbar-search input:focus {
+          outline: none;
+          border-color: #2563eb;
+          box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+        }
+
+        .toolbar-search svg {
+          position: absolute;
+          left: 0.9rem;
+          top: 50%;
+          transform: translateY(-50%);
+          color: #6b7280;
+          pointer-events: none;
+        }
+
+        .toolbar-meta {
+          color: #374151;
+          font-size: 0.9rem;
+          font-weight: 500;
+        }
+
+        .toolbar-meta span {
+          white-space: nowrap;
+        }
+
+        .toolbar-count-label span {
+          font-weight: 600;
+          color: #111827;
+        }
+
+        .sr-only {
+          position: absolute;
+          width: 1px;
+          height: 1px;
+          padding: 0;
+          margin: -1px;
+          overflow: hidden;
+          clip: rect(0, 0, 0, 0);
+          border: 0;
+        }
+
+        .no-results {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          gap: 0.75rem;
+          padding: 1.5rem 0;
+          color: #4b5563;
+        }
+
+        .no-results p {
+          margin: 0;
+          font-size: 0.95rem;
+          text-align: center;
+        }
+
+        /* Participants Table Enhancements */
+        .table-container {
+          overflow-x: auto;
+          border-radius: 12px;
+        }
+
+        .table {
+          width: 100%;
+          border-collapse: collapse;
+          min-width: 720px;
+        }
+
+        .table th,
+        .table td {
+          vertical-align: top;
+        }
+
+        .table td {
+          color: #2c2c2c;
+        }
+
+        .cell-email {
+          word-break: break-word;
+        }
+
+        .approval-toggle {
+          gap: 0.75rem;
+          flex-wrap: wrap;
+        }
+
+        .approval-status {
+          padding: 0.2rem 0.6rem;
+          border-radius: 999px;
+          background: rgba(40, 167, 69, 0.12);
+          color: #1b6f3a;
+          font-size: 0.75rem;
+          font-weight: 600;
+          letter-spacing: 0.04em;
+          text-transform: uppercase;
+        }
+
+        .approval-status.pending {
+          background: rgba(220, 53, 69, 0.12);
+          color: #b21f2d;
+        }
+
+        .table-actions {
+          position: relative;
+          display: flex;
+          justify-content: flex-end;
+          align-items: center;
+        }
+
+        .actions-toggle {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.35rem;
+          border: 1px solid #d3d9e3;
+          background: #f8fafc;
+          color: #1d4ed8;
+          cursor: pointer;
+          border-radius: 999px;
+          padding: 0.35rem 0.85rem;
+          font-size: 0.75rem;
+          font-weight: 600;
+          letter-spacing: 0.04em;
+          text-transform: uppercase;
+          transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+        }
+
+        .actions-toggle svg {
+          display: block;
+          transition: transform 0.2s ease;
+        }
+
+        .actions-toggle span {
+          display: inline;
+        }
+
+        .actions-toggle:focus-visible {
+          outline: 2px solid #1d4ed8;
+          outline-offset: 2px;
+        }
+
+        .table-actions-list {
+          display: none;
+          position: absolute;
+          right: 0;
+          top: calc(100% + 0.5rem);
+          background: #ffffff;
+          border-radius: 12px;
+          border: 1px solid #dfe3eb;
+          box-shadow: 0 20px 48px rgba(15, 23, 42, 0.18);
+          padding: 0.75rem;
+          min-width: min(260px, 90vw);
+          max-width: min(260px, 90vw);
+          flex-direction: column;
+          gap: 0.25rem;
+          z-index: 20;
+        }
+
+        .table-actions.open .table-actions-list {
+          display: flex;
+        }
+
+        .table-actions.open .actions-toggle {
+          background: #1d4ed8;
+          color: #ffffff;
+          border-color: #1d4ed8;
+        }
+
+        .table-actions.open .actions-toggle svg {
+          transform: rotate(90deg);
+        }
+
+        .actions-separator {
+          height: 1px;
+          background: #e2e8f0;
+          margin: 0.35rem 0;
+        }
+
+        .menu-item {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+          width: 100%;
+          padding: 0.5rem 0.75rem;
+          border-radius: 8px;
+          border: none;
+          background: transparent;
+          color: #1f2937;
+          font-size: 0.85rem;
+          text-decoration: none;
+          cursor: pointer;
+          transition: background-color 0.15s ease, color 0.15s ease;
+          text-align: left;
+        }
+
+        .menu-item:hover,
+        .menu-item:focus {
+          background: #f1f5f9;
+          color: #1d4ed8;
+          outline: none;
+        }
+
+        .menu-item[disabled] {
+          cursor: not-allowed;
+          opacity: 0.6;
+        }
+
+        .menu-item.danger {
+          color: #b91c1c;
+        }
+
+        .menu-item.danger:hover,
+        .menu-item.danger:focus {
+          background: rgba(220, 53, 69, 0.12);
+          color: #7f1d1d;
+        }
+
+        .menu-item.send-last-minute-btn {
+          color: #b45309;
+        }
+
+        .menu-item.send-last-minute-btn:hover,
+        .menu-item.send-last-minute-btn:focus {
+          background: rgba(217, 119, 6, 0.12);
+          color: #92400e;
+        }
+
+        @media (max-width: 1024px) {
+          .table {
+            min-width: 640px;
+          }
+        }
+
+        @media (max-width: 820px) {
+          .table-container {
+            overflow-x: visible;
+          }
+
+          .table {
+            min-width: 0;
+          }
+
+          thead {
+            display: none;
+          }
+
+          table,
+          tbody,
+          tr,
+          td {
+            display: block;
+            width: 100%;
+          }
+
+          tr {
+            background: #ffffff;
+            border: 1px solid #e6e9ee;
+            border-radius: 12px;
+            padding: 1rem 1rem 0.5rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 12px 32px rgba(15, 23, 42, 0.08);
+          }
+
+          td {
+            border: none;
+            padding: 0.75rem 0 0.75rem 45%;
+            position: relative;
+            text-align: left;
+          }
+
+          td::before {
+            content: attr(data-label);
+            position: absolute;
+            left: 0.75rem;
+            top: 0.75rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            color: #6c757d;
+          }
+
+          td:first-child {
+            padding-top: 1rem;
+          }
+
+          td:last-child {
+            padding-bottom: 1.25rem;
+          }
+
+          .approval-toggle {
+            justify-content: space-between;
+          }
+
+          .approval-status {
+            margin-left: auto;
+          }
+
+          .table-actions {
+            margin-top: 0.5rem;
+          }
+
+          .table-toolbar {
+            flex-direction: column;
+            align-items: stretch;
+            margin: 1.25rem 0;
+          }
+
+          .toolbar-meta {
+            width: 100%;
+            text-align: left;
+            font-size: 0.85rem;
+          }
+
+          .toolbar-meta span {
+            white-space: normal;
+          }
+        }
       </style>
     </head>
     <body>
-      ${getAdminNavigation('volunteers')}
+      ${getAdminNavigation("volunteers")}
       
       <!-- Main Content -->
       <div class="main-content">
@@ -212,6 +680,19 @@ export function renderVolunteersTemplate(data: VolunteersPageData): string {
           </div>
         </div>
 
+        <div class="table-toolbar">
+          <div class="toolbar-search">
+            <label for="volunteerSearch" class="sr-only">Search participants</label>
+            <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+              <path fill="currentColor" d="M15.5 14h-.79l-.28-.27a6.5 6.5 0 1 0-.71.71l.27.28v.79l5 4.99L20.49 19zM10.5 15a4.5 4.5 0 1 1 0-9 4.5 4.5 0 0 1 0 9z" />
+            </svg>
+            <input type="search" id="volunteerSearch" name="volunteerSearch" placeholder="Search by name, email, or phone" autocomplete="off" spellcheck="false" />
+          </div>
+          <div class="toolbar-meta">
+            <span class="toolbar-count-label">Showing <span id="volunteerSearchCount">${totalVolunteers}</span> of <span id="volunteerSearchTotal">${totalVolunteers}</span> participants</span>
+          </div>
+        </div>
+
         <div class="table-container">
           <table class="table">
             <thead>
@@ -220,45 +701,30 @@ export function renderVolunteersTemplate(data: VolunteersPageData): string {
                 <th>Email</th>
                 <th>Phone</th>
                 <th>Login Enabled</th>
-                <th>Signup Link</th>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody>
-              ${volunteers.map(volunteer => `
-                <tr>
-                  <td><strong>${volunteer.name}</strong></td>
-                  <td>${volunteer.email || 'N/A'}</td>
-                  <td>${volunteer.phone || 'N/A'}</td>
-                  <td>
-                    <div class="approval-toggle">
-                      <label class="switch">
-                        <input type="checkbox" ${volunteer.approved ? 'checked' : ''} 
-                               onchange="toggleApproval('${volunteer.id}', this.checked, '${volunteer.name.replace(/'/g, "\\'").replace(/"/g, '\\"').replace(/\\/g, '\\\\')}')">
-                        <span class="slider"></span>
-                      </label>
-                    </div>
-                  </td>
-                  <td>
-                    <div class="signup-url-container">
-                      <input type="text" class="signup-url" value="/volunteer/signup/${volunteer.id}" readonly id="url-${volunteer.id}" data-full-url="">
-                      <button class="copy-btn" onclick="copySignupUrl('${volunteer.id}')" id="copy-btn-${volunteer.id}">Copy</button>
-                      <button class="open-btn" onclick="openSignupUrl('${volunteer.id}')" id="open-btn-${volunteer.id}">Open</button>
-                    </div>
-                  </td>
-                  <td>
-                    <div class="table-actions">
-                      <a href="/admin/volunteers/${volunteer.id}/shifts" class="btn btn-sm btn-info">Shifts</a>
-                      <a href="/admin/volunteers/${volunteer.id}/edit" class="btn btn-sm btn-secondary">Edit</a>
-                      <button class="send-pdf-btn btn btn-sm btn-success" data-volunteer-id="${volunteer.id}" data-volunteer-name="${volunteer.name}" data-volunteer-email="${volunteer.email || ''}" ${!volunteer.email ? 'disabled title="No email address"' : ''}>📧 Send PDF</button>
-                      <button class="send-show-week-btn btn btn-sm btn-warning" data-volunteer-id="${volunteer.id}" data-volunteer-name="${volunteer.name}" data-volunteer-email="${volunteer.email || ''}" ${!volunteer.email ? 'disabled title="No email address"' : ''}>🎭 Show Week</button>
-                      <button class="send-last-minute-btn btn btn-sm" style="background-color:#ff6b35;color:white;" data-volunteer-id="${volunteer.id}" data-volunteer-name="${volunteer.name}" data-volunteer-email="${volunteer.email || ''}" ${!volunteer.email ? 'disabled title="No email address"' : ''}>🚨 Last Minute</button>
-                      <button class="email-history-btn btn btn-sm btn-info" data-volunteer-id="${volunteer.id}" data-volunteer-name="${volunteer.name}">📧 History</button>
-                      <button onclick="deleteVolunteer('${volunteer.id}', '${volunteer.name.replace(/'/g, "\\'")}')" class="btn btn-sm btn-danger">Delete</button>
+              ${
+                tableRows ||
+                `
+                <tr class="no-data-row">
+                  <td colspan="5">
+                    <div class="no-results">
+                      <p>No participants found yet.</p>
                     </div>
                   </td>
                 </tr>
-              `).join('')}
+              `
+              }
+              <tr class="no-results-row" style="display: none;">
+                <td colspan="5">
+                  <div class="no-results">
+                    <p>No participants match your search.</p>
+                    <button type="button" class="btn btn-sm btn-outline" id="volunteerSearchReset">Clear search</button>
+                  </div>
+                </td>
+              </tr>
             </tbody>
           </table>
         </div>
@@ -278,16 +744,18 @@ export function renderVolunteersTemplate(data: VolunteersPageData): string {
           }
           return baseUrl;
         }
+
+        let actionMenusEventsBound = false;
         
         // Check and show force mode notification
         function checkForceMode() {
           const urlParams = new URLSearchParams(window.location.search);
           const forceParam = urlParams.get('force');
           const notification = document.getElementById('forceModeNotification');
-          
+
           if (forceParam === 'true' && notification) {
             notification.style.display = 'block';
-            
+
             // Add click handler for disable button
             const disableBtn = document.getElementById('disableForceModeBtn');
             if (disableBtn) {
@@ -301,17 +769,17 @@ export function renderVolunteersTemplate(data: VolunteersPageData): string {
           }
         }
         
-        // Set full URLs and copy function
+        // Hydrate signup URLs for copy/open actions
         document.addEventListener('DOMContentLoaded', function() {
           // Check and show force mode notification
           checkForceMode();
-          // Set full URLs for all signup links
           const urlInputs = document.querySelectorAll('.signup-url');
           urlInputs.forEach(input => {
             const relativeUrl = input.value;
             const fullUrl = globalThis.location.origin + relativeUrl;
             input.setAttribute('data-full-url', fullUrl);
             input.value = fullUrl;
+            input.setAttribute('value', fullUrl);
           });
 
           // Add event listeners for Send PDF buttons
@@ -321,15 +789,15 @@ export function renderVolunteersTemplate(data: VolunteersPageData): string {
               const volunteerId = this.getAttribute('data-volunteer-id');
               const volunteerName = this.getAttribute('data-volunteer-name');
               const volunteerEmail = this.getAttribute('data-volunteer-email');
-              
+
               console.log('Send PDF clicked:', { volunteerId, volunteerName, volunteerEmail });
-              
+
               if (volunteerId && volunteerName) {
                 sendSchedulePDF(volunteerId, volunteerName, volunteerEmail);
               }
             });
           });
-          
+
           // Add event listeners for Show Week buttons
           const sendShowWeekButtons = document.querySelectorAll('.send-show-week-btn');
           sendShowWeekButtons.forEach(button => {
@@ -337,15 +805,15 @@ export function renderVolunteersTemplate(data: VolunteersPageData): string {
               const volunteerId = this.getAttribute('data-volunteer-id');
               const volunteerName = this.getAttribute('data-volunteer-name');
               const volunteerEmail = this.getAttribute('data-volunteer-email');
-              
+
               console.log('Send Show Week clicked:', { volunteerId, volunteerName, volunteerEmail });
-              
+
               if (volunteerId && volunteerName) {
                 sendShowWeekEmail(volunteerId, volunteerName, volunteerEmail);
               }
             });
           });
-          
+
           // Add event listeners for Last Minute Shifts buttons
           const sendLastMinuteButtons = document.querySelectorAll('.send-last-minute-btn');
           sendLastMinuteButtons.forEach(button => {
@@ -353,42 +821,253 @@ export function renderVolunteersTemplate(data: VolunteersPageData): string {
               const volunteerId = this.getAttribute('data-volunteer-id');
               const volunteerName = this.getAttribute('data-volunteer-name');
               const volunteerEmail = this.getAttribute('data-volunteer-email');
-              
+
               console.log('Send Last Minute clicked:', { volunteerId, volunteerName, volunteerEmail });
-              
+
               if (volunteerId && volunteerName) {
                 sendLastMinuteShiftsEmail(volunteerId, volunteerName, volunteerEmail);
               }
             });
           });
-          
+
           // Add event listeners for Email History buttons
           const emailHistoryButtons = document.querySelectorAll('.email-history-btn');
           emailHistoryButtons.forEach(button => {
             button.addEventListener('click', function() {
               const volunteerId = this.getAttribute('data-volunteer-id');
               const volunteerName = this.getAttribute('data-volunteer-name');
-              
+
               console.log('Email History clicked:', { volunteerId, volunteerName });
-              
+
               if (volunteerId && volunteerName) {
                 showEmailHistory(volunteerId, volunteerName);
               }
             });
           });
+
+          initializeActionMenus();
+          initializeVolunteerSearch();
         });
+
+        function initializeActionMenus() {
+          const actionContainers = document.querySelectorAll('.table-actions');
+          if (!actionContainers.length) {
+            return;
+          }
+
+          actionContainers.forEach(container => {
+            const toggle = container.querySelector('.actions-toggle');
+            const list = container.querySelector('.table-actions-list');
+
+            if (!toggle || !list) {
+              return;
+            }
+
+            list.setAttribute('aria-hidden', 'true');
+            toggle.setAttribute('aria-expanded', 'false');
+
+            const focusFirstMenuItem = () => {
+              const firstItem = list.querySelector('[role="menuitem"]:not([disabled])');
+              if (firstItem instanceof HTMLElement) {
+                firstItem.focus();
+              }
+            };
+
+            toggle.addEventListener('click', event => {
+              event.preventDefault();
+              event.stopPropagation();
+
+              const isOpen = container.classList.contains('open');
+              if (isOpen) {
+                container.classList.remove('open');
+                toggle.setAttribute('aria-expanded', 'false');
+                list.setAttribute('aria-hidden', 'true');
+              } else {
+                closeActionMenus();
+                container.classList.add('open');
+                toggle.setAttribute('aria-expanded', 'true');
+                list.setAttribute('aria-hidden', 'false');
+              }
+            });
+
+            toggle.addEventListener('keydown', event => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                toggle.click();
+                setTimeout(() => {
+                  if (container.classList.contains('open')) {
+                    focusFirstMenuItem();
+                  }
+                }, 0);
+              } else if (event.key === 'ArrowDown') {
+                event.preventDefault();
+                if (!container.classList.contains('open')) {
+                  closeActionMenus();
+                  container.classList.add('open');
+                  toggle.setAttribute('aria-expanded', 'true');
+                  list.setAttribute('aria-hidden', 'false');
+                }
+                focusFirstMenuItem();
+              }
+            });
+
+            list.addEventListener('click', event => {
+              event.stopPropagation();
+              setTimeout(() => closeActionMenus(), 0);
+            });
+
+            list.addEventListener('keydown', event => {
+              if (event.key === 'Escape') {
+                event.preventDefault();
+                closeActionMenus();
+                toggle.focus();
+              }
+            });
+          });
+
+          if (!actionMenusEventsBound) {
+            actionMenusEventsBound = true;
+
+            window.addEventListener('resize', () => closeActionMenus());
+            document.addEventListener('click', () => closeActionMenus());
+            document.addEventListener('keydown', event => {
+              if (event.key === 'Escape') {
+                const openToggle = document.querySelector('.table-actions.open .actions-toggle');
+                closeActionMenus();
+                if (openToggle instanceof HTMLElement) {
+                  openToggle.focus();
+                }
+              }
+            });
+          }
+        }
+
+        function closeActionMenus(excluded) {
+          document.querySelectorAll('.table-actions.open').forEach(container => {
+            if (excluded && container === excluded) {
+              return;
+            }
+
+            container.classList.remove('open');
+            const toggle = container.querySelector('.actions-toggle');
+            const list = container.querySelector('.table-actions-list');
+            if (toggle) {
+              toggle.setAttribute('aria-expanded', 'false');
+            }
+            if (list) {
+              list.setAttribute('aria-hidden', 'true');
+            }
+          });
+        }
+
+        function setApprovalStatusLabel(volunteerId, isApproved) {
+          const statusLabel = document.querySelector('.approval-status[data-volunteer-id="' + volunteerId + '"]');
+          if (!statusLabel) {
+            return;
+          }
+
+          statusLabel.textContent = isApproved ? 'Enabled' : 'Disabled';
+          statusLabel.classList.toggle('approved', isApproved);
+          statusLabel.classList.toggle('pending', !isApproved);
+        }
+
+        function initializeVolunteerSearch() {
+          const searchInput = document.getElementById('volunteerSearch');
+          const table = document.querySelector('.table');
+          if (!searchInput || !table) {
+            return;
+          }
+
+          const allRows = Array.from(table.querySelectorAll('tbody tr'))
+            .filter(row => !row.classList.contains('no-results-row') && !row.classList.contains('no-data-row'));
+          const noResultsRow = table.querySelector('.no-results-row');
+          const countEl = document.getElementById('volunteerSearchCount');
+          const totalEl = document.getElementById('volunteerSearchTotal');
+          const resetButton = document.getElementById('volunteerSearchReset');
+          const totalCount = allRows.length;
+
+          if (totalEl) {
+            totalEl.textContent = String(totalCount);
+          }
+
+          const normalizeSearchValue = rawValue => {
+            if (!rawValue) {
+              return '';
+            }
+            let normalized = String(rawValue);
+            try {
+              normalized = normalized.normalize('NFD');
+            } catch (_error) {
+              // normalize may be unavailable - ignore and continue
+            }
+            normalized = normalized.replace(/[\u0300-\u036f]/g, '');
+            return normalized
+              .toLowerCase()
+              .replace(/\s+/g, ' ')
+              .trim();
+          };
+
+          const applyFilter = () => {
+            const query = normalizeSearchValue(searchInput.value);
+            let visibleCount = 0;
+
+            closeActionMenus();
+
+            allRows.forEach(row => {
+              const attributeTokens = row.getAttribute('data-search') || '';
+              const haystack = attributeTokens || normalizeSearchValue(row.textContent || '');
+              const matches = haystack.includes(query);
+              row.style.display = matches ? '' : 'none';
+              if (matches) {
+                visibleCount += 1;
+              }
+            });
+
+            if (countEl) {
+              countEl.textContent = String(visibleCount);
+            }
+
+            if (noResultsRow) {
+              const shouldShow = totalCount > 0 && query !== '' && visibleCount === 0;
+              noResultsRow.style.display = shouldShow ? '' : 'none';
+            }
+          };
+
+          searchInput.addEventListener('input', applyFilter);
+          searchInput.addEventListener('search', applyFilter);
+          searchInput.addEventListener('keydown', event => {
+            if (event.key === 'Escape' && searchInput.value) {
+              searchInput.value = '';
+              applyFilter();
+              searchInput.blur();
+            }
+          });
+
+          if (resetButton) {
+            resetButton.addEventListener('click', () => {
+              searchInput.value = '';
+              applyFilter();
+              searchInput.focus();
+            });
+          }
+
+          applyFilter();
+        }
         
         async function copySignupUrl(volunteerId) {
-          const input = document.getElementById(\`url-\${volunteerId}\`);
+          const input = document.getElementById('url-' + volunteerId);
+          if (!input) {
+            return;
+          }
+
           const fullUrl = input.getAttribute('data-full-url') || input.value;
-          
+
           try {
             await navigator.clipboard.writeText(fullUrl);
             if (typeof Toast !== 'undefined') {
               Toast.success('Signup URL copied to clipboard!', 2000);
             }
-          } catch (err) {
-            // Fallback for older browsers
+          } catch (_error) {
             input.select();
             document.execCommand('copy');
             if (typeof Toast !== 'undefined') {
@@ -396,13 +1075,17 @@ export function renderVolunteersTemplate(data: VolunteersPageData): string {
             }
           }
         }
-        
+
         function openSignupUrl(volunteerId) {
-          const input = document.getElementById(\`url-\${volunteerId}\`);
-          const fullUrl = input.getAttribute('data-full-url') || globalThis.location.origin + input.value;
+          const input = document.getElementById('url-' + volunteerId);
+          if (!input) {
+            return;
+          }
+
+          const fullUrl = input.getAttribute('data-full-url') || input.value;
           globalThis.open(fullUrl, '_blank');
         }
-        
+
         // Toggle approval status
         async function toggleApproval(volunteerId, approved, volunteerName) {
           try {
@@ -441,8 +1124,11 @@ export function renderVolunteersTemplate(data: VolunteersPageData): string {
                           action: 'cancel',
                           handler: () => {
                             // User cancelled - revert the toggle
-                            const checkbox = document.querySelector(\`input[onchange*="toggleApproval(\${volunteerId}"]\`);
-                            if (checkbox) checkbox.checked = true;
+                            const checkbox = document.querySelector('input[onchange*="toggleApproval(' + volunteerId + '"]');
+                            if (checkbox) {
+                              checkbox.checked = true;
+                            }
+                            setApprovalStatusLabel(volunteerId, true);
                           }
                         },
                         {
@@ -483,8 +1169,11 @@ export function renderVolunteersTemplate(data: VolunteersPageData): string {
                         await proceedWithDisabling(volunteerId, approved, volunteerName, shifts);
                       } else {
                         // User cancelled completely - revert the toggle
-                        const checkbox = document.querySelector(\`input[onchange*="toggleApproval(\${volunteerId}"]\`);
-                        if (checkbox) checkbox.checked = true;
+                        const checkbox = document.querySelector('input[onchange*="toggleApproval(' + volunteerId + '"]');
+                        if (checkbox) {
+                          checkbox.checked = true;
+                        }
+                        setApprovalStatusLabel(volunteerId, true);
                       }
                     }
                   }
@@ -537,6 +1226,7 @@ export function renderVolunteersTemplate(data: VolunteersPageData): string {
           });
           
           if (response.ok) {
+            setApprovalStatusLabel(volunteerId, approved);
             
             // Show success message
             if (typeof Toast !== 'undefined') {
@@ -563,8 +1253,11 @@ export function renderVolunteersTemplate(data: VolunteersPageData): string {
         
         // Helper function to revert toggle state
         function revertToggle(volunteerId, approved) {
-          const checkbox = document.querySelector(\`input[onchange*="toggleApproval(\${volunteerId}"]\`);
-          if (checkbox) checkbox.checked = !approved;
+          const checkbox = document.querySelector('input[onchange*="toggleApproval(' + volunteerId + '"]');
+          if (checkbox) {
+            checkbox.checked = !approved;
+          }
+          setApprovalStatusLabel(volunteerId, !approved);
         }
         
         // Generate PDF for removed shifts
