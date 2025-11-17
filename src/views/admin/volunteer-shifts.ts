@@ -71,9 +71,48 @@ export async function showVolunteerShiftsPage(ctx: RouterContext<string>) {
 
     const assignedShifts = assignedShiftsResult.rows as VolunteerShift[];
 
+    const pastShiftsResult = await client.queryObject(
+      `
+      SELECT 
+        s.id,
+        sd.show_id,
+        sh.name as show_name,
+        s.role,
+        CASE 
+          WHEN s.arrive_time IS NOT NULL THEN
+            TO_CHAR(s.arrive_time AT TIME ZONE 'Australia/Adelaide', 'DD/MM/YYYY at FMHH12:MI AM')
+          ELSE 'Time TBD'
+        END as start_time,
+        CASE 
+          WHEN s.depart_time IS NOT NULL THEN
+            TO_CHAR(s.depart_time AT TIME ZONE 'Australia/Adelaide', 'DD/MM/YYYY at FMHH12:MI AM') ||
+            CASE 
+              WHEN s.arrive_time IS NOT NULL AND (s.arrive_time AT TIME ZONE 'Australia/Adelaide')::date != (s.depart_time AT TIME ZONE 'Australia/Adelaide')::date 
+              THEN ' (+1 day)'
+              ELSE ''
+            END
+          ELSE 'Time TBD'
+        END as end_time,
+        TO_CHAR(s.arrive_time AT TIME ZONE 'Australia/Adelaide', 'YYYY-MM-DD"T"HH24:MI:SS') as arrive_time,
+        TO_CHAR(s.depart_time AT TIME ZONE 'Australia/Adelaide', 'YYYY-MM-DD"T"HH24:MI:SS') as depart_time,
+        sd.id as performance_id
+      FROM shifts s
+      JOIN participant_shifts ps ON ps.shift_id = s.id
+      JOIN show_dates sd ON s.show_date_id = sd.id
+      JOIN shows sh ON sd.show_id = sh.id
+      WHERE ps.participant_id = $1
+        AND COALESCE(s.depart_time, sd.end_time, sd.start_time) < NOW()
+      ORDER BY sd.start_time DESC, s.arrive_time DESC
+    `,
+      [volunteerId]
+    );
+
+    const pastShifts = pastShiftsResult.rows as VolunteerShift[];
+
     const data: VolunteerShiftsPageData = {
       volunteer,
       assignedShifts,
+      pastShifts,
     };
 
     ctx.response.headers.set("Content-Type", "text/html");

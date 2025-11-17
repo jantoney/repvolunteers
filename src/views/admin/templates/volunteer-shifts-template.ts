@@ -1,4 +1,8 @@
-import { getAdminNavigation, getAdminStyles, getAdminScripts } from "../components/navigation.ts";
+import {
+  getAdminNavigation,
+  getAdminStyles,
+  getAdminScripts,
+} from "../components/navigation.ts";
 
 export interface VolunteerShift {
   id: number;
@@ -19,11 +23,14 @@ export interface VolunteerShiftsPageData {
     email: string;
   };
   assignedShifts: VolunteerShift[];
+  pastShifts: VolunteerShift[];
 }
 
-export function renderVolunteerShiftsTemplate(data: VolunteerShiftsPageData): string {
-  const { volunteer, assignedShifts } = data;
-  
+export function renderVolunteerShiftsTemplate(
+  data: VolunteerShiftsPageData
+): string {
+  const { volunteer, assignedShifts, pastShifts } = data;
+
   return `
     <!DOCTYPE html>
     <html>
@@ -205,10 +212,38 @@ export function renderVolunteerShiftsTemplate(data: VolunteerShiftsPageData): st
             grid-template-columns: 1fr;
           }
         }
+        .table-wrapper {
+          overflow-x: auto;
+        }
+        .shifts-table {
+          width: 100%;
+          border-collapse: collapse;
+          background: white;
+          border: 1px solid #dee2e6;
+          border-radius: 8px;
+          overflow: hidden;
+        }
+        .shifts-table th,
+        .shifts-table td {
+          padding: 0.75rem;
+          text-align: left;
+          border-bottom: 1px solid #dee2e6;
+        }
+        .shifts-table th {
+          background: #f0f3f8;
+          font-weight: 600;
+          color: #333;
+        }
+        .shifts-table tr:last-child td {
+          border-bottom: none;
+        }
+        .shifts-table tbody tr:nth-child(even) {
+          background: #f9fbfd;
+        }
       </style>
     </head>
     <body>
-      ${getAdminNavigation('volunteers')}
+      ${getAdminNavigation("volunteers")}
       
       <!-- Main Content -->
       <div class="main-content">
@@ -219,7 +254,7 @@ export function renderVolunteerShiftsTemplate(data: VolunteerShiftsPageData): st
         <div class="volunteer-header">
           <div class="volunteer-info">
             <h2>${volunteer.name}</h2>
-            <p><strong>Email:</strong> ${volunteer.email || 'N/A'}</p>
+            <p><strong>Email:</strong> ${volunteer.email || "N/A"}</p>
             <p><strong>Participant ID:</strong> ${volunteer.id}</p>
           </div>
         </div>
@@ -228,6 +263,10 @@ export function renderVolunteerShiftsTemplate(data: VolunteerShiftsPageData): st
           <div class="stat-card">
             <div class="stat-number">${assignedShifts.length}</div>
             <div class="stat-label">Upcoming Assigned Shifts</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-number">${pastShifts.length}</div>
+            <div class="stat-label">Past Shifts</div>
           </div>
         </div>
         
@@ -238,9 +277,12 @@ export function renderVolunteerShiftsTemplate(data: VolunteerShiftsPageData): st
           </div>
           
           <div class="shifts-grid">
-            ${assignedShifts.length === 0 ? 
-              '<div class="no-shifts">No upcoming shifts currently assigned</div>' :
-              assignedShifts.map(shift => `
+            ${
+              assignedShifts.length === 0
+                ? '<div class="no-shifts">No upcoming shifts currently assigned</div>'
+                : assignedShifts
+                    .map(
+                      (shift) => `
                 <div class="shift-card assigned">
                   <div class="shift-header">
                     <div>
@@ -275,9 +317,52 @@ export function renderVolunteerShiftsTemplate(data: VolunteerShiftsPageData): st
                     </button>
                   </div>
                 </div>
-              `).join('')
+              `
+                    )
+                    .join("")
             }
           </div>
+        </section>
+
+        <!-- Past Shifts Section -->
+        <section>
+          <div class="section-header">
+            <h3>Past Shifts</h3>
+          </div>
+          ${
+            pastShifts.length === 0
+              ? `
+            <div class="no-shifts">No past shifts recorded</div>
+          `
+              : `
+            <div class="table-wrapper">
+              <table class="shifts-table">
+                <thead>
+                  <tr>
+                    <th>Show</th>
+                    <th>Role</th>
+                    <th>Start</th>
+                    <th>End</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${pastShifts
+                    .map(
+                      (shift) => `
+                    <tr>
+                      <td>${shift.show_name}</td>
+                      <td>${shift.role}</td>
+                      <td>${shift.start_time}</td>
+                      <td>${shift.end_time}</td>
+                    </tr>
+                  `
+                    )
+                    .join("")}
+                </tbody>
+              </table>
+            </div>
+          `
+          }
         </section>
       </div>
 
@@ -288,7 +373,9 @@ export function renderVolunteerShiftsTemplate(data: VolunteerShiftsPageData): st
       <script>
         // Initialize the volunteer shifts functionality with data
         if (typeof initVolunteerShifts === 'function') {
-          initVolunteerShifts(${volunteer.id}, ${JSON.stringify(volunteer.name)}, ${JSON.stringify(assignedShifts)});
+          initVolunteerShifts(${volunteer.id}, ${JSON.stringify(
+    volunteer.name
+  )}, ${JSON.stringify(assignedShifts)});
         }
       </script>
     </body>

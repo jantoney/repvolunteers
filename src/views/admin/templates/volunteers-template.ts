@@ -108,7 +108,7 @@ export function renderVolunteersTemplate(data: VolunteersPageData): string {
                       }" readonly id="url-${volunteer.id}" data-full-url="">
                       <button type="button" class="actions-toggle" aria-haspopup="true" aria-expanded="false" aria-label='Toggle actions menu for ${ariaName}' aria-controls="actions-menu-${
         volunteer.id
-      }">
+      }" style="anchor-name: --actions-toggle-${volunteer.id};">
                         <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
                           <circle cx="8" cy="2" r="1.5"></circle>
                           <circle cx="8" cy="8" r="1.5"></circle>
@@ -118,7 +118,9 @@ export function renderVolunteersTemplate(data: VolunteersPageData): string {
                       </button>
                       <div class="table-actions-list" id="actions-menu-${
                         volunteer.id
-                      }" role="menu" aria-hidden="true">
+                      }" role="menu" aria-hidden="true" tabindex="-1" popover="manual" style="position-anchor: --actions-toggle-${
+        volunteer.id
+      };">
                         <a href="/admin/volunteers/${
                           volunteer.id
                         }/shifts" class="menu-item" role="menuitem">Shifts</a>
@@ -479,10 +481,10 @@ export function renderVolunteersTemplate(data: VolunteersPageData): string {
         }
 
         .table-actions-list {
-          display: none;
           position: absolute;
-          right: 0;
-          top: calc(100% + 0.5rem);
+          inset: auto;
+          display: flex;
+          flex-direction: column;
           background: #ffffff;
           border-radius: 12px;
           border: 1px solid #dfe3eb;
@@ -490,13 +492,28 @@ export function renderVolunteersTemplate(data: VolunteersPageData): string {
           padding: 0.75rem;
           min-width: min(260px, 90vw);
           max-width: min(260px, 90vw);
-          flex-direction: column;
           gap: 0.25rem;
           z-index: 20;
+          position-area: bottom span-left;
+          position-try-fallbacks: --actions-menu-top;
+          margin-block-start: 0.5rem;
+          justify-self: anchor-end;
+          position-visibility: anchors-visible;
+          pointer-events: auto;
+          opacity: 0;
+          visibility: hidden;
+          transition: opacity 0.15s ease;
         }
 
-        .table-actions.open .table-actions-list {
-          display: flex;
+        .table-actions-list:popover-open {
+          opacity: 1;
+          visibility: visible;
+        }
+
+        @position-try --actions-menu-top {
+          position-area: top span-left;
+          margin-block-start: 0;
+          margin-block-end: 0.5rem;
         }
 
         .table-actions.open .actions-toggle {
@@ -571,10 +588,6 @@ export function renderVolunteersTemplate(data: VolunteersPageData): string {
         }
 
         @media (max-width: 820px) {
-          .table-container {
-            overflow-x: visible;
-          }
-
           .table {
             min-width: 0;
           }
@@ -873,54 +886,65 @@ export function renderVolunteersTemplate(data: VolunteersPageData): string {
               }
             };
 
+            const openMenu = () => {
+              closeActionMenus();
+              list.showPopover();
+              container.classList.add('open');
+              toggle.setAttribute('aria-expanded', 'true');
+              list.setAttribute('aria-hidden', 'false');
+              requestAnimationFrame(() => focusFirstMenuItem());
+            };
+
+            const closeMenu = ({ focusToggle } = { focusToggle: false }) => {
+              if (list.matches(':popover-open')) {
+                list.hidePopover();
+              }
+              container.classList.remove('open');
+              toggle.setAttribute('aria-expanded', 'false');
+              list.setAttribute('aria-hidden', 'true');
+              if (focusToggle) {
+                toggle.focus();
+              }
+            };
+
             toggle.addEventListener('click', event => {
               event.preventDefault();
               event.stopPropagation();
 
-              const isOpen = container.classList.contains('open');
-              if (isOpen) {
-                container.classList.remove('open');
-                toggle.setAttribute('aria-expanded', 'false');
-                list.setAttribute('aria-hidden', 'true');
+              if (list.matches(':popover-open')) {
+                closeMenu();
               } else {
-                closeActionMenus();
-                container.classList.add('open');
-                toggle.setAttribute('aria-expanded', 'true');
-                list.setAttribute('aria-hidden', 'false');
+                openMenu();
               }
             });
 
             toggle.addEventListener('keydown', event => {
               if (event.key === 'Enter' || event.key === ' ') {
                 event.preventDefault();
-                toggle.click();
-                setTimeout(() => {
-                  if (container.classList.contains('open')) {
-                    focusFirstMenuItem();
-                  }
-                }, 0);
+                if (list.matches(':popover-open')) {
+                  closeMenu();
+                } else {
+                  openMenu();
+                }
               } else if (event.key === 'ArrowDown') {
                 event.preventDefault();
-                if (!container.classList.contains('open')) {
-                  closeActionMenus();
-                  container.classList.add('open');
-                  toggle.setAttribute('aria-expanded', 'true');
-                  list.setAttribute('aria-hidden', 'false');
+                if (!list.matches(':popover-open')) {
+                  openMenu();
+                } else {
+                  focusFirstMenuItem();
                 }
-                focusFirstMenuItem();
               }
             });
 
             list.addEventListener('click', event => {
               event.stopPropagation();
-              setTimeout(() => closeActionMenus(), 0);
+              setTimeout(() => closeMenu(), 0);
             });
 
             list.addEventListener('keydown', event => {
               if (event.key === 'Escape') {
                 event.preventDefault();
-                closeActionMenus();
-                toggle.focus();
+                closeMenu({ focusToggle: true });
               }
             });
           });
@@ -942,21 +966,23 @@ export function renderVolunteersTemplate(data: VolunteersPageData): string {
           }
         }
 
-        function closeActionMenus(excluded) {
-          document.querySelectorAll('.table-actions.open').forEach(container => {
-            if (excluded && container === excluded) {
+        function closeActionMenus() {
+          document.querySelectorAll('.table-actions').forEach(container => {
+            const toggle = container.querySelector('.actions-toggle');
+            const list = container.querySelector('.table-actions-list');
+            if (!list) {
               return;
             }
 
+            if (typeof list.hidePopover === 'function' && list.matches(':popover-open')) {
+              list.hidePopover();
+            }
+
             container.classList.remove('open');
-            const toggle = container.querySelector('.actions-toggle');
-            const list = container.querySelector('.table-actions-list');
             if (toggle) {
               toggle.setAttribute('aria-expanded', 'false');
             }
-            if (list) {
-              list.setAttribute('aria-hidden', 'true');
-            }
+            list.setAttribute('aria-hidden', 'true');
           });
         }
 
