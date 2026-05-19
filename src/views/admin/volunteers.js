@@ -1,170 +1,216 @@
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener("DOMContentLoaded", function () {
   let currentVolunteerId = null;
-  
+
   // Make functions globally available for inline onclick handlers
   globalThis.manageShifts = manageShifts;
   globalThis.deleteVolunteer = deleteVolunteer;
   globalThis.closeModal = closeModal;
   globalThis.assignShift = assignShift;
   globalThis.unassignShift = unassignShift;
-  
+
   async function manageShifts(volunteerId, volunteerName) {
     currentVolunteerId = volunteerId;
-    document.getElementById('modalTitle').textContent = `Manage Shifts for ${volunteerName}`;
-    
+    document.getElementById("modalTitle").textContent =
+      `Manage Shifts for ${volunteerName}`;
+
     // Load assigned shifts
     try {
-      const assignedResponse = await fetch(`/admin/api/volunteers/${volunteerId}/shifts`, {
-        credentials: 'include'
-      });
+      const assignedResponse = await fetch(
+        `/admin/api/volunteers/${volunteerId}/shifts`,
+        {
+          credentials: "include",
+        },
+      );
       const assignedShifts = await assignedResponse.json();
-      
-      const assignedContainer = document.getElementById('assignedShiftsList');
+
+      const assignedContainer = document.getElementById("assignedShiftsList");
       if (assignedShifts.length === 0) {
-        assignedContainer.innerHTML = '<div class="no-shifts">No shifts assigned</div>';
+        AdminDOM.setChildren(
+          assignedContainer,
+          AdminDOM.el("div", { className: "no-shifts" }, "No shifts assigned"),
+        );
       } else {
-        assignedContainer.innerHTML = assignedShifts.map(shift => `
-          <div class="shift-item">
-            <div class="shift-info">
-              <div class="shift-title">${shift.show_name} - ${shift.role}</div>
-              <div class="shift-details">${shift.date} at ${shift.time}</div>
-            </div>
-            <button class="btn btn-sm btn-danger" onclick="unassignShift(${shift.id})">Remove</button>
-          </div>
-        `).join('');
+        AdminDOM.setChildren(
+          assignedContainer,
+          assignedShifts.map((shift) =>
+            AdminDOM.el("div", {
+              className: "shift-item",
+            }, [
+              AdminDOM.el("div", { className: "shift-info" }, [
+                AdminDOM.el(
+                  "div",
+                  { className: "shift-title" },
+                  `${shift.show_name} - ${shift.role}`,
+                ),
+                AdminDOM.el(
+                  "div",
+                  { className: "shift-details" },
+                  `${shift.date} at ${shift.time}`,
+                ),
+              ]),
+              AdminDOM.el("button", {
+                className: "btn btn-sm btn-danger",
+                onclick: () => unassignShift(shift.id),
+              }, "Remove"),
+            ])
+          ),
+        );
       }
-      
+
       // Load available shifts
-      const availableResponse = await fetch('/admin/api/shifts/available', {
-        credentials: 'include'
+      const availableResponse = await fetch("/admin/api/shifts/available", {
+        credentials: "include",
       });
       const availableShifts = await availableResponse.json();
-      
-      const availableContainer = document.getElementById('availableShiftsList');
+
+      const availableContainer = document.getElementById("availableShiftsList");
       if (availableShifts.length === 0) {
-        availableContainer.innerHTML = '<div class="no-shifts">No available shifts</div>';
+        AdminDOM.setChildren(
+          availableContainer,
+          AdminDOM.el("div", { className: "no-shifts" }, "No available shifts"),
+        );
       } else {
-        availableContainer.innerHTML = availableShifts.map(shift => `
-          <div class="shift-item">
-            <div class="shift-info">
-              <div class="shift-title">${shift.show_name} - ${shift.role}</div>
-              <div class="shift-details">${shift.date} at ${shift.time}</div>
-            </div>
-            <button class="btn btn-sm btn-success" onclick="assignShift(${shift.id})">Assign</button>
-          </div>
-        `).join('');
+        AdminDOM.setChildren(
+          availableContainer,
+          availableShifts.map((shift) =>
+            AdminDOM.el("div", {
+              className: "shift-item",
+            }, [
+              AdminDOM.el("div", { className: "shift-info" }, [
+                AdminDOM.el(
+                  "div",
+                  { className: "shift-title" },
+                  `${shift.show_name} - ${shift.role}`,
+                ),
+                AdminDOM.el(
+                  "div",
+                  { className: "shift-details" },
+                  `${shift.date} at ${shift.time}`,
+                ),
+              ]),
+              AdminDOM.el("button", {
+                className: "btn btn-sm btn-success",
+                onclick: () => assignShift(shift.id),
+              }, "Assign"),
+            ])
+          ),
+        );
       }
-      
-      document.getElementById('shiftModal').style.display = 'block';
+
+      document.getElementById("shiftModal").style.display = "block";
     } catch (_error) {
-      console.error('Error loading shifts:', _error);
-      if (typeof Modal !== 'undefined') {
-        Modal.error('Error', 'Failed to load shifts');
+      console.error("Error loading shifts:", _error);
+      if (typeof Modal !== "undefined") {
+        Modal.error("Error", "Failed to load shifts");
       } else {
-        alert('Failed to load shifts');
+        alert("Failed to load shifts");
       }
     }
   }
-  
+
   async function assignShift(shiftId) {
     try {
       const response = await fetch(`/admin/api/shifts/${shiftId}/assign`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ participantId: currentVolunteerId }),
-        credentials: 'include'
+        credentials: "include",
       });
-      
+
       if (response.ok) {
         // Refresh the modal content
-        const modalTitle = document.getElementById('modalTitle').textContent;
-        const volunteerName = modalTitle.replace('Manage Shifts for ', '');
+        const modalTitle = document.getElementById("modalTitle").textContent;
+        const volunteerName = modalTitle.replace("Manage Shifts for ", "");
         await manageShifts(currentVolunteerId, volunteerName);
       } else {
-        if (typeof Modal !== 'undefined') {
-          Modal.error('Error', 'Failed to assign shift');
+        if (typeof Modal !== "undefined") {
+          Modal.error("Error", "Failed to assign shift");
         } else {
-          alert('Failed to assign shift');
+          alert("Failed to assign shift");
         }
       }
     } catch (_error) {
-      console.error('Error assigning shift:', _error);
-      if (typeof Modal !== 'undefined') {
-        Modal.error('Error', 'Error assigning shift');
+      console.error("Error assigning shift:", _error);
+      if (typeof Modal !== "undefined") {
+        Modal.error("Error", "Error assigning shift");
       } else {
-        alert('Error assigning shift');
+        alert("Error assigning shift");
       }
     }
   }
-  
+
   async function unassignShift(shiftId) {
     try {
       const response = await fetch(`/admin/api/shifts/${shiftId}/unassign`, {
-        method: 'POST',
-        credentials: 'include'
+        method: "POST",
+        credentials: "include",
       });
-      
+
       if (response.ok) {
         // Refresh the modal content
-        const modalTitle = document.getElementById('modalTitle').textContent;
-        const volunteerName = modalTitle.replace('Manage Shifts for ', '');
+        const modalTitle = document.getElementById("modalTitle").textContent;
+        const volunteerName = modalTitle.replace("Manage Shifts for ", "");
         await manageShifts(currentVolunteerId, volunteerName);
       } else {
-        if (typeof Modal !== 'undefined') {
-          Modal.error('Error', 'Failed to unassign shift');
+        if (typeof Modal !== "undefined") {
+          Modal.error("Error", "Failed to unassign shift");
         } else {
-          alert('Failed to unassign shift');
+          alert("Failed to unassign shift");
         }
       }
     } catch (_error) {
-      console.error('Error unassigning shift:', _error);
-      if (typeof Modal !== 'undefined') {
-        Modal.error('Error', 'Error unassigning shift');
+      console.error("Error unassigning shift:", _error);
+      if (typeof Modal !== "undefined") {
+        Modal.error("Error", "Error unassigning shift");
       } else {
-        alert('Error unassigning shift');
+        alert("Error unassigning shift");
       }
     }
   }
-  
+
   async function deleteVolunteer(id, name) {
-    if (!confirm(`Are you sure you want to delete ${name}? This will also unassign them from all shifts.`)) {
+    if (
+      !confirm(
+        `Are you sure you want to delete ${name}? This will also unassign them from all shifts.`,
+      )
+    ) {
       return;
     }
-    
+
     try {
       const response = await fetch(`/admin/api/volunteers/${id}`, {
-        method: 'DELETE',
-        credentials: 'include'
+        method: "DELETE",
+        credentials: "include",
       });
-      
+
       if (response.ok) {
         globalThis.location.reload();
       } else {
-        if (typeof Modal !== 'undefined') {
-          Modal.error('Error', 'Failed to delete participant');
+        if (typeof Modal !== "undefined") {
+          Modal.error("Error", "Failed to delete participant");
         } else {
-          alert('Failed to delete participant');
+          alert("Failed to delete participant");
         }
       }
     } catch (_error) {
-      console.error('Error:', _error);
-      if (typeof Modal !== 'undefined') {
-        Modal.error('Error', 'Error deleting participant');
+      console.error("Error:", _error);
+      if (typeof Modal !== "undefined") {
+        Modal.error("Error", "Error deleting participant");
       } else {
-        alert('Error deleting participant');
+        alert("Error deleting participant");
       }
     }
   }
-  
+
   function closeModal() {
-    document.getElementById('shiftModal').style.display = 'none';
+    document.getElementById("shiftModal").style.display = "none";
   }
-  
+
   // Close modal when clicking outside of it
-  globalThis.onclick = function(event) {
-    const modal = document.getElementById('shiftModal');
+  globalThis.onclick = function (event) {
+    const modal = document.getElementById("shiftModal");
     if (event.target === modal) {
-      modal.style.display = 'none';
+      modal.style.display = "none";
     }
   };
 });

@@ -37,6 +37,21 @@ router.get("/src/views/admin/:filename", async (ctx) => {
   }
 });
 
+router.get("/src/views/admin/styles/:filename", async (ctx) => {
+  const filename = ctx.params.filename;
+  if (filename && filename.endsWith('.css')) {
+    try {
+      await send(ctx, `src/views/admin/styles/${filename}`, {
+        root: Deno.cwd(),
+      });
+    } catch {
+      ctx.response.status = 404;
+    }
+  } else {
+    ctx.response.status = 404;
+  }
+});
+
 // PWA manifest
 router.get("/manifest.webmanifest", async (ctx) => {
   ctx.response.headers.set("Content-Type", "application/manifest+json");
