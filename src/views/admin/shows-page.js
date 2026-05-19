@@ -36,115 +36,170 @@ window.toggleDates = async function (showId) {
               AdminDOM.el("em", {}, "No performances set"),
             );
           } else {
-            const table = AdminDOM.el("table", {
-              style: { width: "100%", margin: "0" },
-            }, [
-              AdminDOM.el(
-                "thead",
-                {},
-                AdminDOM.el("tr", { style: { background: "none" } }, [
-                  AdminDOM.el("th", {
-                    style: { padding: "0.5rem", border: "none" },
-                  }, "Date"),
-                  AdminDOM.el("th", {
-                    style: { padding: "0.5rem", border: "none" },
-                  }, "Performance Time"),
-                  AdminDOM.el("th", {
-                    style: { padding: "0.5rem", border: "none" },
-                  }, "Shifts"),
-                  AdminDOM.el("th", {
-                    style: { padding: "0.5rem", border: "none" },
-                  }, "Actions"),
-                ]),
-              ),
-              AdminDOM.el(
-                "tbody",
-                {},
-                Array.isArray(dates)
-                  ? dates.map((date) => {
-                    const fillPercentage = date.total_shifts > 0
-                      ? (date.filled_shifts / date.total_shifts) * 100
-                      : 0;
-                    let trafficColor = "grey";
-                    if (date.total_shifts > 0) {
-                      if (fillPercentage >= 80) trafficColor = "green";
-                      else if (fillPercentage >= 50) trafficColor = "yellow";
-                      else trafficColor = "red";
-                    }
-                    const dateForInput =
-                      (new Date(date.start_time)).toISOString().split("T")[0];
-                    const start = new Date(date.start_time);
-                    const end = new Date(date.end_time);
-                    const showTimeRange = `${
-                      start.getHours().toString().padStart(2, "0")
-                    }:${start.getMinutes().toString().padStart(2, "0")} - ${
-                      end.getHours().toString().padStart(2, "0")
-                    }:${end.getMinutes().toString().padStart(2, "0")}`;
-                    const shiftsLabel = date.total_shifts > 0
-                      ? date.filled_shifts + "/" + date.total_shifts
-                      : "No shifts";
-                    const actions = date.total_shifts > 0
-                      ? [
-                        AdminDOM.el("a", {
-                          href:
-                            `/admin/shifts?shows=${showId}&date=${dateForInput}`,
-                          className: "performance-link",
-                        }, "View Shifts"),
-                        AdminDOM.el("button", {
-                          className: "btn btn-sm btn-info",
-                          style: { marginLeft: "8px" },
-                          onclick: () =>
-                            window.open(
-                              `/admin/api/show-dates/${date.id}/run-sheet`,
-                              "_blank",
-                            ),
-                        }, "Run Sheet PDF"),
-                      ]
-                      : AdminDOM.el(
-                        "span",
-                        { style: { color: "#6c757d" } },
-                        "No shifts",
-                      );
+            const table = AdminDOM.el(
+              "table",
+              {
+                style: { width: "100%", margin: "0" },
+              },
+              [
+                AdminDOM.el(
+                  "thead",
+                  {},
+                  AdminDOM.el("tr", { style: { background: "none" } }, [
+                    AdminDOM.el(
+                      "th",
+                      {
+                        style: { padding: "0.5rem", border: "none" },
+                      },
+                      "Date",
+                    ),
+                    AdminDOM.el(
+                      "th",
+                      {
+                        style: { padding: "0.5rem", border: "none" },
+                      },
+                      "Performance Time",
+                    ),
+                    AdminDOM.el(
+                      "th",
+                      {
+                        style: { padding: "0.5rem", border: "none" },
+                      },
+                      "Shifts",
+                    ),
+                    AdminDOM.el(
+                      "th",
+                      {
+                        style: { padding: "0.5rem", border: "none" },
+                      },
+                      "Actions",
+                    ),
+                  ]),
+                ),
+                AdminDOM.el(
+                  "tbody",
+                  {},
+                  Array.isArray(dates)
+                    ? dates.map((date) => {
+                        const fillPercentage =
+                          date.total_shifts > 0
+                            ? (date.filled_shifts / date.total_shifts) * 100
+                            : 0;
+                        let trafficColor = "grey";
+                        if (date.total_shifts > 0) {
+                          if (fillPercentage >= 80) trafficColor = "green";
+                          else if (fillPercentage >= 50)
+                            trafficColor = "yellow";
+                          else trafficColor = "red";
+                        }
+                        const dateForInput = new Date(date.start_time)
+                          .toISOString()
+                          .split("T")[0];
+                        const start = new Date(date.start_time);
+                        const end = new Date(date.end_time);
+                        const showTimeRange = `${start
+                          .getHours()
+                          .toString()
+                          .padStart(
+                            2,
+                            "0",
+                          )}:${start.getMinutes().toString().padStart(2, "0")} - ${end
+                          .getHours()
+                          .toString()
+                          .padStart(
+                            2,
+                            "0",
+                          )}:${end.getMinutes().toString().padStart(2, "0")}`;
+                        const shiftsLabel =
+                          date.total_shifts > 0
+                            ? date.filled_shifts + "/" + date.total_shifts
+                            : "No shifts";
+                        const actions =
+                          date.total_shifts > 0
+                            ? [
+                                AdminDOM.el(
+                                  "a",
+                                  {
+                                    href: `/admin/shifts?shows=${showId}&date=${dateForInput}`,
+                                    className: "performance-link",
+                                  },
+                                  "View Shifts",
+                                ),
+                                AdminDOM.el(
+                                  "button",
+                                  {
+                                    className: "btn btn-sm btn-info",
+                                    style: { marginLeft: "8px" },
+                                    onclick: () =>
+                                      window.open(
+                                        `/admin/api/show-dates/${date.id}/run-sheet`,
+                                        "_blank",
+                                      ),
+                                  },
+                                  "Run Sheet PDF",
+                                ),
+                              ]
+                            : AdminDOM.el(
+                                "span",
+                                { style: { color: "#6c757d" } },
+                                "No shifts",
+                              );
 
-                    return AdminDOM.el("tr", {}, [
-                      AdminDOM.el(
-                        "td",
-                        { style: { padding: "0.5rem", border: "none" } },
-                        start.toLocaleDateString("en-AU", {
-                          weekday: "short",
-                          day: "2-digit",
-                          month: "short",
-                          year: "numeric",
-                        }),
-                      ),
-                      AdminDOM.el("td", {
-                        style: { padding: "0.5rem", border: "none" },
-                      }, showTimeRange),
-                      AdminDOM.el("td", {
-                        style: { padding: "0.5rem", border: "none" },
-                      }, [
-                        AdminDOM.el("span", {
-                          className: `traffic-light ${trafficColor}`,
-                          style: {
-                            width: "16px",
-                            height: "16px",
-                            marginRight: "6px",
-                          },
-                          title: date.total_shifts > 0
-                            ? date.filled_shifts + "/" + date.total_shifts +
-                              " filled"
-                            : "No shifts",
-                        }),
-                        shiftsLabel,
-                      ]),
-                      AdminDOM.el("td", {
-                        style: { padding: "0.5rem", border: "none" },
-                      }, actions),
-                    ]);
-                  })
-                  : [],
-              ),
-            ]);
+                        return AdminDOM.el("tr", {}, [
+                          AdminDOM.el(
+                            "td",
+                            { style: { padding: "0.5rem", border: "none" } },
+                            start.toLocaleDateString("en-AU", {
+                              weekday: "short",
+                              day: "2-digit",
+                              month: "short",
+                              year: "numeric",
+                            }),
+                          ),
+                          AdminDOM.el(
+                            "td",
+                            {
+                              style: { padding: "0.5rem", border: "none" },
+                            },
+                            showTimeRange,
+                          ),
+                          AdminDOM.el(
+                            "td",
+                            {
+                              style: { padding: "0.5rem", border: "none" },
+                            },
+                            [
+                              AdminDOM.el("span", {
+                                className: `traffic-light ${trafficColor}`,
+                                style: {
+                                  width: "16px",
+                                  height: "16px",
+                                  marginRight: "6px",
+                                },
+                                title:
+                                  date.total_shifts > 0
+                                    ? date.filled_shifts +
+                                      "/" +
+                                      date.total_shifts +
+                                      " filled"
+                                    : "No shifts",
+                              }),
+                              shiftsLabel,
+                            ],
+                          ),
+                          AdminDOM.el(
+                            "td",
+                            {
+                              style: { padding: "0.5rem", border: "none" },
+                            },
+                            actions,
+                          ),
+                        ]);
+                      })
+                    : [],
+                ),
+              ],
+            );
             AdminDOM.setChildren(content, table);
           }
         } else {

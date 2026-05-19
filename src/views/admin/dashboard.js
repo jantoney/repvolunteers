@@ -18,7 +18,9 @@ document.addEventListener("click", function (event) {
   const toggle = document.querySelector(".mobile-menu-toggle");
 
   if (
-    navMenu && toggle && !navMenu.contains(event.target) &&
+    navMenu &&
+    toggle &&
+    !navMenu.contains(event.target) &&
     !toggle.contains(event.target)
   ) {
     navMenu.classList.remove("active");
@@ -74,9 +76,13 @@ function renderShowCheckboxes() {
   if (availableShows.length === 0) {
     AdminDOM.setChildren(
       container,
-      AdminDOM.el("p", {
-        style: { color: "#666", margin: "0" },
-      }, "No productions with shifts found."),
+      AdminDOM.el(
+        "p",
+        {
+          style: { color: "#666", margin: "0" },
+        },
+        "No productions with shifts found.",
+      ),
     );
     return;
   }
@@ -84,20 +90,28 @@ function renderShowCheckboxes() {
   AdminDOM.setChildren(
     container,
     availableShows.map((show) =>
-      AdminDOM.el("div", {
-        className: "show-checkbox",
-      }, [
-        AdminDOM.el("input", {
-          type: "checkbox",
-          id: `show-${show.id}`,
-          value: show.id,
-          checked: selectedShows.includes(show.id),
-          onchange: updateSelectedShows,
-        }),
-        AdminDOM.el("label", {
-          htmlFor: `show-${show.id}`,
-        }, `${show.name} (${show.shift_count} shifts)`),
-      ])
+      AdminDOM.el(
+        "div",
+        {
+          className: "show-checkbox",
+        },
+        [
+          AdminDOM.el("input", {
+            type: "checkbox",
+            id: `show-${show.id}`,
+            value: show.id,
+            checked: selectedShows.includes(show.id),
+            onchange: updateSelectedShows,
+          }),
+          AdminDOM.el(
+            "label",
+            {
+              htmlFor: `show-${show.id}`,
+            },
+            `${show.name} (${show.shift_count} shifts)`,
+          ),
+        ],
+      ),
     ),
   );
 }
@@ -128,9 +142,8 @@ async function applyShowFilter() {
 
 async function loadShiftData() {
   try {
-    const showsParam = selectedShows.length > 0
-      ? `?shows=${selectedShows.join(",")}`
-      : "";
+    const showsParam =
+      selectedShows.length > 0 ? `?shows=${selectedShows.join(",")}` : "";
     console.log("Loading shift data with params:", showsParam);
     const response = await fetch(
       `/admin/api/shifts/calendar-data${showsParam}`,
@@ -211,7 +224,8 @@ function renderCalendar() {
 
     const isCurrentMonth = date.getMonth() === currentDate.getMonth();
     const today = new Date();
-    const isToday = date.getDate() === today.getDate() &&
+    const isToday =
+      date.getDate() === today.getDate() &&
       date.getMonth() === today.getMonth() &&
       date.getFullYear() === today.getFullYear();
 
@@ -339,6 +353,7 @@ document.addEventListener("DOMContentLoaded", () => {
 async function loadCounters() {
   await Promise.all([
     loadUnfilledShiftsCount(),
+    loadAvailabilityConflictsCount(),
     loadPerformancesWithoutShiftsCount(),
   ]);
 }
@@ -359,6 +374,30 @@ async function loadUnfilledShiftsCount() {
     }
   } catch (error) {
     console.error("Error loading unfilled shifts count:", error);
+  }
+}
+
+async function loadAvailabilityConflictsCount() {
+  try {
+    const response = await fetch("/admin/api/availability-conflicts/count", {
+      credentials: "include",
+    });
+    if (response.ok) {
+      const data = await response.json();
+      const countElement = document.getElementById(
+        "availabilityConflictsCount",
+      );
+      if (countElement) {
+        countElement.textContent = data.count;
+      }
+    } else {
+      console.error(
+        "Failed to load availability conflicts count:",
+        response.status,
+      );
+    }
+  } catch (error) {
+    console.error("Error loading availability conflicts count:", error);
   }
 }
 

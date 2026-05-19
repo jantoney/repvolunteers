@@ -4,13 +4,28 @@ let availabilityVolunteers = [];
 const selectedShowVolunteers = new Set();
 const selectedUnfilledVolunteers = new Set();
 const selectedAvailabilityVolunteers = new Set();
+const emailTypes = new Set([
+  "show-week",
+  "unfilled-shifts",
+  "availability-request",
+]);
 
 document.addEventListener("DOMContentLoaded", function () {
   loadShows();
   loadUnfilledVolunteers();
   loadAvailabilityVolunteers();
   setupEventListeners();
+  switchEmailType(getEmailTypeFromUrl(), { replaceUrl: true });
 });
+
+async function fetchJson(url, options) {
+  const response = await fetch(url, options);
+  if (!response.ok) {
+    throw new Error(`Request failed (${response.status})`);
+  }
+
+  return await response.json();
+}
 
 function setupEventListeners() {
   document.querySelectorAll(".email-tab").forEach((tab) => {
@@ -26,22 +41,64 @@ function setupEventListeners() {
       document.getElementById("showVolunteersSection").style.display = "none";
     }
   });
+
+  globalThis.addEventListener("popstate", () => {
+    switchEmailType(getEmailTypeFromUrl(), { updateUrl: false });
+  });
+
+  globalThis.addEventListener("hashchange", () => {
+    switchEmailType(getEmailTypeFromUrl(), { replaceUrl: true });
+  });
 }
 
-function switchEmailType(emailType) {
+function getEmailTypeFromUrl() {
+  const tab = new URLSearchParams(globalThis.location.search).get("tab");
+  if (emailTypes.has(tab)) {
+    return tab;
+  }
+
+  const hashTab = globalThis.location.hash.replace(/^#/, "");
+  if (emailTypes.has(hashTab)) {
+    return hashTab;
+  }
+
+  return "show-week";
+}
+
+function updateTabUrl(emailType, replaceUrl) {
+  const url = new URL(globalThis.location.href);
+  url.searchParams.set("tab", emailType);
+  url.hash = "";
+
+  const method = replaceUrl ? "replaceState" : "pushState";
+  globalThis.history[method]({}, "", url);
+}
+
+function switchEmailType(emailType, options = {}) {
+  const activeEmailType = emailTypes.has(emailType) ? emailType : "show-week";
+  const { updateUrl = true, replaceUrl = false } = options;
+
   document.querySelectorAll(".email-tab").forEach((tab) => {
-    tab.classList.toggle("active", tab.dataset.emailType === emailType);
+    const isActive = tab.dataset.emailType === activeEmailType;
+    tab.classList.toggle("active", isActive);
+    tab.setAttribute("aria-selected", String(isActive));
   });
 
   document.querySelectorAll(".email-content").forEach((content) => {
-    content.classList.toggle("active", content.id === emailType + "-content");
+    content.classList.toggle(
+      "active",
+      content.id === activeEmailType + "-content",
+    );
   });
+
+  if (updateUrl) {
+    updateTabUrl(activeEmailType, replaceUrl);
+  }
 }
 
 async function loadShows() {
   try {
-    const response = await fetch("/admin/api/bulk-email/shows");
-    const shows = await response.json();
+    const shows = await fetchJson("/admin/api/bulk-email/shows");
     const select = document.getElementById("showSelect");
 
     AdminDOM.setChildren(
@@ -69,10 +126,9 @@ async function loadShowVolunteers(showId) {
   document.getElementById("loadingState").classList.add("active");
 
   try {
-    const response = await fetch(
+    showVolunteers = await fetchJson(
       `/admin/api/bulk-email/shows/${showId}/volunteers`,
     );
-    showVolunteers = await response.json();
     renderShowVolunteers();
     document.getElementById("showVolunteersSection").style.display = "block";
     updateShowSelectionCount();
@@ -86,10 +142,9 @@ async function loadShowVolunteers(showId) {
 
 async function loadUnfilledVolunteers() {
   try {
-    const response = await fetch(
+    unfilledVolunteers = await fetchJson(
       "/admin/api/bulk-email/volunteers/unfilled-shifts",
     );
-    unfilledVolunteers = await response.json();
     renderUnfilledVolunteers();
     updateUnfilledSelectionCount();
   } catch (error) {
@@ -100,10 +155,9 @@ async function loadUnfilledVolunteers() {
 
 async function loadAvailabilityVolunteers() {
   try {
-    const response = await fetch(
+    availabilityVolunteers = await fetchJson(
       "/admin/api/bulk-email/volunteers/availability-request",
     );
-    availabilityVolunteers = await response.json();
     renderAvailabilityVolunteers();
     updateAvailabilitySelectionCount();
   } catch (error) {
@@ -112,34 +166,137 @@ async function loadAvailabilityVolunteers() {
   }
 }
 
-function createVolunteerItem(volunteer, details, onChange) {
-  return AdminDOM.el("div", { className: "volunteer-item" }, [
-    AdminDOM.el("input", {
-      type: "checkbox",
-      className: "volunteer-checkbox",
-      dataset: { volunteerId: String(volunteer.id) },
-      onchange: (event) => onChange(String(volunteer.id), event.target.checked),
-    }),
-    AdminDOM.el("div", { className: "volunteer-info" }, [
-      AdminDOM.el("div", { className: "volunteer-name" }, volunteer.name),
-      AdminDOM.el("div", { className: "volunteer-details" }, details),
-    ]),
+function hasAvailability(volunteer) {
+  return (
+    volunteer.has_availability === true ||
+    Number(
+      volunteer.availability_performances_count ??
+        volunteer.unavailable_performances_count ??
+        0,
+    ) > 0
+  );
+}
+
+function createVolunteerTable(
+  container,
+  volunteers,
+  columns,
+  selection,
+  onChange,
+  emptyMessage,
+) {
+  if (volunteers.length === 0) {
+    AdminDOM.setChildren(
+      container,
+      AdminDOM.el("div", { className: "table-empty-state" }, emptyMessage),
+    );
+    return;
+  }
+
+  const table = AdminDOM.el("table", { className: "volunteer-table" }, [
+    AdminDOM.el(
+      "thead",
+      {},
+      AdminDOM.el("tr", {}, [
+        AdminDOM.el("th", { className: "select-column" }, "Select"),
+        ...columns.map((column) =>
+          AdminDOM.el(
+            "th",
+            { className: column.className || "" },
+            column.label,
+          ),
+        ),
+      ]),
+    ),
+    AdminDOM.el(
+      "tbody",
+      {},
+      volunteers.map((volunteer) => {
+        const isSelectable =
+          hasAvailability(volunteer) ||
+          volunteer.has_availability === undefined;
+        const volunteerId = String(volunteer.id);
+        return AdminDOM.el(
+          "tr",
+          {
+            className: isSelectable ? "" : "volunteer-unavailable",
+          },
+          [
+            AdminDOM.el(
+              "td",
+              { className: "select-column" },
+              AdminDOM.el("input", {
+                type: "checkbox",
+                className: "volunteer-checkbox",
+                dataset: { volunteerId },
+                disabled: !isSelectable,
+                checked: selection.has(volunteerId),
+                title: isSelectable
+                  ? "Select volunteer"
+                  : "No availability saved",
+                onchange: (event) =>
+                  onChange(volunteerId, event.target.checked),
+              }),
+            ),
+            ...columns.map((column) =>
+              AdminDOM.el(
+                "td",
+                { className: column.className || "" },
+                column.value(volunteer, isSelectable),
+              ),
+            ),
+          ],
+        );
+      }),
+    ),
   ]);
+
+  AdminDOM.setChildren(container, table);
+}
+
+function availabilityStatus(volunteer) {
+  const count = Number(
+    volunteer.availability_performances_count ??
+      volunteer.unavailable_performances_count ??
+      0,
+  );
+
+  if (count === 0) {
+    return AdminDOM.el(
+      "span",
+      { className: "status-pill muted" },
+      "No availability saved",
+    );
+  }
+
+  return AdminDOM.el(
+    "span",
+    { className: "status-pill" },
+    `${count} performance${count === 1 ? "" : "s"}`,
+  );
 }
 
 function renderShowVolunteers() {
   const container = document.getElementById("showVolunteersList");
-  AdminDOM.setChildren(
+  createVolunteerTable(
     container,
-    showVolunteers.map((volunteer) =>
-      createVolunteerItem(
-        volunteer,
-        `${volunteer.email} - ${volunteer.shift_count} shifts - Next: ${
-          volunteer.next_shift_date || "N/A"
-        }`,
-        updateShowSelection,
-      ),
-    ),
+    showVolunteers,
+    [
+      {
+        label: "Volunteer",
+        className: "volunteer-name-cell",
+        value: (volunteer) => volunteer.name,
+      },
+      { label: "Email", value: (volunteer) => volunteer.email },
+      { label: "Shifts", value: (volunteer) => String(volunteer.shift_count) },
+      {
+        label: "Next Shift",
+        value: (volunteer) => volunteer.next_shift_date || "Not scheduled",
+      },
+    ],
+    selectedShowVolunteers,
+    updateShowSelection,
+    "No volunteers with shifts found for this production.",
   );
 
   selectedShowVolunteers.clear();
@@ -148,15 +305,29 @@ function renderShowVolunteers() {
 
 function renderUnfilledVolunteers() {
   const container = document.getElementById("unfilledVolunteersList");
-  AdminDOM.setChildren(
+  createVolunteerTable(
     container,
-    unfilledVolunteers.map((volunteer) =>
-      createVolunteerItem(
-        volunteer,
-        `${volunteer.email} - Total shifts: ${volunteer.total_shifts} - Upcoming: ${volunteer.upcoming_shifts}`,
-        updateUnfilledSelection,
-      ),
-    ),
+    unfilledVolunteers,
+    [
+      {
+        label: "Volunteer",
+        className: "volunteer-name-cell",
+        value: (volunteer) => volunteer.name,
+      },
+      { label: "Email", value: (volunteer) => volunteer.email },
+      {
+        label: "Availability",
+        value: (volunteer) => availabilityStatus(volunteer),
+      },
+      {
+        label: "Upcoming",
+        value: (volunteer) => String(volunteer.upcoming_shifts),
+      },
+      { label: "Total", value: (volunteer) => String(volunteer.total_shifts) },
+    ],
+    selectedUnfilledVolunteers,
+    updateUnfilledSelection,
+    "No approved volunteers with email addresses found.",
   );
 
   selectedUnfilledVolunteers.clear();
@@ -165,15 +336,24 @@ function renderUnfilledVolunteers() {
 
 function renderAvailabilityVolunteers() {
   const container = document.getElementById("availabilityVolunteersList");
-  AdminDOM.setChildren(
+  createVolunteerTable(
     container,
-    availabilityVolunteers.map((volunteer) =>
-      createVolunteerItem(
-        volunteer,
-        `${volunteer.email} - Unavailable performances saved: ${volunteer.unavailable_performances_count}`,
-        updateAvailabilitySelection,
-      ),
-    ),
+    availabilityVolunteers,
+    [
+      {
+        label: "Volunteer",
+        className: "volunteer-name-cell",
+        value: (volunteer) => volunteer.name,
+      },
+      { label: "Email", value: (volunteer) => volunteer.email },
+      {
+        label: "Availability",
+        value: (volunteer) => availabilityStatus(volunteer),
+      },
+    ],
+    selectedAvailabilityVolunteers,
+    updateAvailabilitySelection,
+    "No approved volunteers with email addresses found.",
   );
 
   selectedAvailabilityVolunteers.clear();
@@ -229,6 +409,10 @@ function setAll(containerSelector, selection, checked) {
     `${containerSelector} .volunteer-checkbox`,
   );
   checkboxes.forEach((checkbox) => {
+    if (checkbox.disabled) {
+      return;
+    }
+
     checkbox.checked = checked;
     if (checked) {
       selection.add(checkbox.dataset.volunteerId);
@@ -306,8 +490,8 @@ async function sendShowWeekEmails() {
     console.error("Error sending show week emails:", error);
     showStatus("Error sending emails", "error");
   } finally {
-    btn.disabled = false;
     btn.textContent = "Send Show Week Emails";
+    updateShowSelectionCount();
   }
 }
 
@@ -341,8 +525,8 @@ async function sendUnfilledShiftsEmails() {
     console.error("Error sending unfilled shifts emails:", error);
     showStatus("Error sending emails", "error");
   } finally {
-    btn.disabled = false;
     btn.textContent = "Send Unfilled Shifts Emails";
+    updateUnfilledSelectionCount();
   }
 }
 
@@ -379,8 +563,8 @@ async function sendAvailabilityRequestEmails() {
     console.error("Error sending availability request emails:", error);
     showStatus("Error sending emails", "error");
   } finally {
-    btn.disabled = false;
     btn.textContent = "Send Availability Requests";
+    updateAvailabilitySelectionCount();
   }
 }
 
@@ -391,12 +575,13 @@ function showStatus(message, type) {
   setTimeout(() => statusElement.classList.remove("active"), 5000);
 }
 
-window.selectAllShowVolunteers = selectAllShowVolunteers;
-window.deselectAllShowVolunteers = deselectAllShowVolunteers;
-window.selectAllUnfilledVolunteers = selectAllUnfilledVolunteers;
-window.deselectAllUnfilledVolunteers = deselectAllUnfilledVolunteers;
-window.selectAllAvailabilityVolunteers = selectAllAvailabilityVolunteers;
-window.deselectAllAvailabilityVolunteers = deselectAllAvailabilityVolunteers;
-window.sendShowWeekEmails = sendShowWeekEmails;
-window.sendUnfilledShiftsEmails = sendUnfilledShiftsEmails;
-window.sendAvailabilityRequestEmails = sendAvailabilityRequestEmails;
+globalThis.selectAllShowVolunteers = selectAllShowVolunteers;
+globalThis.deselectAllShowVolunteers = deselectAllShowVolunteers;
+globalThis.selectAllUnfilledVolunteers = selectAllUnfilledVolunteers;
+globalThis.deselectAllUnfilledVolunteers = deselectAllUnfilledVolunteers;
+globalThis.selectAllAvailabilityVolunteers = selectAllAvailabilityVolunteers;
+globalThis.deselectAllAvailabilityVolunteers =
+  deselectAllAvailabilityVolunteers;
+globalThis.sendShowWeekEmails = sendShowWeekEmails;
+globalThis.sendUnfilledShiftsEmails = sendUnfilledShiftsEmails;
+globalThis.sendAvailabilityRequestEmails = sendAvailabilityRequestEmails;

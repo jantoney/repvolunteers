@@ -3,12 +3,12 @@ declare global {
   // eslint-disable-next-line no-var
   var DateTimeFormat:
     | {
-      formatDate: (date: Date | string) => string;
-      formatDateTime: (date: Date) => string;
-      formatShowTimeRange: (startTime: string, endTime: string) => string;
-      formatShiftTime: (arriveTime: string, departTime: string) => string;
-      ADELAIDE_TIMEZONE: string;
-    }
+        formatDate: (date: Date | string) => string;
+        formatDateTime: (date: Date) => string;
+        formatShowTimeRange: (startTime: string, endTime: string) => string;
+        formatShiftTime: (arriveTime: string, departTime: string) => string;
+        ADELAIDE_TIMEZONE: string;
+      }
     | undefined;
 }
 import {
@@ -62,6 +62,7 @@ export interface Shift {
   depart_time: string;
   volunteer_count: number;
   volunteer_names: string[];
+  is_duplicate: boolean;
 }
 
 export interface ShiftsPageData {
@@ -97,13 +98,20 @@ export function renderShiftsTemplate(data: ShiftsPageData): string {
         .filter-group { display: flex; flex-direction: column; min-width: 200px; }
         .filter-group label { margin-bottom: 0.25rem; font-weight: 500; }
         .performance-section { margin-bottom: 2rem; }
-        .performance-header { background: #f8f9fa; padding: 1rem; border-radius: 6px; margin-bottom: 1rem; }
+        .performance-header { background: #f8f9fa; padding: 1rem; border-radius: 6px; margin-bottom: 1rem; display: flex; justify-content: space-between; gap: 1rem; align-items: flex-start; }
+        .performance-heading { min-width: 0; }
         .performance-title { margin: 0; color: #495057; }
         .performance-details { font-size: 0.9rem; color: #6c757d; margin: 0.25rem 0 0 0; }
+        .performance-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: flex-end; }
+        .btn-warning { background: #ffc107; color: #212529; border-color: #ffc107; }
+        .btn-warning:hover { background: #e0a800; border-color: #d39e00; color: #212529; }
         .shifts-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1rem; }
         .shift-card { border: 1px solid #dee2e6; border-radius: 6px; padding: 1rem; background: white; }
+        .shift-card.duplicate-shift { border-color: #ffc107; background: #fff8e1; box-shadow: inset 4px 0 0 #ffc107; }
         .shift-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; }
+        .shift-title { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; min-width: 0; }
         .shift-role { font-weight: 600; font-size: 1.1rem; color: #495057; }
+        .duplicate-badge { display: inline-flex; align-items: center; border: 1px solid #d39e00; border-radius: 12px; background: #fff3cd; color: #856404; font-size: 0.75rem; font-weight: 700; line-height: 1; padding: 0.25rem 0.45rem; text-transform: uppercase; }
         .shift-status { font-size: 0.85rem; padding: 0.25rem 0.5rem; border-radius: 12px; }
         .status-filled { background: #d4edda; color: #155724; }
         .status-unfilled { background: #f8d7da; color: #721c24; }
@@ -220,6 +228,11 @@ export function renderShiftsTemplate(data: ShiftsPageData): string {
           font-size: 0.9rem;
           color: #666;
         }
+
+        @media (max-width: 640px) {
+          .performance-header { display: block; }
+          .performance-actions { justify-content: flex-start; margin-top: 0.75rem; }
+        }
         
         .volunteer-search {
           width: 100%;
@@ -273,22 +286,22 @@ export function renderShiftsTemplate(data: ShiftsPageData): string {
             <div class="filter-section">
               <h4>Filter by Productions</h4>
               <div class="show-checkboxes">
-                ${
-    shows
-      .map(
-        (show) => `
+                ${shows
+                  .map(
+                    (show) => `
                   <div class="show-checkbox">
                     <input type="checkbox" name="shows" value="${show.id}" id="show-${show.id}" 
                            ${
-          selectedShowIds.includes(show.id.toString()) ? "checked" : ""
-        }
+                             selectedShowIds.includes(show.id.toString())
+                               ? "checked"
+                               : ""
+                           }
                            onchange="updateShowFilter()">
                     <label for="show-${show.id}">${show.name}</label>
                   </div>
                 `,
-      )
-      .join("")
-  }
+                  )
+                  .join("")}
               </div>
               
               <div class="filter-actions">
@@ -302,8 +315,8 @@ export function renderShiftsTemplate(data: ShiftsPageData): string {
                 <div class="filter-group">
                   <label for="date">Date:</label>
                   <input type="date" name="date" id="date" value="${
-    selectedDate || ""
-  }" class="form-control">
+                    selectedDate || ""
+                  }" class="form-control">
                 </div>
                 
                 <div class="filter-group">
@@ -319,36 +332,55 @@ export function renderShiftsTemplate(data: ShiftsPageData): string {
         </div>
 
         <!-- Shifts -->
-        ${
-    Array.from(groupedShifts.entries())
-      .map(([_performanceKey, shifts]) => {
-        const firstShift = shifts[0];
-        return `
+        ${Array.from(groupedShifts.entries())
+          .map(([_performanceKey, shifts]) => {
+            const firstShift = shifts[0];
+            const hasDuplicates = shifts.some((shift) => shift.is_duplicate);
+            return `
             <div class="performance-section">
               <div class="performance-header">
-                <h3 class="performance-title">${firstShift.show_name}</h3>
-                <p class="performance-details">
-                  ${formatDate(new Date(firstShift.date))} | 
-                  <span class="show-time" data-start-time="${firstShift.show_start}" data-end-time="${firstShift.show_end}">Loading...</span>
-                </p>
+                <div class="performance-heading">
+                  <h3 class="performance-title">${firstShift.show_name}</h3>
+                  <p class="performance-details">
+                    ${formatDate(new Date(firstShift.date))} | 
+                    <span class="show-time" data-start-time="${firstShift.show_start}" data-end-time="${firstShift.show_end}">Loading...</span>
+                  </p>
+                </div>
+                <div class="performance-actions">
+                  ${
+                    hasDuplicates
+                      ? `<button type="button" class="btn btn-sm btn-warning" onclick="removeDuplicateShifts(${firstShift.show_date_id}, this)">Remove Duplicates</button>`
+                      : ""
+                  }
+                </div>
               </div>
               
               <div class="shifts-grid">
-                ${
-          shifts
-            .map((shift) => {
-              const isFilled = shift.volunteer_count > 0;
+                ${shifts
+                  .map((shift) => {
+                    const isFilled = shift.volunteer_count > 0;
 
-              return `
-                    <div class="shift-card">
+                    return `
+                    <div class="shift-card${
+                      shift.is_duplicate ? " duplicate-shift" : ""
+                    }">
                       <div class="shift-header">
-                        <div class="shift-role">${shift.role}</div>
-                        <span class="shift-status ${
-                isFilled ? "status-filled" : "status-unfilled"
-              }">
+                        <div class="shift-title">
+                          <div class="shift-role">${shift.role}</div>
                           ${
-                isFilled ? `${shift.volunteer_count} assigned` : "Unfilled"
-              }
+                            shift.is_duplicate
+                              ? `<span class="duplicate-badge" title="Same shift name appears more than once for this performance">Duplicate</span>`
+                              : ""
+                          }
+                        </div>
+                        <span class="shift-status ${
+                          isFilled ? "status-filled" : "status-unfilled"
+                        }">
+                          ${
+                            isFilled
+                              ? `${shift.volunteer_count} assigned`
+                              : "Unfilled"
+                          }
                         </span>
                       </div>
                       
@@ -361,41 +393,35 @@ export function renderShiftsTemplate(data: ShiftsPageData): string {
                       <div class="shift-volunteers">
                         <strong>Assigned volunteers</strong>
                         ${
-                shift.volunteer_names.length > 0
-                  ? `<ul>${
-                    shift.volunteer_names
-                      .map((name) => `<li>${escapeHtml(name)}</li>`)
-                      .join("")
-                  }</ul>`
-                  : `<span class="volunteer-empty">No one assigned</span>`
-              }
+                          shift.volunteer_names.length > 0
+                            ? `<ul>${shift.volunteer_names
+                                .map((name) => `<li>${escapeHtml(name)}</li>`)
+                                .join("")}</ul>`
+                            : `<span class="volunteer-empty">No one assigned</span>`
+                        }
                       </div>
                       
                       <div class="table-actions">
                         <a href="/admin/shifts/${shift.id}/edit" class="btn btn-sm btn-secondary">Edit</a>
-                        <button onclick="deleteShift(${shift.id}, '${
-                shift.role.replace(
-                  /'/g,
-                  "\\'",
-                )
-              }')" class="btn btn-sm btn-danger">Delete</button>
+                        <button onclick="deleteShift(${shift.id}, '${shift.role.replace(
+                          /'/g,
+                          "\\'",
+                        )}')" class="btn btn-sm btn-danger">Delete</button>
                         <button onclick="viewShiftDetails(${shift.id})" class="btn btn-sm btn-info">Details</button>
                       </div>
                     </div>
                   `;
-            })
-            .join("")
-        }
+                  })
+                  .join("")}
               </div>
             </div>
           `;
-      })
-      .join("")
-  }
+          })
+          .join("")}
         
         ${
-    groupedShifts.size === 0
-      ? `
+          groupedShifts.size === 0
+            ? `
           <div class="content-card">
             <div style="text-align: center; padding: 2rem; color: #6c757d;">
               <h4>No shifts found</h4>
@@ -403,8 +429,8 @@ export function renderShiftsTemplate(data: ShiftsPageData): string {
             </div>
           </div>
         `
-      : ""
-  }
+            : ""
+        }
       </div>
 
       <script src="/src/utils/modal.js"></script>

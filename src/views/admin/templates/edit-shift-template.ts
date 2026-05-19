@@ -63,17 +63,18 @@ export function renderEditShiftTemplate(data: EditShiftPageData): string {
             <div class="form-group">
               <label for="show_date_id">Performance:</label>
               <select id="show_date_id" name="show_date_id" required>
-                ${
-    showDates.map((showDate) =>
-      `<option value="${showDate.id}" ${
-        showDate.id === shift.show_date_id ? "selected" : ""
-      }>
-                    ${showDate.show_name} - ${formatDate(showDate.date)} (${
-        formatTime(showDate.start_time)
-      } - ${formatTime(showDate.end_time)})
-                  </option>`
-    ).join("")
-  }
+                ${showDates
+                  .map(
+                    (showDate) =>
+                      `<option value="${showDate.id}" ${
+                        showDate.id === shift.show_date_id ? "selected" : ""
+                      }>
+                    ${showDate.show_name} - ${formatDate(showDate.date)} (${formatTime(
+                      showDate.start_time,
+                    )} - ${formatTime(showDate.end_time)})
+                  </option>`,
+                  )
+                  .join("")}
               </select>
             </div>
             
@@ -84,17 +85,17 @@ export function renderEditShiftTemplate(data: EditShiftPageData): string {
               <div class="form-group">
               <label for="arrive_time">Arrive Time:</label>
               <input type="datetime-local" id="arrive_time" name="arrive_time" 
-                     value="${
-    formatDateTimeForInput(shift.arrive_time)
-  }" required>
+                     value="${formatDateTimeForInput(
+                       shift.arrive_time,
+                     )}" required>
             </div>
             
             <div class="form-group">
               <label for="depart_time">Depart Time:</label>
               <input type="datetime-local" id="depart_time" name="depart_time" 
-                     value="${
-    formatDateTimeForInput(shift.depart_time)
-  }" required>
+                     value="${formatDateTimeForInput(
+                       shift.depart_time,
+                     )}" required>
             </div>
             
             <div class="form-actions">

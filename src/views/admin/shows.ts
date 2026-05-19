@@ -117,47 +117,50 @@ export function renderShowsTemplate(data: ShowsPageData): string {
                   <th>Actions</th>
                 </tr>
               </thead>              <tbody id="showsTableBody" class="${
-    pastShowsCount > 0 ? "past-shows-hidden" : ""
-  }">                ${
-    shows.map((show) => { // Calculate traffic light color based on filled vs total shifts
-      let trafficColor = "grey";
-      let statusText = "No shifts";
+                pastShowsCount > 0 ? "past-shows-hidden" : ""
+              }">                ${shows
+                .map((show) => {
+                  // Calculate traffic light color based on filled vs total shifts
+                  let trafficColor = "grey";
+                  let statusText = "No shifts";
 
-      if (show.total_shifts > 0) {
-        const fillPercentage = (show.filled_shifts / show.total_shifts) * 100;
-        if (fillPercentage >= 80) {
-          trafficColor = "green";
-          statusText = `${show.filled_shifts}/${show.total_shifts} filled`;
-        } else if (fillPercentage >= 50) {
-          trafficColor = "yellow";
-          statusText = `${show.filled_shifts}/${show.total_shifts} filled`;
-        } else {
-          trafficColor = "red";
-          statusText = `${show.filled_shifts}/${show.total_shifts} filled`;
-        }
-      }
+                  if (show.total_shifts > 0) {
+                    const fillPercentage =
+                      (show.filled_shifts / show.total_shifts) * 100;
+                    if (fillPercentage >= 80) {
+                      trafficColor = "green";
+                      statusText = `${show.filled_shifts}/${show.total_shifts} filled`;
+                    } else if (fillPercentage >= 50) {
+                      trafficColor = "yellow";
+                      statusText = `${show.filled_shifts}/${show.total_shifts} filled`;
+                    } else {
+                      trafficColor = "red";
+                      statusText = `${show.filled_shifts}/${show.total_shifts} filled`;
+                    }
+                  }
 
-      const rowClass = show.is_past ? ' class="past-show-row"' : "";
+                  const rowClass = show.is_past ? ' class="past-show-row"' : "";
 
-      return `                    <tr${rowClass}>                      <td>
+                  return `                    <tr${rowClass}>                      <td>
                         <strong>${show.name}</strong>
                         ${
-        show.show_date_count > 0
-          ? `<br><button class="expand-btn" onclick="toggleDates(${show.id})">View ${show.show_date_count} performance(s)</button>`
-          : ""
-      }
+                          show.show_date_count > 0
+                            ? `<br><button class="expand-btn" onclick="toggleDates(${show.id})">View ${show.show_date_count} performance(s)</button>`
+                            : ""
+                        }
                       </td>
                       <td>${show.show_date_count} performance${
-        show.show_date_count !== 1 ? "s" : ""
-      }</td>
+                        show.show_date_count !== 1 ? "s" : ""
+                      }</td>
                       <td>
                         ${
-        show.first_date && show.last_date
-          ? (show.first_date.getTime() === show.last_date.getTime()
-            ? formatDate(show.first_date)
-            : `${formatDate(show.first_date)} - ${formatDate(show.last_date)}`)
-          : "No dates set"
-      }
+                          show.first_date && show.last_date
+                            ? show.first_date.getTime() ===
+                              show.last_date.getTime()
+                              ? formatDate(show.first_date)
+                              : `${formatDate(show.first_date)} - ${formatDate(show.last_date)}`
+                            : "No dates set"
+                        }
                       </td>
                       <td>
                         <span class="traffic-light ${trafficColor}" title="${statusText}"></span>
@@ -166,40 +169,41 @@ export function renderShowsTemplate(data: ShowsPageData): string {
                       <td>
                         <div class="table-actions">
                           <a href="/admin/shows/${show.id}/edit" class="btn btn-sm btn-secondary">Edit</a>
-                          <button onclick="deleteShow(${show.id}, '${
-        show.name.replace(/'/g, "\\'")
-      }')" class="btn btn-sm btn-danger">Delete</button>
+                          <button onclick="deleteShow(${show.id}, '${show.name.replace(
+                            /'/g,
+                            "\\'",
+                          )}')" class="btn btn-sm btn-danger">Delete</button>
                         </div>
                       </td>
                     </tr>
                     <tr class="expandable-row${
-        show.is_past ? " past-show-row" : ""
-      }" id="dates-${show.id}">
+                      show.is_past ? " past-show-row" : ""
+                    }" id="dates-${show.id}">
                       <td colspan="5">
                         <div id="dates-content-${show.id}" style="padding: 1rem;">Loading dates...</div>
                       </td>
                     </tr>
                   `;
-    }).join("")
-  }
+                })
+                .join("")}
               </tbody>
               ${
-    pastShowsCount > 0
-      ? `
+                pastShowsCount > 0
+                  ? `
               <tfoot>
                 <tr>
                   <td colspan="5" class="show-past-footer">
                     <button type="button" class="btn btn-secondary" id="showPastShowsButton" onclick="showPastShows()">
                       Show ${pastShowsCount} past production${
-        pastShowsCount === 1 ? "" : "s"
-      }
+                        pastShowsCount === 1 ? "" : "s"
+                      }
                     </button>
                   </td>
                 </tr>
               </tfoot>
               `
-      : ""
-  }
+                  : ""
+              }
             </table>
           </div>
         </div>

@@ -9,10 +9,12 @@ const knownAdminPaths = [
   /^\/logout$/,
   /^\/reset-password$/,
   /^\/dashboard$/,
+  /^\/settings$/,
   /^\/shows$/,
   /^\/shows\/new$/,
   /^\/shows\/[^/]+\/edit$/,
   /^\/api\/shows$/,
+  /^\/api\/maintenance\/migrations$/,
   /^\/api\/shows\/[^/]+$/,
   /^\/api\/shows\/[^/]+\/dates$/,
   /^\/api\/shows\/[^/]+\/run-sheet\/[^/]+$/,
@@ -28,6 +30,7 @@ const knownAdminPaths = [
   /^\/api\/volunteers$/,
   /^\/api\/volunteers\/[^/]+$/,
   /^\/api\/volunteers\/[^/]+\/approval$/,
+  /^\/api\/volunteers\/[^/]+\/unavailable-performances$/,
   /^\/api\/volunteers\/[^/]+\/shifts$/,
   /^\/api\/volunteers\/[^/]+\/shifts\/[^/]+$/,
   /^\/api\/volunteers\/[^/]+\/shifts\/removal-pdf$/,
@@ -36,6 +39,7 @@ const knownAdminPaths = [
   /^\/api\/volunteers\/[^/]+\/email-schedule-pdf$/,
   /^\/api\/volunteers\/[^/]+\/email-show-week$/,
   /^\/api\/volunteers\/[^/]+\/email-last-minute-shifts$/,
+  /^\/api\/volunteers\/[^/]+\/email-availability-request$/,
   /^\/api\/volunteers\/[^/]+\/emails$/,
   /^\/api\/volunteers\/[^/]+\/available-shifts$/,
   /^\/api\/emails\/[^/]+\/content$/,
@@ -47,6 +51,7 @@ const knownAdminPaths = [
   /^\/api\/shifts\/calendar-data$/,
   /^\/api\/shifts\/calendar-shows$/,
   /^\/api\/shifts\/default-roles$/,
+  /^\/api\/performances\/[^/]+\/duplicate-shifts\/remove$/,
   /^\/api\/shifts\/[^/]+$/,
   /^\/api\/shifts\/[^/]+\/volunteers$/,
   /^\/api\/shifts\/[^/]+\/available-roles$/,
@@ -56,12 +61,15 @@ const knownAdminPaths = [
   /^\/api\/analytics\/unfilled$/,
   /^\/api\/unfilled-shifts\/count$/,
   /^\/api\/unfilled-shifts\/pdf$/,
+  /^\/api\/availability-conflicts\/count$/,
   /^\/api\/performances-without-shifts\/count$/,
   /^\/api\/bulk-email\/shows$/,
   /^\/api\/bulk-email\/shows\/[^/]+\/volunteers$/,
   /^\/api\/bulk-email\/volunteers\/unfilled-shifts$/,
+  /^\/api\/bulk-email\/volunteers\/availability-request$/,
   /^\/api\/bulk-email\/send-show-week$/,
   /^\/api\/bulk-email\/send-unfilled-shifts$/,
+  /^\/api\/bulk-email\/send-availability-request$/,
   /^\/api\/server-time$/,
   /^\/api\/volunteer-shifts$/,
 ];
@@ -94,6 +102,11 @@ router.use(async (ctx, next) => {
 // Protected admin routes - apply middleware first
 router.use(requireAdminAuth);
 router.get("/dashboard", adminController.showDashboard);
+router.get("/settings", adminController.showSettingsPage);
+router.post(
+  "/api/maintenance/migrations",
+  adminController.runDatabaseMigrations,
+);
 
 // Shows management pages
 router.get("/shows", adminController.showShowsPage);
@@ -197,6 +210,10 @@ router.get("/api/shifts/calendar-data", adminController.getShiftCalendarData);
 router.get("/api/shifts/calendar-shows", adminController.getShowsForCalendar);
 router.get("/api/shifts/default-roles", adminController.getDefaultRoles);
 router.post("/api/shifts", adminController.createShift);
+router.post(
+  "/api/performances/:showDateId/duplicate-shifts/remove",
+  adminController.removeDuplicateShiftsForPerformance,
+);
 router.put("/api/shifts/:id", adminController.updateShift);
 router.delete("/api/shifts/:id", adminController.deleteShift);
 
@@ -211,6 +228,10 @@ router.get("/api/analytics/unfilled", adminController.unfilledShifts);
 router.get(
   "/api/unfilled-shifts/count",
   adminController.getUnfilledShiftsCount,
+);
+router.get(
+  "/api/availability-conflicts/count",
+  adminController.getAvailabilityConflictsCount,
 );
 router.get(
   "/api/unfilled-shifts/pdf",

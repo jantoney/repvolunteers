@@ -117,6 +117,46 @@ export function renderNewShiftTemplate(data: NewShiftPageData): string {
         .custom-role-input input { flex: 1; max-width: 250px; }
         .custom-role-input button { padding: 0.5rem 1rem; white-space: nowrap; }
         
+        .selection-step-note {
+          background: #e7f3ff;
+          border: 1px solid #b8daff;
+          color: #0c5460;
+          padding: 0.75rem;
+          border-radius: 4px;
+          margin: 0.5rem 0 1rem 0;
+        }
+        .submit-help {
+          color: #6c757d;
+          font-size: 0.85rem;
+          margin-top: 0.5rem;
+        }
+        @keyframes create-shifts-complete {
+          0% {
+            transform: scale(1);
+            box-shadow: 0 0 0 rgba(25, 135, 84, 0);
+          }
+          35% {
+            transform: scale(1.03);
+            box-shadow: 0 0 0 0.35rem rgba(25, 135, 84, 0.18);
+          }
+          100% {
+            transform: scale(1);
+            box-shadow: 0 0 0 rgba(25, 135, 84, 0);
+          }
+        }
+        .btn-primary.create-complete,
+        .btn-primary.create-complete:disabled {
+          background: #198754;
+          border-color: #198754;
+          color: white;
+          opacity: 1;
+          animation: create-shifts-complete 1.2s ease-out;
+        }
+        .form-actions button:disabled {
+          opacity: 0.65;
+          cursor: not-allowed;
+        }
+
         .custom-role-warning {
           background: #fff3cd;
           border: 1px solid #ffeaa7;
@@ -143,24 +183,27 @@ export function renderNewShiftTemplate(data: NewShiftPageData): string {
         </div>
 
         <div class="form-container">
-          <div id="successMessage" class="success" style="display: none;"></div>
-          <div id="errorMessage" class="error" style="display: none;"></div>
+          <div id="successMessage" class="success" role="status" tabindex="-1" style="display: none;"></div>
+          <div id="errorMessage" class="error" role="alert" tabindex="-1" style="display: none;"></div>
 
           <form id="shiftForm">
             <div class="form-group">
               <label for="show_id">Production:</label>
               <select id="show_id" name="show_id" required>
                 <option value="">Select a production</option>
-                ${
-    shows.map((show) => `
+                ${shows
+                  .map(
+                    (show) => `
                   <option value="${show.id}">${show.name}</option>
-                `).join("")
-  }
+                `,
+                  )
+                  .join("")}
               </select>
             </div>
               <div class="show-dates-section" id="showDatesSection" style="display: none;">
               <label>Performances:</label>
-              <p class="help-text">Select the performances for this shift. Each selected performance will get its own shift with the times specified below.</p>
+              <div class="selection-step-note">Select performances first. The shift times and roles will appear after at least one performance is selected.</div>
+              <p class="help-text">Each selected performance will get its own shift with the times specified below.</p>
               
               <div class="filter-actions" id="dateFilterActions" style="margin-bottom: 1rem; display: none;">
                 <button type="button" class="filter-btn" onclick="selectAllDates()">Select All</button>
@@ -173,7 +216,7 @@ export function renderNewShiftTemplate(data: NewShiftPageData): string {
               <div id="showDatesList" class="checkbox-group">
               </div>
             </div>
-              <div class="time-group">
+              <div class="time-group" id="timeSection" style="display: none;">
               <div class="form-group">
                 <label for="arrive_time">Arrive Time:</label>
                 <input type="time" id="arrive_time" name="arrive_time" required>
@@ -190,7 +233,7 @@ export function renderNewShiftTemplate(data: NewShiftPageData): string {
               ⚠️ <strong>Following Day:</strong> Depart time is before arrive time, so the depart time will be saved as the next day for each selected performance.
             </div>
             
-            <div class="roles-section">
+            <div class="roles-section" id="rolesSection" style="display: none;">
               <label>Roles:</label>
               <div id="defaultRolesList" class="checkbox-group">
                 <!-- Default roles will be loaded here -->
@@ -212,7 +255,8 @@ export function renderNewShiftTemplate(data: NewShiftPageData): string {
             </div>
             
             <div class="form-actions">
-              <button type="submit" class="btn btn-primary">Create Shifts</button>
+              <button type="submit" id="createShiftsButton" class="btn btn-primary" disabled>Create Shifts</button>
+              <div id="submitHelp" class="submit-help">Select a performance and at least one role to create shifts.</div>
               <a href="/admin/shifts" class="btn btn-secondary">Cancel</a>
             </div>
           </form>
@@ -376,6 +420,7 @@ export function renderNewShiftTemplate(data: NewShiftPageData): string {
               checkboxItem.classList.add('checked');
             }
           });
+            globalThis.updateNewShiftFormState?.();
         }
         
         function selectNoDates() {
@@ -387,6 +432,7 @@ export function renderNewShiftTemplate(data: NewShiftPageData): string {
               checkboxItem.classList.remove('checked');
             }
           });
+            globalThis.updateNewShiftFormState?.();
         }
         
         function selectTimeGroup(startTime, endTime, showStartTime, showEndTime) {
@@ -407,6 +453,7 @@ export function renderNewShiftTemplate(data: NewShiftPageData): string {
             setArriveTime(showStartTime, -60); // 1 hour before show start
             setDepartTime(showEndTime, 30);    // 30 minutes after show end
           }
+            globalThis.updateNewShiftFormState?.();
         }
         
         function setArriveTime(showStartTime, offsetMinutes) {
@@ -531,6 +578,7 @@ export function renderNewShiftTemplate(data: NewShiftPageData): string {
               }
             }
           });
+            globalThis.updateNewShiftFormState?.();
         }
       </script>
     </body>

@@ -16,6 +16,8 @@ import {
   type VolunteerData,
 } from "../utils/pdf-generator.ts";
 
+let migrationsRunning = false;
+
 // Import view functions from separated files
 export {
   showBulkEmailPage,
@@ -27,6 +29,7 @@ export {
   showNewShiftForm,
   showNewShowForm,
   showNewVolunteerForm,
+  showSettingsPage,
   showShiftsPage,
   showShowsPage,
   showUnfilledShiftsPage,
@@ -72,6 +75,58 @@ export async function logout(ctx: RouterContext<string>) {
       path: "/",
     });
     ctx.response.redirect("/admin/login");
+  }
+}
+
+export async function runDatabaseMigrations(ctx: RouterContext<string>) {
+  if (migrationsRunning) {
+    ctx.response.status = 409;
+    ctx.response.body = {
+      error: "Migrations are already running",
+    };
+    return;
+  }
+
+  migrationsRunning = true;
+
+  try {
+    const command = new Deno.Command(Deno.execPath(), {
+      args: ["run", "-A", "scripts/migrate.ts"],
+      stdout: "piped",
+      stderr: "piped",
+    });
+
+    const output = await command.output();
+    const decoder = new TextDecoder();
+    const stdout = decoder.decode(output.stdout).trim();
+    const stderr = decoder.decode(output.stderr).trim();
+
+    if (!output.success) {
+      console.error("Database migrations failed:", stderr || stdout);
+      ctx.response.status = 500;
+      ctx.response.body = {
+        error: "Database migrations failed",
+        code: output.code,
+        stdout,
+        stderr,
+      };
+      return;
+    }
+
+    ctx.response.body = {
+      success: true,
+      code: output.code,
+      stdout,
+      stderr,
+    };
+  } catch (error) {
+    console.error("Error running database migrations:", error);
+    ctx.response.status = 500;
+    ctx.response.body = {
+      error: "Failed to run database migrations",
+    };
+  } finally {
+    migrationsRunning = false;
   }
 }
 
@@ -934,6 +989,12 @@ export async function getShiftCalendarData(ctx: RouterContext<string>) {
       ) shift_volunteers ON shift_volunteers.shift_id = s.id
       WHERE DATE(sd.start_time) >= CURRENT_DATE - INTERVAL '30 days'
         AND DATE(sd.start_time) <= CURRENT_DATE + INTERVAL '90 days'
+        AND EXISTS (
+          SELECT 1
+          FROM show_dates active_sd
+          WHERE active_sd.show_id = sh.id
+            AND active_sd.end_time >= NOW() - INTERVAL '3 hours'
+        )
         ${showFilter}
       GROUP BY DATE(sd.start_time)
       HAVING COUNT(s.id) > 0
@@ -962,6 +1023,12 @@ export async function getShowsForCalendar(ctx: RouterContext<string>) {
       FROM shows s
       LEFT JOIN show_dates sd ON sd.show_id = s.id
       LEFT JOIN shifts sh ON sh.show_date_id = sd.id
+      WHERE EXISTS (
+        SELECT 1
+        FROM show_dates active_sd
+        WHERE active_sd.show_id = s.id
+          AND active_sd.end_time >= NOW() - INTERVAL '3 hours'
+      )
       GROUP BY s.id, s.name
       HAVING COUNT(sh.id) > 0
       ORDER BY s.name
@@ -996,7 +1063,7 @@ export async function listShifts(ctx: RouterContext<string>) {
        JOIN show_dates sd ON sd.id = s.show_date_id
        JOIN shows sh ON sh.id = sd.show_id
        WHERE s.depart_time >= NOW() - INTERVAL '3 hours'
-       ORDER BY sh.name, DATE(sd.start_time), sd.start_time, s.arrive_time`,
+       ORDER BY sh.name, sd.start_time, LOWER(s.role), s.role, s.arrive_time`,
     );
     // Group by show, then by performance (date/start_time)
     const grouped: {
@@ -1226,6 +1293,138 @@ export async function deleteShift(ctx: RouterContext<string>) {
   try {
     await client.queryObject("DELETE FROM shifts WHERE id=$1", [id]);
     ctx.response.status = 204;
+  } finally {
+    client.release();
+  }
+}
+
+export async function removeDuplicateShiftsForPerformance(
+  ctx: RouterContext<string>,
+) {
+  const showDateId = Number(ctx.params.showDateId);
+  if (!Number.isInteger(showDateId)) {
+    ctx.response.status = 400;
+    ctx.response.body = { error: "Performance not found." };
+    return;
+  }
+
+  const pool = getPool();
+  const client = await pool.connect();
+  try {
+    await client.queryObject("BEGIN");
+
+    const performanceResult = await client.queryObject<{ id: number }>(
+      "SELECT id FROM show_dates WHERE id = $1",
+      [showDateId],
+    );
+    if (performanceResult.rows.length === 0) {
+      await client.queryObject("ROLLBACK");
+      ctx.response.status = 404;
+      ctx.response.body = { error: "Performance not found." };
+      return;
+    }
+
+    const duplicateGroups = await client.queryObject<{
+      normalized_role: string;
+      role: string;
+      shift_count: number;
+      filled_count: number;
+      unfilled_shift_ids: number[];
+    }>(
+      `
+        WITH shift_fill_counts AS (
+          SELECT
+            s.id,
+            s.role,
+            LOWER(TRIM(s.role)) AS normalized_role,
+            COUNT(ps.participant_id)::int AS volunteer_count
+          FROM shifts s
+          LEFT JOIN participant_shifts ps ON ps.shift_id = s.id
+          WHERE s.show_date_id = $1
+          GROUP BY s.id, s.role
+        )
+        SELECT
+          normalized_role,
+          MIN(role) AS role,
+          COUNT(*)::int AS shift_count,
+          COUNT(*) FILTER (WHERE volunteer_count > 0)::int AS filled_count,
+          COALESCE(
+            ARRAY_AGG(id ORDER BY id) FILTER (WHERE volunteer_count = 0),
+            ARRAY[]::integer[]
+          ) AS unfilled_shift_ids
+        FROM shift_fill_counts
+        GROUP BY normalized_role
+        HAVING COUNT(*) > 1
+        ORDER BY MIN(role)
+      `,
+      [showDateId],
+    );
+
+    if (duplicateGroups.rows.length === 0) {
+      await client.queryObject("ROLLBACK");
+      ctx.response.body = {
+        deletedCount: 0,
+        message: "No duplicate shifts were found for this performance.",
+      };
+      return;
+    }
+
+    const blockedGroups = duplicateGroups.rows.filter(
+      (group) => group.filled_count > 1,
+    );
+
+    const shiftIdsToDelete: number[] = [];
+    for (const group of duplicateGroups.rows) {
+      const unfilledShiftIds = group.unfilled_shift_ids ?? [];
+      const deleteCount =
+        group.filled_count === 1
+          ? unfilledShiftIds.length
+          : Math.max(0, unfilledShiftIds.length - 1);
+      shiftIdsToDelete.push(...unfilledShiftIds.slice(0, deleteCount));
+    }
+
+    if (shiftIdsToDelete.length > 0) {
+      await client.queryObject(
+        "DELETE FROM shifts WHERE show_date_id = $1 AND id = ANY($2::int[])",
+        [showDateId, shiftIdsToDelete],
+      );
+    }
+
+    await client.queryObject("COMMIT");
+    const blockedRoleList = blockedGroups.map((group) => group.role).join(", ");
+    const removedMessage =
+      shiftIdsToDelete.length === 1
+        ? "Removed 1 unfilled duplicate shift."
+        : `Removed ${shiftIdsToDelete.length} unfilled duplicate shifts.`;
+
+    if (blockedGroups.length > 0) {
+      const blockedMessage = `Cannot remove duplicate shifts for ${blockedRoleList}. Each duplicate copy has assigned volunteers, so the app cannot safely choose one to delete. Move or remove volunteers from one copy, then try again.`;
+
+      if (shiftIdsToDelete.length === 0) {
+        ctx.response.status = 409;
+        ctx.response.body = { error: blockedMessage };
+        return;
+      }
+
+      ctx.response.body = {
+        deletedCount: shiftIdsToDelete.length,
+        blockedRoles: blockedGroups.map((group) => group.role),
+        message: `${removedMessage} ${blockedMessage}`,
+      };
+      return;
+    }
+
+    ctx.response.body = {
+      deletedCount: shiftIdsToDelete.length,
+      message: removedMessage,
+    };
+  } catch (error) {
+    await client.queryObject("ROLLBACK");
+    console.error("Error removing duplicate shifts:", error);
+    ctx.response.status = 500;
+    ctx.response.body = {
+      error: "Could not remove duplicate shifts. Please try again.",
+    };
   } finally {
     client.release();
   }
@@ -1634,6 +1833,37 @@ export async function getUnfilledShiftsCount(ctx: RouterContext<string>) {
        LEFT JOIN participant_shifts vs ON vs.shift_id = s.id
        WHERE vs.participant_id IS NULL
          AND s.depart_time >= NOW() - INTERVAL '3 hours'`,
+    );
+
+    const count = parseInt(result.rows[0]?.count || "0");
+    ctx.response.body = { count };
+  } finally {
+    client.release();
+  }
+}
+
+export async function getAvailabilityConflictsCount(
+  ctx: RouterContext<string>,
+) {
+  const pool = getPool();
+  const client = await pool.connect();
+  try {
+    const result = await client.queryObject<{ count: string }>(
+      `WITH assignments AS (
+         SELECT ps.participant_id, s.show_date_id, s.depart_time
+         FROM participant_shifts ps
+         JOIN shifts s ON s.id = ps.shift_id
+         UNION
+         SELECT s.assigned_participant_id as participant_id, s.show_date_id, s.depart_time
+         FROM shifts s
+         WHERE s.assigned_participant_id IS NOT NULL
+       )
+       SELECT COUNT(DISTINCT assignments.participant_id::text || ':' || assignments.show_date_id::text) as count
+       FROM assignments
+       JOIN volunteer_unavailable_performances vup
+         ON vup.participant_id = assignments.participant_id
+        AND vup.show_date_id = assignments.show_date_id
+       WHERE assignments.depart_time >= NOW() - INTERVAL '3 hours'`,
     );
 
     const count = parseInt(result.rows[0]?.count || "0");
@@ -2282,7 +2512,7 @@ export async function emailAvailabilityRequest(ctx: RouterContext<string>) {
 }
 
 // Helper function to get next 10 unfilled shifts
-async function getNext10UnfilledShifts() {
+async function _getNext10UnfilledShifts() {
   const pool = getPool();
   const client = await pool.connect();
   try {
@@ -2668,25 +2898,34 @@ export async function getVolunteersForUnfilledShifts(
       email: string;
       total_shifts: number;
       upcoming_shifts: number;
+      availability_performances_count: number;
     }>(
       `SELECT p.id, p.name, p.email,
               COUNT(DISTINCT vs.shift_id) as total_shifts,
-              COUNT(DISTINCT CASE WHEN sd.start_time >= NOW() THEN vs.shift_id END) as upcoming_shifts
+              COUNT(DISTINCT CASE WHEN sd.start_time >= NOW() THEN vs.shift_id END) as upcoming_shifts,
+              COUNT(DISTINCT vup_sd.id) as availability_performances_count
        FROM participants p
        LEFT JOIN participant_shifts vs ON vs.participant_id = p.id
        LEFT JOIN shifts s ON s.id = vs.shift_id
        LEFT JOIN show_dates sd ON sd.id = s.show_date_id
+       LEFT JOIN volunteer_unavailable_performances vup ON vup.participant_id = p.id
+       LEFT JOIN show_dates vup_sd ON vup_sd.id = vup.show_date_id
+         AND vup_sd.end_time >= NOW() - INTERVAL '3 hours'
        WHERE p.approved = true
          AND p.email IS NOT NULL
          AND p.email != ''
        GROUP BY p.id, p.name, p.email
-       ORDER BY p.name`,
+       ORDER BY (COUNT(DISTINCT vup_sd.id) > 0) DESC, p.name`,
     );
 
     ctx.response.body = result.rows.map((volunteer) => ({
       ...volunteer,
       total_shifts: Number(volunteer.total_shifts),
       upcoming_shifts: Number(volunteer.upcoming_shifts),
+      availability_performances_count: Number(
+        volunteer.availability_performances_count,
+      ),
+      has_availability: Number(volunteer.availability_performances_count) > 0,
     }));
   } finally {
     client.release();
@@ -2706,7 +2945,7 @@ export async function getVolunteersForAvailabilityRequest(
       unavailable_performances_count: number;
     }>(
       `SELECT p.id, p.name, p.email,
-              COUNT(vup.show_date_id) as unavailable_performances_count
+              COUNT(DISTINCT sd.id) as unavailable_performances_count
        FROM participants p
        LEFT JOIN volunteer_unavailable_performances vup ON vup.participant_id = p.id
        LEFT JOIN show_dates sd ON sd.id = vup.show_date_id
@@ -2715,7 +2954,7 @@ export async function getVolunteersForAvailabilityRequest(
          AND p.email IS NOT NULL
          AND p.email != ''
        GROUP BY p.id, p.name, p.email
-       ORDER BY p.name`,
+       ORDER BY (COUNT(DISTINCT sd.id) > 0) DESC, p.name`,
     );
 
     ctx.response.body = result.rows.map((volunteer) => ({
@@ -2723,10 +2962,31 @@ export async function getVolunteersForAvailabilityRequest(
       unavailable_performances_count: Number(
         volunteer.unavailable_performances_count,
       ),
+      has_availability: Number(volunteer.unavailable_performances_count) > 0,
     }));
   } finally {
     client.release();
   }
+}
+
+async function hasFutureAvailabilityPerformance(
+  client: ReturnType<ReturnType<typeof getPool>["connect"]> extends Promise<
+    infer T
+  >
+    ? T
+    : never,
+  volunteerId: string,
+): Promise<boolean> {
+  const result = await client.queryObject<{ count: number }>(
+    `SELECT COUNT(DISTINCT sd.id) as count
+     FROM volunteer_unavailable_performances vup
+     JOIN show_dates sd ON sd.id = vup.show_date_id
+     WHERE vup.participant_id = $1
+       AND sd.end_time >= NOW() - INTERVAL '3 hours'`,
+    [volunteerId],
+  );
+
+  return Number(result.rows[0]?.count ?? 0) > 0;
 }
 
 /**
@@ -2968,6 +3228,17 @@ export async function sendBulkUnfilledShiftsEmails(ctx: RouterContext<string>) {
           continue;
         }
 
+        if (!(await hasFutureAvailabilityPerformance(client, volunteerId))) {
+          results.push({
+            volunteerId,
+            volunteerName: volunteer.name,
+            volunteerEmail: volunteer.email,
+            success: true,
+            info: "No availability saved, email not sent",
+          });
+          continue;
+        }
+
         // Get unfilled shifts that don't overlap with this volunteer's existing shifts
         const unfilledShifts = await getUnfilledShiftsForVolunteer(
           volunteerId,
@@ -3140,6 +3411,17 @@ export async function sendBulkAvailabilityRequestEmails(
             error: "No email address",
           });
           errorCount++;
+          continue;
+        }
+
+        if (!(await hasFutureAvailabilityPerformance(client, volunteerId))) {
+          results.push({
+            volunteerId,
+            volunteerName: volunteer.name,
+            volunteerEmail: volunteer.email,
+            success: true,
+            info: "No availability saved, email not sent",
+          });
           continue;
         }
 

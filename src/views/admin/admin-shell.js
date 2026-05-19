@@ -45,8 +45,8 @@
       }
 
       unfilledNav.textContent = data.count > 0
-        ? "Unfilled (" + data.count + ")"
-        : "Unfilled";
+        ? "Unfilled Shifts (" + data.count + ")"
+        : "Unfilled Shifts";
     } catch (error) {
       console.error("Error fetching unfilled count:", error);
     }

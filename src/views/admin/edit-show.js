@@ -3,13 +3,42 @@ const showId = document.currentScript.getAttribute("data-show-id");
 
 document.addEventListener("DOMContentLoaded", function () {
   const form = document.getElementById("showForm");
+  const editNameButton = document.getElementById("editProductionName");
+  const cancelNameEditButton = document.getElementById(
+    "cancelProductionNameEdit",
+  );
+  const nameInput = document.getElementById("name");
+  const productionNameDisplay = document.getElementById(
+    "productionNameDisplay",
+  );
+  let savedProductionName = nameInput?.value ?? "";
+
+  editNameButton?.addEventListener("click", () => {
+    form?.classList.remove("hidden");
+    nameInput?.focus();
+    nameInput?.select();
+  });
+
+  cancelNameEditButton?.addEventListener("click", () => {
+    if (nameInput) {
+      nameInput.value = savedProductionName;
+    }
+    form?.classList.add("hidden");
+  });
 
   if (form) {
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
 
       const formData = new FormData(e.target);
-      const data = { name: formData.get("name") };
+      const productionName = String(formData.get("name") ?? "").trim();
+
+      if (!productionName) {
+        showError("Enter a production name.");
+        return;
+      }
+
+      const data = { name: productionName };
 
       try {
         const response = await fetch(`/admin/api/shows/${showId}`, {
@@ -20,6 +49,14 @@ document.addEventListener("DOMContentLoaded", function () {
         });
 
         if (response.ok) {
+          savedProductionName = productionName;
+          if (nameInput) {
+            nameInput.value = productionName;
+          }
+          if (productionNameDisplay) {
+            productionNameDisplay.textContent = productionName;
+          }
+          form.classList.add("hidden");
           showSuccess("Production name updated.");
         } else {
           showError("Failed to update production name");
@@ -38,14 +75,14 @@ function showError(message) {
   const element = document.getElementById("errorMessage");
   element.textContent = message;
   element.style.display = "block";
-  setTimeout(() => element.style.display = "none", 5000);
+  setTimeout(() => (element.style.display = "none"), 5000);
 }
 
 function showSuccess(message) {
   const element = document.getElementById("successMessage");
   element.textContent = message;
   element.style.display = "block";
-  setTimeout(() => element.style.display = "none", 3000);
+  setTimeout(() => (element.style.display = "none"), 3000);
 }
 
 async function updateShowDate(dateId) {
@@ -182,65 +219,71 @@ function renderIntervals(intervals) {
     intervals.map((interval) => {
       const startHours = Math.floor(interval.start_minutes / 60);
       const startMins = interval.start_minutes % 60;
-      const startTime = startHours > 0
-        ? `${startHours}h ${startMins}m`
-        : `${startMins}m`;
+      const startTime =
+        startHours > 0 ? `${startHours}h ${startMins}m` : `${startMins}m`;
       const endMinutes = interval.start_minutes + interval.duration_minutes;
       const endHours = Math.floor(endMinutes / 60);
       const endMinsDisplay = endMinutes % 60;
-      const endTime = endHours > 0
-        ? `${endHours}h ${endMinsDisplay}m`
-        : `${endMinsDisplay}m`;
+      const endTime =
+        endHours > 0 ? `${endHours}h ${endMinsDisplay}m` : `${endMinsDisplay}m`;
 
-      return AdminDOM.el("div", {
-        className: "interval-item",
-        dataset: { intervalId: String(interval.id) },
-      }, [
-        AdminDOM.el("div", { className: "interval-header" }, [
-          AdminDOM.el(
-            "strong",
-            {},
-            `Interval: ${startTime} - ${endTime} (${interval.duration_minutes} minutes)`,
-          ),
-          AdminDOM.el("button", {
-            type: "button",
-            className: "btn btn-danger btn-sm",
-            onclick: () => deleteInterval(interval.id),
-          }, "Delete"),
-        ]),
-        AdminDOM.el("div", { className: "time-group" }, [
-          AdminDOM.el("div", { className: "form-group" }, [
+      return AdminDOM.el(
+        "div",
+        {
+          className: "interval-item",
+          dataset: { intervalId: String(interval.id) },
+        },
+        [
+          AdminDOM.el("div", { className: "interval-header" }, [
             AdminDOM.el(
-              "label",
-              { htmlFor: `intervalStart_${interval.id}` },
-              "Start (minutes from performance start):",
+              "strong",
+              {},
+              `Interval: ${startTime} - ${endTime} (${interval.duration_minutes} minutes)`,
             ),
-            AdminDOM.el("input", {
-              type: "number",
-              id: `intervalStart_${interval.id}`,
-              value: interval.start_minutes,
-              min: "0",
-              max: "300",
-              onchange: () => updateInterval(interval.id),
-            }),
-          ]),
-          AdminDOM.el("div", { className: "form-group" }, [
             AdminDOM.el(
-              "label",
-              { htmlFor: `intervalDuration_${interval.id}` },
-              "Duration (minutes):",
+              "button",
+              {
+                type: "button",
+                className: "btn btn-danger btn-sm",
+                onclick: () => deleteInterval(interval.id),
+              },
+              "Delete",
             ),
-            AdminDOM.el("input", {
-              type: "number",
-              id: `intervalDuration_${interval.id}`,
-              value: interval.duration_minutes,
-              min: "1",
-              max: "60",
-              onchange: () => updateInterval(interval.id),
-            }),
           ]),
-        ]),
-      ]);
+          AdminDOM.el("div", { className: "time-group" }, [
+            AdminDOM.el("div", { className: "form-group" }, [
+              AdminDOM.el(
+                "label",
+                { htmlFor: `intervalStart_${interval.id}` },
+                "Start (minutes from performance start):",
+              ),
+              AdminDOM.el("input", {
+                type: "number",
+                id: `intervalStart_${interval.id}`,
+                value: interval.start_minutes,
+                min: "0",
+                max: "300",
+                onchange: () => updateInterval(interval.id),
+              }),
+            ]),
+            AdminDOM.el("div", { className: "form-group" }, [
+              AdminDOM.el(
+                "label",
+                { htmlFor: `intervalDuration_${interval.id}` },
+                "Duration (minutes):",
+              ),
+              AdminDOM.el("input", {
+                type: "number",
+                id: `intervalDuration_${interval.id}`,
+                value: interval.duration_minutes,
+                min: "1",
+                max: "60",
+                onchange: () => updateInterval(interval.id),
+              }),
+            ]),
+          ]),
+        ],
+      );
     }),
   );
 }
@@ -286,10 +329,12 @@ async function addNewInterval() {
 }
 
 async function updateInterval(intervalId) {
-  const startMinutes =
-    document.getElementById(`intervalStart_${intervalId}`).value;
-  const duration =
-    document.getElementById(`intervalDuration_${intervalId}`).value;
+  const startMinutes = document.getElementById(
+    `intervalStart_${intervalId}`,
+  ).value;
+  const duration = document.getElementById(
+    `intervalDuration_${intervalId}`,
+  ).value;
 
   if (!startMinutes || !duration) {
     showError("Both start time and duration are required");

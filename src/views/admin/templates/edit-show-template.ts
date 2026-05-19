@@ -21,8 +21,21 @@ export interface EditShowPageData {
   showDates: ShowDate[];
 }
 
+function escapeHtml(value: string): string {
+  return value.replace(/[&<>"]/g, (char) => {
+    const entities: Record<string, string> = {
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+    };
+    return entities[char];
+  });
+}
+
 export function renderEditShowTemplate(data: EditShowPageData): string {
   const { show, showDates } = data;
+  const showName = escapeHtml(show.name);
 
   return `
     <!DOCTYPE html>
@@ -42,6 +55,70 @@ export function renderEditShowTemplate(data: EditShowPageData): string {
       <style>
         .time-group { display: flex; gap: 1rem; }
         .time-group .form-group { flex: 1; }
+        .edit-show-header {
+          justify-content: flex-start;
+          align-items: flex-start;
+        }
+        .edit-show-title-row {
+          display: flex;
+          align-items: center;
+          gap: 1rem;
+          flex-wrap: wrap;
+        }
+        .back-to-productions {
+          flex: 0 0 auto;
+        }
+        .production-title-wrap {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+          min-width: 0;
+        }
+        .production-name-edit-btn {
+          width: 2.25rem;
+          height: 2.25rem;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          border: 1px solid #ced4da;
+          border-radius: 6px;
+          background: #fff;
+          color: #495057;
+          cursor: pointer;
+          font-size: 1rem;
+          line-height: 1;
+        }
+        .production-name-edit-btn:hover,
+        .production-name-edit-btn:focus {
+          border-color: #007bff;
+          color: #007bff;
+          outline: none;
+          box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.15);
+        }
+        .production-name-form {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+          flex-wrap: wrap;
+          width: 100%;
+        }
+        .production-name-form.hidden {
+          display: none;
+        }
+        .production-name-form input {
+          max-width: 28rem;
+        }
+        .visually-hidden {
+          position: absolute;
+          width: 1px;
+          height: 1px;
+          padding: 0;
+          margin: -1px;
+          overflow: hidden;
+          clip: rect(0, 0, 0, 0);
+          white-space: nowrap;
+          border: 0;
+        }
         .show-dates { margin-top: 2rem; }
         .show-intervals { margin-top: 2rem; }
         .show-date-item { 
@@ -89,33 +166,36 @@ export function renderEditShowTemplate(data: EditShowPageData): string {
       
       <!-- Main Content -->
       <div class="main-content">
-        <div class="page-header">
-          <h1 class="page-title">Edit Production: ${show.name}</h1>
+        <div class="page-header edit-show-header">
+          <div class="edit-show-title-row" id="productionNameDisplayRow">
+            <a href="/admin/shows" class="btn btn-secondary back-to-productions">Back to Productions</a>
+            <div class="production-title-wrap">
+              <h1 class="page-title">Edit Production: <span id="productionNameDisplay">${showName}</span></h1>
+              <button type="button" class="production-name-edit-btn" id="editProductionName" aria-label="Edit production name" title="Edit production name">&#9998;</button>
+            </div>
+          </div>
+
+          <form id="showForm" class="production-name-form hidden">
+            <label for="name" class="visually-hidden">Production Name</label>
+            <input type="text" id="name" name="name" value="${showName}" required>
+            <button type="submit" class="btn btn-primary">Save</button>
+            <button type="button" class="btn btn-secondary" id="cancelProductionNameEdit">Cancel</button>
+          </form>
         </div>
 
         <div class="form-container">
           <div id="errorMessage" class="error"></div>
           <div id="successMessage" class="success"></div>
 
-          <form id="showForm">
-            <div class="form-group">
-              <label for="name">Production Name:</label>
-              <input type="text" id="name" name="name" value="${show.name}" required>
-            </div>
-            
-            <div class="form-actions">
-              <button type="submit" class="btn btn-primary">Update Production Name</button>
-              <a href="/admin/shows" class="btn btn-secondary">Back to Productions</a>
-            </div>
-          </form>
-
           <div class="show-dates">
             <h2>Performances</h2>
             
             ${
-    showDates.length === 0
-      ? "<p>No performances scheduled for this production.</p>"
-      : showDates.map((date) => `
+              showDates.length === 0
+                ? "<p>No performances scheduled for this production.</p>"
+                : showDates
+                    .map(
+                      (date) => `
                 <div class="show-date-item" data-date-id="${date.id}">
                   <div class="show-date-header">
                     <strong>${formatDate(date.start_time)}</strong>
@@ -124,20 +204,22 @@ export function renderEditShowTemplate(data: EditShowPageData): string {
                   <div class="time-group">
                     <div class="form-group">
                       <label>Start Date & Time:</label>
-                      <input type="datetime-local" id="start_${date.id}" value="${
-        formatDateTimeForInput(date.start_time)
-      }" onchange="updateShowDate(${date.id})">
+                      <input type="datetime-local" id="start_${date.id}" value="${formatDateTimeForInput(
+                        date.start_time,
+                      )}" onchange="updateShowDate(${date.id})">
                     </div>
                     <div class="form-group">
                       <label>End Date & Time:</label>
-                      <input type="datetime-local" id="end_${date.id}" value="${
-        formatDateTimeForInput(date.end_time)
-      }" onchange="updateShowDate(${date.id})">
+                      <input type="datetime-local" id="end_${date.id}" value="${formatDateTimeForInput(
+                        date.end_time,
+                      )}" onchange="updateShowDate(${date.id})">
                     </div>
                   </div>
                 </div>
-              `).join("")
-  }
+              `,
+                    )
+                    .join("")
+            }
 
             <div class="form-section">
               <h3>Add New Performance</h3>

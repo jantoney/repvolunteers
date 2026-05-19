@@ -24,7 +24,7 @@ export function renderBulkEmailTemplate(): string {
         /* Email type tabs */
         .email-tabs {
           display: flex;
-          gap: 1rem;
+          gap: 0.5rem;
           margin-bottom: 2rem;
           border-bottom: 1px solid #e9ecef;
         }
@@ -32,7 +32,7 @@ export function renderBulkEmailTemplate(): string {
         .email-tab {
           background: none;
           border: none;
-          padding: 1rem 1.5rem;
+          padding: 0.85rem 1.25rem;
           cursor: pointer;
           color: #666;
           font-size: 1rem;
@@ -61,46 +61,107 @@ export function renderBulkEmailTemplate(): string {
 
         /* Volunteer list */
         .volunteer-list {
-          max-height: 400px;
+          max-height: 520px;
           overflow-y: auto;
-          border: 1px solid #ddd;
+          overflow-x: auto;
+          border: 1px solid #d8dee4;
           border-radius: 4px;
-          padding: 1rem;
-          background: #f8f9fa;
+          background: #fff;
         }
 
-        .volunteer-item {
-          display: flex;
-          align-items: center;
-          padding: 0.5rem;
-          margin-bottom: 0.5rem;
-          background: white;
-          border-radius: 4px;
-          border: 1px solid #e9ecef;
+        .volunteer-table {
+          width: 100%;
+          min-width: 760px;
+          border-collapse: collapse;
+          font-size: 0.95rem;
+        }
+
+        .volunteer-table th,
+        .volunteer-table td {
+          padding: 0.75rem 0.9rem;
+          text-align: left;
+          vertical-align: middle;
+          border-bottom: 1px solid #e9ecef;
+        }
+
+        .volunteer-table th {
+          position: sticky;
+          top: 0;
+          z-index: 1;
+          background: #f8f9fa;
+          color: #495057;
+          font-size: 0.82rem;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0;
+        }
+
+        .volunteer-table tbody tr:last-child td {
+          border-bottom: none;
+        }
+
+        .volunteer-table tbody tr:hover {
+          background: #f8fbff;
+        }
+
+        .volunteer-table .select-column {
+          width: 5.5rem;
+          text-align: center;
         }
 
         .volunteer-checkbox {
-          margin-right: 1rem;
-          transform: scale(1.2);
+          width: 1.1rem;
+          height: 1.1rem;
+          cursor: pointer;
         }
 
-        .volunteer-info {
-          flex-grow: 1;
+        .volunteer-checkbox:disabled {
+          cursor: not-allowed;
         }
 
-        .volunteer-name {
-          font-weight: bold;
-          color: #333;
+        .volunteer-name-cell {
+          min-width: 12rem;
+          font-weight: 700;
+          color: #212529;
         }
 
-        .volunteer-details {
-          font-size: 0.9rem;
-          color: #666;
+        .volunteer-unavailable {
+          color: #6c757d;
+          background: #fafafa;
+        }
+
+        .volunteer-unavailable .volunteer-name-cell {
+          color: #6c757d;
+        }
+
+        .status-pill {
+          display: inline-flex;
+          align-items: center;
+          min-height: 1.65rem;
+          padding: 0.25rem 0.55rem;
+          border-radius: 999px;
+          background: #e7f5ff;
+          color: #0b7285;
+          font-size: 0.82rem;
+          font-weight: 700;
+          white-space: nowrap;
+        }
+
+        .status-pill.muted {
+          background: #f1f3f5;
+          color: #6c757d;
+        }
+
+        .table-empty-state {
+          padding: 1.25rem;
+          color: #6c757d;
+          text-align: center;
         }
 
         /* Action buttons */
         .volunteer-actions {
           display: flex;
+          flex-wrap: wrap;
           gap: 1rem;
           margin-bottom: 1.5rem;
         }
@@ -163,13 +224,17 @@ export function renderBulkEmailTemplate(): string {
           }
 
           .email-tab {
-            text-align: center;
+            text-align: left;
             border-bottom: 1px solid #e9ecef;
             border-radius: 0;
           }
 
           .volunteer-actions {
             flex-direction: column;
+          }
+
+          .volunteer-actions .btn {
+            width: 100%;
           }
         }
       </style>
@@ -191,14 +256,14 @@ export function renderBulkEmailTemplate(): string {
 
         <!-- Email Type Selection -->
         <div class="section-content">
-          <div class="email-tabs">
-            <button class="email-tab active" data-email-type="show-week">
+          <div class="email-tabs" role="tablist" aria-label="Bulk email type">
+            <button class="email-tab active" type="button" role="tab" aria-selected="true" data-email-type="show-week">
               📅 Show Week Email
             </button>
-            <button class="email-tab" data-email-type="unfilled-shifts">
+            <button class="email-tab" type="button" role="tab" aria-selected="false" data-email-type="unfilled-shifts">
               🚨 Unfilled Shifts Email
             </button>
-            <button class="email-tab" data-email-type="availability-request">
+            <button class="email-tab" type="button" role="tab" aria-selected="false" data-email-type="availability-request">
               📆 Availability Request
             </button>
           </div>

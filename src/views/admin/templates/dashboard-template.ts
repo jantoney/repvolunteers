@@ -313,6 +313,10 @@ export function renderDashboardTemplate(): string {
                 <div class="counter-label">Unfilled Shifts</div>
               </div>
               <div class="counter">
+                <span class="counter-value" id="availabilityConflictsCount">-</span>
+                <div class="counter-label">Availability Conflicts</div>
+              </div>
+              <div class="counter">
                 <span class="counter-value" id="performancesWithoutShiftsCount">-</span>
                 <div class="counter-label">Performances Without Shifts</div>
               </div>

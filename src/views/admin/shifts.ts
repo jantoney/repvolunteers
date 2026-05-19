@@ -85,8 +85,8 @@ export async function showShiftsPage(ctx: RouterContext<string>) {
     }
 
     shiftsQuery += `
-      GROUP BY s.id, sh.id, sh.name, DATE(sd.start_time AT TIME ZONE 'Australia/Adelaide'), sd.start_time, sd.end_time, s.arrive_time, s.depart_time
-      ORDER BY DATE(sd.start_time AT TIME ZONE 'Australia/Adelaide'), s.arrive_time AT TIME ZONE 'Australia/Adelaide'
+      GROUP BY s.id, sh.id, sh.name, DATE(sd.start_time AT TIME ZONE 'Australia/Adelaide'), sd.start_time, sd.end_time, s.role, s.arrive_time, s.depart_time
+      ORDER BY sh.name, sd.start_time, LOWER(s.role), s.role, s.arrive_time AT TIME ZONE 'Australia/Adelaide'
     `;
 
     const shiftsResult = await client.queryObject<{
@@ -104,10 +104,19 @@ export async function showShiftsPage(ctx: RouterContext<string>) {
       volunteer_names: string[];
     }>(shiftsQuery, queryParams);
 
+    const duplicateShiftCounts = new Map<string, number>();
+    for (const shift of shiftsResult.rows) {
+      const duplicateKey = `${shift.show_date_id}:${shift.role.trim().toLowerCase()}`;
+      duplicateShiftCounts.set(
+        duplicateKey,
+        (duplicateShiftCounts.get(duplicateKey) ?? 0) + 1,
+      );
+    }
+
     // Group shifts by performance (show date)
     const groupedShifts = new Map<string, Shift[]>();
     for (const shift of shiftsResult.rows) {
-      const key = `${shift.show_name} - ${shift.date}`;
+      const key = `${shift.show_name} - ${shift.show_date_id}`;
       if (!groupedShifts.has(key)) {
         groupedShifts.set(key, []);
       }
@@ -118,6 +127,10 @@ export async function showShiftsPage(ctx: RouterContext<string>) {
         : [];
       const formattedShift: Shift = {
         ...shift,
+        is_duplicate:
+          (duplicateShiftCounts.get(
+            `${shift.show_date_id}:${shift.role.trim().toLowerCase()}`,
+          ) ?? 0) > 1,
         volunteer_names: volunteerNames,
         show_start: shift.show_start,
         show_end: shift.show_end,

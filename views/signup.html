@@ -620,6 +620,104 @@
         font-weight: 600;
       }
 
+      .performance-group {
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        margin-bottom: 0.75rem;
+        overflow: hidden;
+        background: #fff;
+      }
+
+      .performance-group-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+        background: #f1f7ff;
+        border-bottom: 1px solid #d6e8ff;
+        padding: 0.5rem 0.75rem;
+      }
+
+      .performance-heading-text {
+        display: flex;
+        align-items: baseline;
+        gap: 0.65rem;
+        min-width: 0;
+        flex: 1 1 auto;
+        white-space: nowrap;
+      }
+
+      .performance-date-heading {
+        color: #1f4f82;
+        font-weight: 700;
+        flex: 0 0 auto;
+      }
+
+      .performance-meta {
+        color: #495057;
+        font-size: 0.95rem;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .performance-group-header .shift-actions {
+        flex: 0 0 auto;
+      }
+
+      .performance-group-header .availability-toggle {
+        padding: 0.5rem 1rem;
+      }
+
+      @media (max-width: 640px) {
+        .performance-group-header {
+          gap: 0.5rem;
+          padding: 0.45rem 0.6rem;
+        }
+
+        .performance-heading-text {
+          gap: 0.45rem;
+        }
+
+        .performance-group-header .availability-toggle {
+          min-width: 122px;
+          padding: 0.5rem 0.75rem;
+        }
+      }
+
+      .performance-group .shift {
+        border-left: 0;
+        border-right: 0;
+        border-top: 0;
+        border-radius: 0;
+        margin-bottom: 0;
+      }
+
+      .performance-group .shift:last-child {
+        border-bottom: 0;
+      }
+
+      .performance-shifts.collapsed {
+        display: none;
+      }
+
+      .alternate-toggle {
+        background: #007bff;
+        padding: 0.5rem 1rem;
+      }
+
+      .alternate-toggle:hover {
+        background: #0056b3;
+      }
+
+      .btn-primary-action {
+        background: #007bff;
+      }
+
+      .btn-primary-action:hover {
+        background: #0056b3;
+      }
+
       .availability-status.success {
         color: #155724;
       }
@@ -694,7 +792,7 @@
         </div>
 
         <div class="form-actions">
-          <button type="submit" id="submitBtn">
+          <button type="submit" id="submitBtn" style="display: none">
             Sign Up for Selected Shifts
           </button>
         </div>
@@ -899,6 +997,109 @@
       const availableContainer = document.getElementById("availableShifts");
       const submitBtn = document.getElementById("submitBtn");
 
+      function escapeHtml(value) {
+        return String(value ?? "")
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#39;");
+      }
+
+      function truncateShowName(showName) {
+        const value = String(showName ?? "");
+        return value.length > 30 ? `${value.slice(0, 30)}...` : value;
+      }
+
+      function isShiftCurrent(departTime) {
+        const shiftEndTime = new Date(departTime);
+        const currentCutoff = new Date(Date.now() - 3 * 60 * 60 * 1000);
+        return shiftEndTime >= currentCutoff;
+      }
+
+      function getFutureAssignedShifts() {
+        const allShifts = [];
+
+        assignedShifts.forEach((show) => {
+          if (show.show_date && show.arrive_time) {
+            if (isShiftCurrent(show.depart_time)) {
+              allShifts.push({
+                ...show,
+                date: show.show_date,
+                show_name: show.show_name,
+              });
+            }
+          } else if (show.performances && Array.isArray(show.performances)) {
+            show.performances.forEach((performance) => {
+              if (performance.shifts && Array.isArray(performance.shifts)) {
+                performance.shifts.forEach((shift) => {
+                  if (isShiftCurrent(shift.depart_time)) {
+                    allShifts.push({
+                      ...shift,
+                      show_name: show.show_name,
+                      date: shift.date || performance.date,
+                      start_time: shift.start_time,
+                      end_time: shift.end_time,
+                    });
+                  }
+                });
+              }
+            });
+          }
+        });
+
+        return allShifts;
+      }
+
+      function getAssignedShiftForPerformance(performanceId) {
+        return getFutureAssignedShifts().find(
+          (shift) => String(shift.show_date_id) === String(performanceId),
+        );
+      }
+
+      async function performRemoveShift(shiftId) {
+        const response = await fetch(
+          `/volunteer/signup/${volunteer.id}/shift`,
+          {
+            method: "DELETE",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ shiftId }),
+          },
+        );
+
+        if (!response.ok) {
+          throw new Error("Failed to remove from shift");
+        }
+      }
+
+      async function performAcceptShift(shiftId) {
+        const response = await fetch(window.location.href, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ shiftIds: [String(shiftId)] }),
+        });
+
+        if (!response.ok) {
+          const error = await response.json().catch(() => ({}));
+          const message = error.error || "Failed to accept shift";
+          throw new Error(message);
+        }
+      }
+
+      async function performSwapShift(oldShiftId, newShiftId) {
+        const response = await fetch(`/volunteer/signup/${volunteer.id}/swap`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ oldShiftId, newShiftId }),
+        });
+
+        if (!response.ok) {
+          const error = await response.json().catch(() => ({}));
+          const message = error.error || "Failed to swap shifts";
+          throw new Error(message);
+        }
+      }
+
       async function saveUnavailablePerformances(button) {
         const originalText = button ? button.textContent : "";
         if (button) {
@@ -939,6 +1140,9 @@
         const wasUnavailable = unavailablePerformanceIds.has(
           normalizedPerformanceId,
         );
+        const assignedShift = getAssignedShiftForPerformance(
+          normalizedPerformanceId,
+        );
 
         function setUnavailablePerformanceDetail(isUnavailable) {
           const existingIndex = unavailablePerformances.findIndex(
@@ -954,33 +1158,75 @@
           }
         }
 
-        if (wasUnavailable) {
-          unavailablePerformanceIds.delete(normalizedPerformanceId);
-          setUnavailablePerformanceDetail(false);
-        } else {
-          unavailablePerformanceIds.add(normalizedPerformanceId);
-          setUnavailablePerformanceDetail(true);
-          selectedShiftsByPerformance.delete(button.dataset.performanceKey);
-        }
-
-        try {
-          await saveUnavailablePerformances(button);
-          populateAvailableShifts();
-          generateCalendar();
-        } catch (error) {
+        async function applyAvailabilityChange(removeAssignedShift) {
           if (wasUnavailable) {
-            unavailablePerformanceIds.add(normalizedPerformanceId);
-            setUnavailablePerformanceDetail(true);
-          } else {
             unavailablePerformanceIds.delete(normalizedPerformanceId);
             setUnavailablePerformanceDetail(false);
+          } else {
+            unavailablePerformanceIds.add(normalizedPerformanceId);
+            setUnavailablePerformanceDetail(true);
+            selectedShiftsByPerformance.delete(button.dataset.performanceKey);
           }
-          Modal.error(
-            "Could not save availability",
-            error.message || "Please try again.",
-          );
-          populateAvailableShifts();
+
+          try {
+            if (removeAssignedShift && assignedShift) {
+              await performRemoveShift(assignedShift.id);
+            }
+            await saveUnavailablePerformances(button);
+            populateAssignedShifts();
+            populateAvailableShifts();
+            generateCalendar();
+            if (removeAssignedShift) {
+              Modal.success(
+                "Shift removed",
+                "Your shift was removed and this performance was marked unavailable.",
+                () => location.reload(),
+              );
+            }
+          } catch (error) {
+            if (wasUnavailable) {
+              unavailablePerformanceIds.add(normalizedPerformanceId);
+              setUnavailablePerformanceDetail(true);
+            } else {
+              unavailablePerformanceIds.delete(normalizedPerformanceId);
+              setUnavailablePerformanceDetail(false);
+            }
+            Modal.error(
+              "Could not save availability",
+              error.message || "Please try again.",
+            );
+            populateAvailableShifts();
+          }
         }
+
+        if (!wasUnavailable && assignedShift) {
+          Modal.showModal("availability-shift-conflict", {
+            title: "You already have a shift",
+            body: `
+              <p>You are assigned to <strong>${escapeHtml(assignedShift.role)}</strong> for this performance.</p>
+              <p>To mark the performance unavailable, you need to remove that shift first.</p>
+            `,
+            buttons: [
+              {
+                text: "Cancel",
+                className: "modal-btn-outline",
+                action: "cancel",
+              },
+              {
+                text: "Remove Shift",
+                className: "modal-btn-primary",
+                action: "remove",
+                handler: async () => {
+                  Modal.closeModal("availability-shift-conflict");
+                  await applyAvailabilityChange(true);
+                },
+              },
+            ],
+          });
+          return;
+        }
+
+        await applyAvailabilityChange(false);
       }
 
       // Calendar state - initialize in Adelaide timezone
@@ -1123,12 +1369,10 @@
 
         // Build available shift map: date -> Set of available performance keys
         if (availableShifts && Array.isArray(availableShifts)) {
-          const now = new Date();
           availableShifts.forEach((show) => {
             if (show.show_date && show.depart_time) {
-              const shiftEndTime = new Date(show.depart_time);
               if (
-                shiftEndTime > now &&
+                isShiftCurrent(show.depart_time) &&
                 !unavailablePerformanceIds.has(String(show.show_date_id))
               ) {
                 const dateOnly = dateToString(show.show_date);
@@ -1140,9 +1384,8 @@
                 }
               }
             } else if (show.date && show.depart_time) {
-              const shiftEndTime = new Date(show.depart_time);
               if (
-                shiftEndTime > now &&
+                isShiftCurrent(show.depart_time) &&
                 !unavailablePerformanceIds.has(String(show.show_date_id))
               ) {
                 const dateOnly = dateToString(show.date);
@@ -1157,9 +1400,8 @@
               show.performances.forEach((perf) => {
                 if (perf.shifts && Array.isArray(perf.shifts)) {
                   perf.shifts.forEach((shift) => {
-                    const shiftEndTime = new Date(shift.depart_time);
                     if (
-                      shiftEndTime > now &&
+                      isShiftCurrent(shift.depart_time) &&
                       shift.date &&
                       !unavailablePerformanceIds.has(String(shift.show_date_id))
                     ) {
@@ -1323,13 +1565,12 @@
           const today = new Date(now);
           today.setHours(0, 0, 0, 0); // Start of today for date comparison
 
-          // Flatten all shifts and filter to those whose start_time is in the future
+          // Flatten all shifts and keep them current until 3 hours after depart_time.
           const allShifts = [];
           assignedShifts.forEach((show) => {
             // Handle flattened structure
             if (show.show_date && show.arrive_time) {
-              const shiftStart = new Date(show.start_time);
-              if (shiftStart >= now) {
+              if (isShiftCurrent(show.depart_time)) {
                 allShifts.push({
                   id: show.id,
                   role: show.role,
@@ -1347,8 +1588,7 @@
               show.performances.forEach((performance) => {
                 if (performance.shifts && Array.isArray(performance.shifts)) {
                   performance.shifts.forEach((shift) => {
-                    const shiftStart = new Date(shift.start_time);
-                    if (shiftStart >= now) {
+                    if (isShiftCurrent(shift.depart_time)) {
                       allShifts.push({
                         ...shift,
                         show_name: show.show_name,
@@ -1445,8 +1685,7 @@
         availableShifts.forEach((show) => {
           // Flattened structure (single shift per show)
           if (show.show_date && show.arrive_time) {
-            const shiftEndTime = new Date(show.depart_time);
-            if (shiftEndTime > now) {
+            if (isShiftCurrent(show.depart_time)) {
               allAvailableShifts.push({
                 ...show,
                 date: show.show_date,
@@ -1460,8 +1699,7 @@
             show.performances.forEach((performance) => {
               if (performance.shifts && Array.isArray(performance.shifts)) {
                 performance.shifts.forEach((shift) => {
-                  const shiftEndTime = new Date(shift.depart_time);
-                  if (shiftEndTime > now) {
+                  if (isShiftCurrent(shift.depart_time)) {
                     allAvailableShifts.push({
                       ...shift,
                       date: shift.date || performance.date,
@@ -1520,10 +1758,11 @@
               } catch (e) {}
               const performanceId = String(shift.show_date_id);
               const performanceKey = `${shift.performance_date}T${shift.performance_start}`;
-              const isUnavailable = unavailablePerformanceIds.has(performanceId);
+              const isUnavailable =
+                unavailablePerformanceIds.has(performanceId);
               const availabilityButtonLabel = isUnavailable
-                ? "I'm available"
-                : "I'm unavailable";
+                ? "Mark available"
+                : "Mark unavailable";
               const availabilityButtonClass = isUnavailable
                 ? "available"
                 : "unavailable";
@@ -1560,6 +1799,268 @@
               !unavailablePerformanceIds.has(String(shift.show_date_id)),
           );
         }
+      }
+
+      function populateAvailableShifts() {
+        const allAvailableShifts = [];
+
+        availableShifts.forEach((show) => {
+          if (show.show_date && show.arrive_time) {
+            if (isShiftCurrent(show.depart_time)) {
+              allAvailableShifts.push({
+                ...show,
+                date: show.show_date,
+                performance_date: show.show_date,
+                performance_start: show.start_time,
+                performance_end: show.end_time,
+                show_name: show.show_name,
+              });
+            }
+          } else if (show.performances && Array.isArray(show.performances)) {
+            show.performances.forEach((performance) => {
+              if (performance.shifts && Array.isArray(performance.shifts)) {
+                performance.shifts.forEach((shift) => {
+                  if (isShiftCurrent(shift.depart_time)) {
+                    const performanceDate =
+                      shift.date ||
+                      performance.date ||
+                      (performance.start_time || "").split("T")[0];
+                    allAvailableShifts.push({
+                      ...shift,
+                      date: performanceDate,
+                      performance_date: performanceDate,
+                      performance_start: performance.start_time,
+                      performance_end: performance.end_time,
+                      show_name: show.show_name,
+                    });
+                  }
+                });
+              }
+            });
+          }
+        });
+
+        if (allAvailableShifts.length === 0) {
+          availableContainer.innerHTML =
+            '<div class="no-shifts">No shifts are currently available for signup.</div>';
+          submitBtn.disabled = true;
+          return;
+        }
+
+        allAvailableShifts.sort((a, b) => {
+          const dateCompare =
+            new Date(a.performance_date) - new Date(b.performance_date);
+          if (dateCompare !== 0) return dateCompare;
+          return new Date(a.arrive_time) - new Date(b.arrive_time);
+        });
+
+        const groupedByPerformance = new Map();
+        allAvailableShifts.forEach((shift) => {
+          const performanceId = String(shift.show_date_id);
+          if (!groupedByPerformance.has(performanceId)) {
+            groupedByPerformance.set(performanceId, {
+              performanceId,
+              showName: shift.show_name,
+              date: shift.performance_date || shift.date,
+              startTime: shift.performance_start,
+              endTime: shift.performance_end,
+              shifts: [],
+            });
+          }
+          groupedByPerformance.get(performanceId).shifts.push(shift);
+        });
+
+        availableContainer.innerHTML = Array.from(groupedByPerformance.values())
+          .map((performance) => {
+            const assignedShift = getAssignedShiftForPerformance(
+              performance.performanceId,
+            );
+            const isUnavailable = unavailablePerformanceIds.has(
+              performance.performanceId,
+            );
+            const performanceKey = `${performance.date}T${performance.startTime}`;
+            const performanceDate = performance.date
+              ? DateTimeFormat.formatDate(performance.date)
+              : "Performance";
+            const performanceTime = DateTimeFormat.formatShiftTime(
+              performance.startTime,
+              performance.endTime,
+            );
+            const displayShowName = truncateShowName(performance.showName);
+            const availabilityButtonLabel = isUnavailable
+              ? "Mark available"
+              : "Mark unavailable";
+            const availabilityButtonClass = isUnavailable
+              ? "available"
+              : "unavailable";
+
+            const shiftCards = performance.shifts
+              .map((shift) => {
+                let plusOneDay = "";
+                let shiftTimeStr = formatShiftTime(
+                  shift.arrive_time,
+                  shift.depart_time,
+                );
+                shiftTimeStr = shiftTimeStr
+                  .replace(/\s*\+1\s*day(s)?/i, "")
+                  .replace(/\s*\(\+1\s*day(s)?\)/i, "")
+                  .replace(/\s*\(\+1d\)/i, "");
+                try {
+                  const arrive = new Date(shift.arrive_time);
+                  const depart = new Date(shift.depart_time);
+                  if (
+                    arrive instanceof Date &&
+                    depart instanceof Date &&
+                    !isNaN(arrive) &&
+                    !isNaN(depart) &&
+                    (depart.getDate() !== arrive.getDate() ||
+                      depart.getMonth() !== arrive.getMonth() ||
+                      depart.getFullYear() !== arrive.getFullYear())
+                  ) {
+                    plusOneDay = " (+1d)";
+                  }
+                } catch (e) {}
+
+                const actionControl = assignedShift
+                  ? `<button type="button" class="btn btn-primary-action" data-old-shift-id="${escapeHtml(assignedShift.id)}" data-new-shift-id="${escapeHtml(shift.id)}" data-current-role="${escapeHtml(assignedShift.role)}" data-new-role="${escapeHtml(shift.role)}" data-show-name="${escapeHtml(performance.showName)}" data-performance-date="${escapeHtml(performanceDate)}" onclick="swapToShift(this)">Swap to this role</button>`
+                  : isUnavailable
+                    ? '<span class="availability-note">Marked unavailable</span>'
+                    : `<button type="button" class="btn" data-shift-id="${escapeHtml(shift.id)}" data-shift-role="${escapeHtml(shift.role)}" onclick="acceptShift(this)">Accept shift</button>`;
+
+                return `
+                  <div class="shift available-shift ${isUnavailable ? "unavailable-performance" : ""}" style="padding: 0;">
+                    <div class="shift-row" style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1rem; padding: 1rem;">
+                      <div class="shift-details" style="flex: 1 1 250px; min-width: 200px; margin-left: 0;">
+                        <div class="shift-role">${escapeHtml(shift.role)}</div>
+                        <div class="shift-time">Shift Times: ${escapeHtml(shiftTimeStr)}${plusOneDay}</div>
+                      </div>
+                      <div class="shift-actions">
+                        ${actionControl}
+                      </div>
+                    </div>
+                  </div>
+                `;
+              })
+              .join("");
+
+            const availabilityControl = assignedShift
+              ? ""
+              : `<button type="button" class="availability-toggle ${availabilityButtonClass}" data-performance-key="${escapeHtml(performanceKey)}" data-performance-date="${escapeHtml(performance.date)}" onclick="togglePerformanceAvailability(this, ${performance.performanceId})">${availabilityButtonLabel}</button>`;
+            const alternateRolesControl = assignedShift
+              ? `<button type="button" class="btn alternate-toggle" data-performance-id="${escapeHtml(performance.performanceId)}" onclick="toggleAlternateRoles(this)">Show alternate roles</button>`
+              : "";
+            const headerControls = alternateRolesControl || availabilityControl;
+            const shouldShowRoles = !isUnavailable && !assignedShift;
+            const rolesClass = shouldShowRoles
+              ? "performance-shifts"
+              : "performance-shifts collapsed";
+
+            return `
+              <section class="performance-group">
+                <div class="performance-group-header">
+                  <div class="performance-heading-text">
+                    <span class="performance-date-heading">${escapeHtml(performanceDate)}</span>
+                    <span class="performance-meta" title="${escapeHtml(performance.showName)}">${escapeHtml(displayShowName)} | ${escapeHtml(performanceTime)}</span>
+                  </div>
+                  ${headerControls ? `<div class="shift-actions">${headerControls}</div>` : ""}
+                </div>
+                <div class="${rolesClass}" data-performance-id="${escapeHtml(performance.performanceId)}">
+                  ${isUnavailable ? "" : shiftCards}
+                </div>
+              </section>
+            `;
+          })
+          .join("");
+
+        submitBtn.disabled = false;
+      }
+
+      async function acceptShift(button) {
+        const shiftId = button.dataset.shiftId;
+        const originalText = button.textContent;
+        button.disabled = true;
+        button.textContent = "Accepting...";
+
+        try {
+          await performAcceptShift(shiftId);
+          Modal.success("Success", "You have accepted this shift.", () => {
+            location.reload();
+          });
+        } catch (error) {
+          Modal.error(
+            "Could not accept shift",
+            error.message || "Please try again.",
+          );
+          button.disabled = false;
+          button.textContent = originalText;
+        }
+      }
+
+      function toggleAlternateRoles(button) {
+        const performanceId = button.dataset.performanceId;
+        const rolesContainer = document.querySelector(
+          `.performance-shifts[data-performance-id="${performanceId}"]`,
+        );
+        if (!rolesContainer) return;
+
+        const isCollapsed = rolesContainer.classList.toggle("collapsed");
+        button.textContent = isCollapsed
+          ? "Show alternate roles"
+          : "Hide alternate roles";
+      }
+
+      function swapToShift(button) {
+        Modal.showModal("direct-shift-swap", {
+          title: "Swap shifts?",
+          body: `
+            <p>You are already assigned to this performance.</p>
+            <div class="shift-details-modal">
+              <div class="show-info">${escapeHtml(button.dataset.showName)}</div>
+              <div class="shift-time">${escapeHtml(button.dataset.performanceDate)}</div>
+              <div class="shift-role">Current: ${escapeHtml(button.dataset.currentRole)}</div>
+              <div class="shift-role">New: ${escapeHtml(button.dataset.newRole)}</div>
+            </div>
+          `,
+          buttons: [
+            {
+              text: "Cancel",
+              className: "modal-btn-outline",
+              action: "cancel",
+            },
+            {
+              text: "Swap Shifts",
+              className: "modal-btn-primary",
+              action: "swap",
+              handler: async () => {
+                const originalText = button.textContent;
+                button.disabled = true;
+                button.textContent = "Swapping...";
+                try {
+                  await performSwapShift(
+                    button.dataset.oldShiftId,
+                    button.dataset.newShiftId,
+                  );
+                  Modal.closeModal("direct-shift-swap");
+                  Modal.success(
+                    "Success",
+                    "Shift swapped successfully.",
+                    () => {
+                      location.reload();
+                    },
+                  );
+                } catch (error) {
+                  Modal.closeModal("direct-shift-swap");
+                  Modal.error(
+                    "Could not swap shifts",
+                    error.message || "Please try again.",
+                  );
+                  button.disabled = false;
+                  button.textContent = originalText;
+                }
+              },
+            },
+          ],
+        });
       }
 
       // Track selected shifts by performance to enforce one per performance rule

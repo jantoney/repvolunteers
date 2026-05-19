@@ -60,20 +60,48 @@ export function renderNewShowTemplate(data: NewShowPageData): string {
                 </label>
               </div>
               
-              <div class="form-group" id="newShowName">
-                <label for="name">Production Name:</label>
-                <input type="text" id="name" name="name" required>
+              <div id="newShowName">
+                <div class="form-group">
+                  <label for="name">Production Name:</label>
+                  <input type="text" id="name" name="name" required>
+                </div>
+
+                <div class="show-intervals">
+                  <h3>Production Intervals (Optional)</h3>
+                  <p class="form-text">Add intervals once for this production. They will apply to each performance on run sheets.</p>
+                  
+                  <div id="intervalsList">
+                    <!-- Intervals will be added dynamically -->
+                  </div>
+                  
+                  <div class="interval-form">
+                    <div class="form-group">
+                      <label for="newIntervalStart">Start (minutes from performance start):</label>
+                      <input type="number" id="newIntervalStart" min="0" max="300" placeholder="e.g. 60">
+                      <small class="form-text">When the interval begins</small>
+                    </div>
+                    <div class="form-group">
+                      <label for="newIntervalDuration">Duration (minutes):</label>
+                      <input type="number" id="newIntervalDuration" min="1" max="60" placeholder="e.g. 20">
+                      <small class="form-text">How long the interval lasts</small>
+                    </div>
+                    <div class="form-group">
+                      <button type="button" class="btn btn-secondary" onclick="addInterval()">Add Interval</button>
+                    </div>
+                  </div>
+                </div>
               </div>
               
               <div class="form-group hidden" id="existingShowSelect">
                 <label for="existingShow">Select Production:</label>
                 <select id="existingShow" name="existingShow">
                   <option value="">-- Select a Production --</option>
-                  ${
-    existingShows.map((show) =>
-      `<option value="${show.id}">${show.name}</option>`
-    ).join("")
-  }
+                  ${existingShows
+                    .map(
+                      (show) =>
+                        `<option value="${show.id}">${show.name}</option>`,
+                    )
+                    .join("")}
                 </select>
               </div>
             </div>
@@ -104,31 +132,6 @@ export function renderNewShowTemplate(data: NewShowPageData): string {
               <div class="selected-dates">
                 <strong>Selected Performances:</strong>
                 <div id="selectedDatesDisplay"></div>
-              </div>
-            </div>
-            
-            <div class="show-intervals">
-              <h3>Performance Intervals (Optional)</h3>
-              <p class="form-text">Add intervals that occur during each performance. These will appear on run sheets.</p>
-              
-              <div id="intervalsList">
-                <!-- Intervals will be added dynamically -->
-              </div>
-              
-              <div class="interval-form">
-                <div class="form-group">
-                  <label for="newIntervalStart">Start (minutes from performance start):</label>
-                  <input type="number" id="newIntervalStart" min="0" max="300" placeholder="e.g. 60">
-                  <small class="form-text">When the interval begins</small>
-                </div>
-                <div class="form-group">
-                  <label for="newIntervalDuration">Duration (minutes):</label>
-                  <input type="number" id="newIntervalDuration" min="1" max="60" placeholder="e.g. 20">
-                  <small class="form-text">How long the interval lasts</small>
-                </div>
-                <div class="form-group">
-                  <button type="button" class="btn btn-secondary" onclick="addInterval()">Add Interval</button>
-                </div>
               </div>
             </div>
             

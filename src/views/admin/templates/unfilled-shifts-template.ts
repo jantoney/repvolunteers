@@ -101,18 +101,18 @@ export function renderUnfilledShiftsTemplate(
             <a href="/admin/shifts" class="btn btn-secondary">All Shifts</a>
           </div>
         </div>        ${
-    shifts.length > 0
-      ? `
+          shifts.length > 0
+            ? `
           <div class="alert">
             <strong>Attention Required!</strong> There ${
-        shifts.length === 1 ? "is" : "are"
-      } ${shifts.length} unfilled shift${
-        shifts.length !== 1 ? "s" : ""
-      } that need${shifts.length === 1 ? "s" : ""} participants assigned.
+              shifts.length === 1 ? "is" : "are"
+            } ${shifts.length} unfilled shift${
+              shifts.length !== 1 ? "s" : ""
+            } that need${shifts.length === 1 ? "s" : ""} participants assigned.
           </div>
         `
-      : ""
-  }
+            : ""
+        }
 
         <!-- Stats -->
         <div class="stats">
@@ -122,21 +122,21 @@ export function renderUnfilledShiftsTemplate(
           </div>
           <div class="stat-card">
             <div class="stat-number">${
-    new Set(shifts.map((s) => s.show_name)).size
-  }</div>
+              new Set(shifts.map((s) => s.show_name)).size
+            }</div>
             <div class="stat-label">Productions Affected</div>
           </div>
           <div class="stat-card">
             <div class="stat-number">${
-    new Set(shifts.map((s) => s.date)).size
-  }</div>
+              new Set(shifts.map((s) => s.date)).size
+            }</div>
             <div class="stat-label">Performances</div>
           </div>
         </div>
 
         ${
-    shifts.length === 0
-      ? `          <div class="form-container">
+          shifts.length === 0
+            ? `          <div class="form-container">
             <div style="text-align: center; padding: 2rem; color: #28a745;">
               <h4>🎉 All Shifts Filled!</h4>
               <p>Excellent! All shifts currently have participants assigned. Great job on the coordination!</p>
@@ -144,12 +144,12 @@ export function renderUnfilledShiftsTemplate(
             </div>
           </div>
         `
-      : `
+            : `
           <!-- Unfilled Shifts -->
-          ${
-        Array.from(grouped.entries()).map(([_key, shiftsGroup]) => {
-          const firstShift = shiftsGroup[0];
-          return `
+          ${Array.from(grouped.entries())
+            .map(([_key, shiftsGroup]) => {
+              const firstShift = shiftsGroup[0];
+              return `
               <div class="performance-group">
                 <div class="performance-header">
                   <h3 class="performance-title">${firstShift.show_name}</h3>
@@ -160,16 +160,16 @@ export function renderUnfilledShiftsTemplate(
                 </div>
                 
                 <div class="shifts-grid">
-                  ${
-            shiftsGroup.map((shift) => {
-              const arriveTime = formatTime(shift.arrive_time);
-              const departTime = formatTime(shift.depart_time);
-              const isNextDay = isDifferentDay(
-                shift.arrive_time,
-                shift.depart_time,
-              );
+                  ${shiftsGroup
+                    .map((shift) => {
+                      const arriveTime = formatTime(shift.arrive_time);
+                      const departTime = formatTime(shift.depart_time);
+                      const isNextDay = isDifferentDay(
+                        shift.arrive_time,
+                        shift.depart_time,
+                      );
 
-              return `
+                      return `
                       <div class="shift-card">
                         <div class="shift-role">${shift.role}</div>
                         
@@ -177,8 +177,10 @@ export function renderUnfilledShiftsTemplate(
                           <span class="time-range">
                             ${arriveTime} - ${departTime}
                             ${
-                isNextDay ? '<span class="next-day">+1 day</span>' : ""
-              }
+                              isNextDay
+                                ? '<span class="next-day">+1 day</span>'
+                                : ""
+                            }
                           </span>
                         </div>
                           <div class="table-actions">
@@ -187,14 +189,14 @@ export function renderUnfilledShiftsTemplate(
                         </div>
                       </div>
                     `;
-            }).join("")
-          }
+                    })
+                    .join("")}
                 </div>
               </div>
             `;
-        }).join("")
-      }        `
-  }
+            })
+            .join("")}        `
+        }
       </div>
 
       <!-- Assignment Modal -->

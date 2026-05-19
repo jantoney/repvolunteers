@@ -84,7 +84,8 @@ export async function viewSignup(ctx: RouterContext<string>) {
       [id],
     );
 
-    const unavailablePerformances = await getVolunteerUnavailablePerformances(id);
+    const unavailablePerformances =
+      await getVolunteerUnavailablePerformances(id);
 
     // Group assigned shifts by show, then by performance
     // ...existing code...
@@ -329,7 +330,9 @@ export async function submitSignup(ctx: RouterContext<string>) {
         `SELECT s.id as shift_id, s.role 
          FROM shifts s
          JOIN participant_shifts vs ON vs.shift_id = s.id
-         WHERE vs.participant_id = $1 AND s.show_date_id = $2`,
+         WHERE vs.participant_id = $1
+           AND s.show_date_id = $2
+           AND s.depart_time >= NOW() - INTERVAL '3 hours'`,
         [id, showDateId],
       );
 
@@ -510,7 +513,10 @@ export async function downloadPDF(ctx: RouterContext<string>) {
     const pdfData = await generateVolunteerPDFData(id);
     const pdfBuffer = await generateServerSidePDF(pdfData);
 
-    const filename = `theatre-shifts-${pdfData.volunteer.name.replace(/[^a-zA-Z0-9]/g, "-")}-${new Date().toISOString().split("T")[0]}.pdf`;
+    const filename = `theatre-shifts-${pdfData.volunteer.name.replace(
+      /[^a-zA-Z0-9]/g,
+      "-",
+    )}-${new Date().toISOString().split("T")[0]}.pdf`;
 
     ctx.response.headers.set("Content-Type", "application/pdf");
     ctx.response.headers.set(
@@ -537,7 +543,10 @@ export async function downloadSchedulePDF(ctx: RouterContext<string>) {
     const pdfData = await generateVolunteerPDFData(id);
     const pdfBuffer = await generateServerSidePDF(pdfData);
 
-    const filename = `theatre-shifts-${pdfData.volunteer.name.replace(/[^a-zA-Z0-9]/g, "-")}-${new Date().toISOString().split("T")[0]}.pdf`;
+    const filename = `theatre-shifts-${pdfData.volunteer.name.replace(
+      /[^a-zA-Z0-9]/g,
+      "-",
+    )}-${new Date().toISOString().split("T")[0]}.pdf`;
 
     ctx.response.headers.set("Content-Type", "application/pdf");
     ctx.response.headers.set(

@@ -198,8 +198,11 @@ function renderCalendar() {
     dayElement.className = "calendar-day";
     dayElement.textContent = currentDay.getDate();
 
-    const dateString = currentDay.getFullYear() + "-" +
-      String(currentDay.getMonth() + 1).padStart(2, "0") + "-" +
+    const dateString =
+      currentDay.getFullYear() +
+      "-" +
+      String(currentDay.getMonth() + 1).padStart(2, "0") +
+      "-" +
       String(currentDay.getDate()).padStart(2, "0");
 
     if (currentDay.getMonth() !== month) {
@@ -214,9 +217,8 @@ function renderCalendar() {
       dayElement.classList.add("selected");
     }
 
-    dayElement.addEventListener(
-      "click",
-      () => selectDate(dateString, dayElement),
+    dayElement.addEventListener("click", () =>
+      selectDate(dateString, dayElement),
     );
     calendarGrid.appendChild(dayElement);
   }
@@ -283,15 +285,13 @@ function renderIntervals() {
     showIntervals.map((interval, index) => {
       const startHours = Math.floor(interval.start_minutes / 60);
       const startMins = interval.start_minutes % 60;
-      const startTime = startHours > 0
-        ? `${startHours}h ${startMins}m`
-        : `${startMins}m`;
+      const startTime =
+        startHours > 0 ? `${startHours}h ${startMins}m` : `${startMins}m`;
       const endMinutes = interval.start_minutes + interval.duration_minutes;
       const endHours = Math.floor(endMinutes / 60);
       const endMinsDisplay = endMinutes % 60;
-      const endTime = endHours > 0
-        ? `${endHours}h ${endMinsDisplay}m`
-        : `${endMinsDisplay}m`;
+      const endTime =
+        endHours > 0 ? `${endHours}h ${endMinsDisplay}m` : `${endMinsDisplay}m`;
 
       return AdminDOM.el("div", { className: "interval-item" }, [
         AdminDOM.el(
@@ -299,11 +299,15 @@ function renderIntervals() {
           {},
           `Interval: ${startTime} - ${endTime} (${interval.duration_minutes} min)`,
         ),
-        AdminDOM.el("button", {
-          type: "button",
-          className: "btn btn-danger btn-sm",
-          onclick: () => globalThis.removeInterval(index),
-        }, "Remove"),
+        AdminDOM.el(
+          "button",
+          {
+            type: "button",
+            className: "btn btn-danger btn-sm",
+            onclick: () => globalThis.removeInterval(index),
+          },
+          "Remove",
+        ),
       ]);
     }),
   );
@@ -375,6 +379,23 @@ async function addIntervalsToShow(showId) {
   }
 }
 
+function selectExistingShow(showId, showName) {
+  const existingShowInput = document.getElementById("existingShow");
+  const showIdValue = String(showId);
+  let showOption = Array.from(existingShowInput.options).find(
+    (option) => option.value === showIdValue,
+  );
+
+  if (!showOption) {
+    showOption = document.createElement("option");
+    showOption.value = showIdValue;
+    existingShowInput.appendChild(showOption);
+  }
+
+  showOption.textContent = showName;
+  existingShowInput.value = showIdValue;
+}
+
 function clearForm() {
   document.getElementById("name").value = "";
   resetShowTimes();
@@ -407,7 +428,7 @@ function showSuccess(message) {
   const element = document.getElementById("successMessage");
   element.textContent = message;
   element.style.display = "block";
-  setTimeout(() => element.style.display = "none", 5000);
+  setTimeout(() => (element.style.display = "none"), 5000);
 }
 
 function showError(message) {
@@ -436,8 +457,9 @@ function initializeEventListeners() {
     e.preventDefault();
     hideMessages();
 
-    const showType =
-      document.querySelector('input[name="showType"]:checked').value;
+    const showType = document.querySelector(
+      'input[name="showType"]:checked',
+    ).value;
     const startTime = document.getElementById("startTime").value;
     const endTime = document.getElementById("endTime").value;
 
@@ -495,35 +517,40 @@ function initializeEventListeners() {
         const successful = result.results.filter((r) => r.success);
         const failed = result.results.filter((r) => !r.success);
 
-        let message = "Added " + successful.length +
-          " performance(s) to '" + showName + "'.";
+        let message =
+          "Added " +
+          successful.length +
+          " performance(s) to '" +
+          showName +
+          "'.";
         if (failed.length > 0) {
-          message += " " + failed.length +
-            " duplicate performance(s) skipped.";
+          message += " " + failed.length + " duplicate performance(s) skipped.";
         }
 
         // Store the created/updated show ID
         lastCreatedShowId = result.showId;
 
-        // Add intervals if any were defined
-        if (showIntervals.length > 0) {
+        // Add intervals only when creating a new production. Existing productions
+        // manage their production-level intervals on the edit production page.
+        if (showType === "new" && showIntervals.length > 0) {
           await addIntervalsToShow(lastCreatedShowId);
-          message += " " + showIntervals.length +
-            " performance interval(s) added.";
+          message +=
+            " " + showIntervals.length + " production interval(s) added.";
         }
 
         showSuccess(message);
 
         // Switch to "Add Performances to Existing Production" and select the production we just worked with
-        document.querySelector('input[name="showType"][value="existing"]')
-          .checked = true;
+        document.querySelector(
+          'input[name="showType"][value="existing"]',
+        ).checked = true;
         document.getElementById("newShowName").classList.add("hidden");
-        document.getElementById("existingShowSelect").classList.remove(
-          "hidden",
-        );
+        document
+          .getElementById("existingShowSelect")
+          .classList.remove("hidden");
         document.getElementById("name").required = false;
         document.getElementById("existingShow").required = true;
-        document.getElementById("existingShow").value = lastCreatedShowId;
+        selectExistingShow(lastCreatedShowId, showName);
 
         // Clear only the dates and times, keep the production selected
         resetShowTimes();
