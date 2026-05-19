@@ -56,8 +56,11 @@ function extractTime(str: string): string {
   // Try Date object or string
   const dateObj = new Date(str);
   if (!isNaN(dateObj.getTime())) {
-    return String(dateObj.getHours()).padStart(2, "0") + ":" +
-      String(dateObj.getMinutes()).padStart(2, "0");
+    return (
+      String(dateObj.getHours()).padStart(2, "0") +
+      ":" +
+      String(dateObj.getMinutes()).padStart(2, "0")
+    );
   }
   return str;
 }
@@ -68,7 +71,8 @@ function plusOneDayIfNeeded(arrive: string, depart: string): string {
   const d = new Date(depart);
   if (!isNaN(a.getTime()) && !isNaN(d.getTime())) {
     if (
-      d.getDate() !== a.getDate() || d.getMonth() !== a.getMonth() ||
+      d.getDate() !== a.getDate() ||
+      d.getMonth() !== a.getMonth() ||
       d.getFullYear() !== a.getFullYear()
     ) {
       return " (+1d)";
@@ -108,8 +112,8 @@ async function getUnfilledShiftsData(): Promise<UnfilledShiftsData> {
 
     return {
       shifts,
-      generatedAt: formatCurrentDateAdelaide() + " " +
-        formatCurrentTimeAdelaide(),
+      generatedAt:
+        formatCurrentDateAdelaide() + " " + formatCurrentTimeAdelaide(),
       totalShifts: shifts.length,
       affectedShows: uniqueShows.size,
       performanceDates: uniqueDates.size,
@@ -155,7 +159,7 @@ export async function generateUnfilledShiftsPDF(): Promise<Uint8Array> {
     const pageWidth = 210;
     const pageHeight = 297;
     const margin = 15;
-    const contentWidth = pageWidth - (2 * margin);
+    const contentWidth = pageWidth - 2 * margin;
     let yPos = margin + 5;
 
     // Title
@@ -214,7 +218,7 @@ export async function generateUnfilledShiftsPDF(): Promise<Uint8Array> {
       const totalTextWidth = doc.getTextWidth(totalText);
       doc.text(
         totalText,
-        margin + (statBoxWidth / 2) - (totalTextWidth / 2),
+        margin + statBoxWidth / 2 - totalTextWidth / 2,
         yPos + 12,
       );
       doc.setFontSize(9);
@@ -222,7 +226,7 @@ export async function generateUnfilledShiftsPDF(): Promise<Uint8Array> {
       const totalLabelWidth = doc.getTextWidth("Unfilled Shifts");
       doc.text(
         "Unfilled Shifts",
-        margin + (statBoxWidth / 2) - (totalLabelWidth / 2),
+        margin + statBoxWidth / 2 - totalLabelWidth / 2,
         yPos + 20,
       );
 
@@ -241,7 +245,7 @@ export async function generateUnfilledShiftsPDF(): Promise<Uint8Array> {
       const showsTextWidth = doc.getTextWidth(showsText);
       doc.text(
         showsText,
-        margin + statBoxWidth + 10 + (statBoxWidth / 2) - (showsTextWidth / 2),
+        margin + statBoxWidth + 10 + statBoxWidth / 2 - showsTextWidth / 2,
         yPos + 12,
       );
       doc.setFontSize(9);
@@ -249,7 +253,7 @@ export async function generateUnfilledShiftsPDF(): Promise<Uint8Array> {
       const showsLabelWidth = doc.getTextWidth("Shows Affected");
       doc.text(
         "Shows Affected",
-        margin + statBoxWidth + 10 + (statBoxWidth / 2) - (showsLabelWidth / 2),
+        margin + statBoxWidth + 10 + statBoxWidth / 2 - showsLabelWidth / 2,
         yPos + 20,
       );
 
@@ -268,8 +272,10 @@ export async function generateUnfilledShiftsPDF(): Promise<Uint8Array> {
       const datesTextWidth = doc.getTextWidth(datesText);
       doc.text(
         datesText,
-        margin + (statBoxWidth + 10) * 2 + (statBoxWidth / 2) -
-          (datesTextWidth / 2),
+        margin +
+          (statBoxWidth + 10) * 2 +
+          statBoxWidth / 2 -
+          datesTextWidth / 2,
         yPos + 12,
       );
       doc.setFontSize(9);
@@ -277,8 +283,10 @@ export async function generateUnfilledShiftsPDF(): Promise<Uint8Array> {
       const datesLabelWidth = doc.getTextWidth("Performance Dates");
       doc.text(
         "Performance Dates",
-        margin + (statBoxWidth + 10) * 2 + (statBoxWidth / 2) -
-          (datesLabelWidth / 2),
+        margin +
+          (statBoxWidth + 10) * 2 +
+          statBoxWidth / 2 -
+          datesLabelWidth / 2,
         yPos + 20,
       );
 
@@ -385,7 +393,8 @@ export async function generateUnfilledShiftsPDF(): Promise<Uint8Array> {
 
           // Shift Times (align with the role text, not show name)
           const arriveTime = extractTime(shift.arrive_time);
-          const departTime = extractTime(shift.depart_time) +
+          const departTime =
+            extractTime(shift.depart_time) +
             plusOneDayIfNeeded(shift.arrive_time, shift.depart_time);
           doc.text(`${arriveTime} - ${departTime}`, xPos, currentRowY);
           xPos += colWidths[2];
@@ -399,7 +408,7 @@ export async function generateUnfilledShiftsPDF(): Promise<Uint8Array> {
             );
           }
 
-          yPos += (i === 0 && shift.show_name.length > 20) ? 8 : 6;
+          yPos += i === 0 && shift.show_name.length > 20 ? 8 : 6;
         }
 
         yPos += 3; // Extra space between performances
@@ -414,9 +423,8 @@ export async function generateUnfilledShiftsPDF(): Promise<Uint8Array> {
     return new Uint8Array(pdfData);
   } catch (error) {
     console.error("Unfilled shifts PDF generation failed:", error);
-    const errorMessage = error instanceof Error
-      ? error.message
-      : "Unknown error occurred";
+    const errorMessage =
+      error instanceof Error ? error.message : "Unknown error occurred";
     throw new Error(`PDF generation failed: ${errorMessage}`);
   }
 }
@@ -439,7 +447,7 @@ export async function generateOutstandingShiftsPDF(
     const pageWidth = 210;
     const pageHeight = 297;
     const margin = 15;
-    const contentWidth = pageWidth - (2 * margin);
+    const contentWidth = pageWidth - 2 * margin;
     let yPos = margin + 5;
 
     // Title
@@ -532,7 +540,8 @@ export async function generateOutstandingShiftsPDF(
           year: "numeric",
         });
         const arriveTime = extractTime(shift.arrive_time);
-        const departTime = extractTime(shift.depart_time) +
+        const departTime =
+          extractTime(shift.depart_time) +
           plusOneDayIfNeeded(shift.arrive_time, shift.depart_time);
 
         doc.text(date, margin, yPos);
@@ -578,9 +587,8 @@ export async function generateOutstandingShiftsPDF(
     return new Uint8Array(pdfData);
   } catch (error) {
     console.error("Outstanding shifts PDF generation failed:", error);
-    const errorMessage = error instanceof Error
-      ? error.message
-      : "Unknown error occurred";
+    const errorMessage =
+      error instanceof Error ? error.message : "Unknown error occurred";
     throw new Error(
       `Outstanding shifts PDF generation failed: ${errorMessage}`,
     );
@@ -606,7 +614,7 @@ export async function generateOutstandingShiftsPDFForVolunteer(
     const pageWidth = 210;
     const pageHeight = 297;
     const margin = 15;
-    const contentWidth = pageWidth - (2 * margin);
+    const contentWidth = pageWidth - 2 * margin;
     let yPos = margin + 5;
 
     // Title
@@ -704,7 +712,8 @@ export async function generateOutstandingShiftsPDFForVolunteer(
           year: "numeric",
         });
         const arriveTime = extractTime(shift.arrive_time);
-        const departTime = extractTime(shift.depart_time) +
+        const departTime =
+          extractTime(shift.depart_time) +
           plusOneDayIfNeeded(shift.arrive_time, shift.depart_time);
 
         doc.text(date, margin, yPos);
@@ -751,9 +760,8 @@ export async function generateOutstandingShiftsPDFForVolunteer(
       "Volunteer-specific outstanding shifts PDF generation failed:",
       error,
     );
-    const errorMessage = error instanceof Error
-      ? error.message
-      : "Unknown error occurred";
+    const errorMessage =
+      error instanceof Error ? error.message : "Unknown error occurred";
     throw new Error(
       `Volunteer-specific outstanding shifts PDF generation failed: ${errorMessage}`,
     );
@@ -793,8 +801,8 @@ async function getOutstandingShiftsData(
 
     return {
       shifts,
-      generatedAt: formatCurrentDateAdelaide() + " " +
-        formatCurrentTimeAdelaide(),
+      generatedAt:
+        formatCurrentDateAdelaide() + " " + formatCurrentTimeAdelaide(),
       totalShifts: shifts.length,
       affectedShows: uniqueShows.size,
       performanceDates: uniqueDates.size,
@@ -825,6 +833,12 @@ async function getOutstandingShiftsDataForVolunteer(
        JOIN shows sh ON sh.id = sd.show_id
        LEFT JOIN participant_shifts vs ON vs.shift_id = s.id
        WHERE s.depart_time >= NOW() - INTERVAL '3 hours'
+         AND NOT EXISTS (
+           SELECT 1
+           FROM volunteer_unavailable_performances vup
+           WHERE vup.participant_id = $1
+             AND vup.show_date_id = s.show_date_id
+         )
          AND s.id NOT IN (
            -- Exclude shifts that overlap with volunteer's existing shifts
            SELECT DISTINCT unfilled.id
@@ -858,8 +872,8 @@ async function getOutstandingShiftsDataForVolunteer(
 
     return {
       shifts,
-      generatedAt: formatCurrentDateAdelaide() + " " +
-        formatCurrentTimeAdelaide(),
+      generatedAt:
+        formatCurrentDateAdelaide() + " " + formatCurrentTimeAdelaide(),
       totalShifts: shifts.length,
       affectedShows: uniqueShows.size,
       performanceDates: uniqueDates.size,

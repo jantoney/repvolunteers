@@ -9,31 +9,31 @@ jobs:
     runs-on: self-hosted
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v5
+      - name: Checkout code
+        uses: actions/checkout@v5
 
-    - name: Create .env file
-      run: |
-        cat > .env <<EOF
-        PORT=8044
-        DATABASE_URL=${{ secrets.DATABASE_URL }}
-        SESSION_SECRET=${{ secrets.SESSION_SECRET }}
-        RESEND_API_KEY=${{ secrets.RESEND_API_KEY }}
-        BASE_URL=${{ secrets.BASE_URL }}
-        FROM_EMAIL=${{ secrets.FROM_EMAIL }}
-        FROM_NAME=${{ secrets.FROM_NAME }}
-        ADMIN_USER=${{ secrets.ADMIN_USER }}
-        ADMIN_PASS=${{ secrets.ADMIN_PASS }}
-        BETTER_AUTH_SECRET=${{ secrets.BETTER_AUTH_SECRET }}
-        BETTER_AUTH_URL=${{ secrets.BETTER_AUTH_URL }}
-        MICROSOFT_TENANT_ID=${{ vars.MICROSOFT_TENANT_ID }}
-        MICROSOFT_CLIENT_ID=${{ vars.MICROSOFT_CLIENT_ID }}
-        MICROSOFT_CLIENT_SECRET=${{ secrets.MICROSOFT_CLIENT_SECRET }}
-        MICROSOFT_ADMIN_GROUP_ID=${{ vars.MICROSOFT_ADMIN_GROUP_ID }}
-        DENO_ENV=production
-        EOF
+      - name: Create .env file
+        run: |
+          cat > .env <<EOF
+          PORT=8044
+          DATABASE_URL=${{ secrets.DATABASE_URL }}
+          SESSION_SECRET=${{ secrets.SESSION_SECRET }}
+          RESEND_API_KEY=${{ secrets.RESEND_API_KEY }}
+          BASE_URL=${{ secrets.BASE_URL }}
+          FROM_EMAIL=${{ vars.FROM_EMAIL }}
+          FROM_NAME=${{ vars.FROM_NAME }}
+          ADMIN_USER=${{ secrets.ADMIN_USER }}
+          ADMIN_PASS=${{ secrets.ADMIN_PASS }}
+          BETTER_AUTH_SECRET=${{ secrets.BETTER_AUTH_SECRET }}
+          BETTER_AUTH_URL=${{ secrets.BETTER_AUTH_URL }}
+          MICROSOFT_TENANT_ID=${{ vars.MICROSOFT_TENANT_ID }}
+          MICROSOFT_CLIENT_ID=${{ vars.MICROSOFT_CLIENT_ID }}
+          MICROSOFT_CLIENT_SECRET=${{ secrets.MICROSOFT_CLIENT_SECRET }}
+          MICROSOFT_ADMIN_GROUP_ID=${{ vars.MICROSOFT_ADMIN_GROUP_ID }}
+          DENO_ENV=production
+          EOF
 
-    - name: Restart app with Docker Compose
-      run: |
-        docker compose down theatreapp
-        docker compose -f docker-compose.yml.localserver up -d --build
+      - name: Restart app with Docker Compose
+        run: |
+          docker compose down theatreapp
+          docker compose -f docker-compose.yml.localserver up -d --build

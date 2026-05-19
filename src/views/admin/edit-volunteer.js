@@ -10,6 +10,7 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   loadEmailHistory();
+  loadUnavailablePerformances();
   setupEventListeners();
 });
 
@@ -55,6 +56,203 @@ function setupEventListeners() {
         }
       }
     });
+  }
+
+  const addUnavailablePerformanceBtn = document.getElementById(
+    "addUnavailablePerformanceBtn",
+  );
+  if (addUnavailablePerformanceBtn) {
+    addUnavailablePerformanceBtn.addEventListener(
+      "click",
+      addUnavailablePerformance,
+    );
+  }
+
+  const saveUnavailablePerformancesBtn = document.getElementById(
+    "saveUnavailablePerformancesBtn",
+  );
+  if (saveUnavailablePerformancesBtn) {
+    saveUnavailablePerformancesBtn.addEventListener(
+      "click",
+      saveUnavailablePerformances,
+    );
+  }
+}
+
+const unavailablePerformanceIds = new Set();
+const performanceById = new Map();
+let performanceOptions = [];
+
+function setUnavailablePerformancesStatus(message, type) {
+  const statusEl = document.getElementById("unavailablePerformancesStatus");
+  if (!statusEl) return;
+  statusEl.textContent = message;
+  statusEl.className = `availability-status ${type || ""}`;
+}
+
+function populateUnavailablePerformanceSelect() {
+  const select = document.getElementById("unavailablePerformanceSelect");
+  if (!select) return;
+
+  const availableOptions = performanceOptions.filter(
+    (performance) => !unavailablePerformanceIds.has(String(performance.id)),
+  );
+  AdminDOM.setChildren(select, [
+    AdminDOM.el(
+      "option",
+      { value: "" },
+      availableOptions.length === 0
+        ? "No more upcoming performances"
+        : "Choose a performance",
+    ),
+    ...availableOptions.map((performance) =>
+      AdminDOM.el(
+        "option",
+        { value: String(performance.id) },
+        performance.label,
+      ),
+    ),
+  ]);
+}
+
+function renderUnavailablePerformances() {
+  const listEl = document.getElementById("unavailablePerformancesList");
+  if (!listEl) return;
+
+  const selectedPerformances = Array.from(unavailablePerformanceIds)
+    .map((id) => performanceById.get(id))
+    .filter(Boolean)
+    .sort((a, b) =>
+      `${a.date} ${a.start_time}`.localeCompare(`${b.date} ${b.start_time}`),
+    );
+
+  if (selectedPerformances.length === 0) {
+    AdminDOM.setChildren(
+      listEl,
+      AdminDOM.el(
+        "div",
+        { className: "alert alert-warning" },
+        "No unavailable performances added.",
+      ),
+    );
+    populateUnavailablePerformanceSelect();
+    return;
+  }
+
+  AdminDOM.setChildren(
+    listEl,
+    selectedPerformances.map((performance) =>
+      AdminDOM.el("div", { className: "unavailable-performance-item" }, [
+        AdminDOM.el("span", {}, performance.label),
+        AdminDOM.el(
+          "button",
+          {
+            type: "button",
+            className: "btn btn-sm btn-danger",
+            onclick: () => {
+              unavailablePerformanceIds.delete(String(performance.id));
+              renderUnavailablePerformances();
+              setUnavailablePerformancesStatus(
+                "Remember to save your changes.",
+                "",
+              );
+            },
+          },
+          "Remove",
+        ),
+      ]),
+    ),
+  );
+
+  populateUnavailablePerformanceSelect();
+}
+
+async function loadUnavailablePerformances() {
+  try {
+    const response = await fetch(
+      `/admin/api/volunteers/${volunteerId}/unavailable-performances`,
+    );
+    if (!response.ok) {
+      throw new Error("Failed to load unavailable performances");
+    }
+
+    const data = await response.json();
+    unavailablePerformanceIds.clear();
+    performanceById.clear();
+    performanceOptions = data.options || [];
+    performanceOptions.forEach((performance) =>
+      performanceById.set(String(performance.id), performance),
+    );
+    (data.performances || []).forEach((performance) => {
+      unavailablePerformanceIds.add(String(performance.id));
+      performanceById.set(String(performance.id), performance);
+    });
+    renderUnavailablePerformances();
+  } catch (error) {
+    console.error("Error loading unavailable performances:", error);
+    setUnavailablePerformancesStatus(
+      "Failed to load unavailable performances.",
+      "error",
+    );
+  }
+}
+
+function addUnavailablePerformance() {
+  const select = document.getElementById("unavailablePerformanceSelect");
+  if (!select || !select.value) {
+    setUnavailablePerformancesStatus("Choose a performance to add.", "error");
+    return;
+  }
+
+  unavailablePerformanceIds.add(String(select.value));
+  select.value = "";
+  renderUnavailablePerformances();
+  setUnavailablePerformancesStatus("Remember to save your changes.", "");
+}
+
+async function saveUnavailablePerformances() {
+  const button = document.getElementById("saveUnavailablePerformancesBtn");
+  const originalText = button ? button.textContent : "Save";
+  if (button) {
+    button.disabled = true;
+    button.textContent = "Saving...";
+  }
+
+  try {
+    const response = await fetch(
+      `/admin/api/volunteers/${volunteerId}/unavailable-performances`,
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          performanceIds: Array.from(unavailablePerformanceIds)
+            .map(Number)
+            .sort((a, b) => a - b),
+        }),
+      },
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || "Failed to save unavailable performances");
+    }
+
+    setUnavailablePerformancesStatus(
+      "Unavailable performances saved.",
+      "success",
+    );
+  } catch (error) {
+    console.error("Error saving unavailable performances:", error);
+    setUnavailablePerformancesStatus(
+      error.message || "Failed to save unavailable performances.",
+      "error",
+    );
+  } finally {
+    if (button) {
+      button.disabled = false;
+      button.textContent = originalText;
+    }
   }
 }
 
@@ -115,11 +313,15 @@ function renderEmailHistory(emails) {
       AdminDOM.el(
         "div",
         { className: "email-actions" },
-        AdminDOM.el("button", {
-          type: "button",
-          className: "btn btn-sm btn-primary",
-          onclick: () => viewEmailContent(email.id),
-        }, "View Details"),
+        AdminDOM.el(
+          "button",
+          {
+            type: "button",
+            className: "btn btn-sm btn-primary",
+            onclick: () => viewEmailContent(email.id),
+          },
+          "View Details",
+        ),
       ),
     ]);
   });
@@ -210,9 +412,13 @@ async function viewEmailContent(emailId) {
       AdminDOM.el(
         "span",
         { className: "email-details-value" },
-        AdminDOM.el("span", {
-          className: statusBadgeClass,
-        }, statusBadgeText),
+        AdminDOM.el(
+          "span",
+          {
+            className: statusBadgeClass,
+          },
+          statusBadgeText,
+        ),
       ),
     );
 
@@ -221,28 +427,38 @@ async function viewEmailContent(emailId) {
     ];
 
     if (email.attachments && email.attachments.length > 0) {
-      sections.push(AdminDOM.el("div", { className: "attachments-section" }, [
-        AdminDOM.el("span", { className: "attachments-label" }, "Attachments:"),
-        AdminDOM.el(
-          "div",
-          { className: "attachments-list" },
-          email.attachments.map((att) =>
-            AdminDOM.el("a", {
-              href: `/admin/api/emails/attachments/${att.id}/download`,
-              target: "_blank",
-              className: "attachment-link",
-              title: `Open ${att.filename}`,
-            }, [
-              AdminDOM.el(
-                "span",
-                { className: "attachment-icon" },
-                "Attachment",
-              ),
-              att.filename,
-            ])
+      sections.push(
+        AdminDOM.el("div", { className: "attachments-section" }, [
+          AdminDOM.el(
+            "span",
+            { className: "attachments-label" },
+            "Attachments:",
           ),
-        ),
-      ]));
+          AdminDOM.el(
+            "div",
+            { className: "attachments-list" },
+            email.attachments.map((att) =>
+              AdminDOM.el(
+                "a",
+                {
+                  href: `/admin/api/emails/attachments/${att.id}/download`,
+                  target: "_blank",
+                  className: "attachment-link",
+                  title: `Open ${att.filename}`,
+                },
+                [
+                  AdminDOM.el(
+                    "span",
+                    { className: "attachment-icon" },
+                    "Attachment",
+                  ),
+                  att.filename,
+                ],
+              ),
+            ),
+          ),
+        ]),
+      );
     }
 
     const contentBody = AdminDOM.el("div", { className: "email-content-body" });
@@ -251,15 +467,23 @@ async function viewEmailContent(emailId) {
         AdminDOM.el("iframe", { srcdoc: email.html_content }),
       );
     } else {
-      contentBody.appendChild(AdminDOM.el("div", {
-        style: { padding: "1rem", fontStyle: "italic", color: "#666" },
-      }, email.content || "No content available"));
+      contentBody.appendChild(
+        AdminDOM.el(
+          "div",
+          {
+            style: { padding: "1rem", fontStyle: "italic", color: "#666" },
+          },
+          email.content || "No content available",
+        ),
+      );
     }
 
-    sections.push(AdminDOM.el("div", { className: "email-content-section" }, [
-      AdminDOM.el("span", { className: "email-content-label" }, "Content:"),
-      contentBody,
-    ]));
+    sections.push(
+      AdminDOM.el("div", { className: "email-content-section" }, [
+        AdminDOM.el("span", { className: "email-content-label" }, "Content:"),
+        contentBody,
+      ]),
+    );
 
     AdminDOM.setChildren(body, sections);
   } catch (error) {

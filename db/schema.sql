@@ -42,6 +42,13 @@ CREATE TABLE IF NOT EXISTS participant_shifts (
   PRIMARY KEY (participant_id, shift_id)
 );
 
+CREATE TABLE IF NOT EXISTS volunteer_unavailable_performances (
+  participant_id UUID REFERENCES participants(id) ON DELETE CASCADE,
+  show_date_id INTEGER REFERENCES show_dates(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (participant_id, show_date_id)
+);
+
 -- Better Auth tables
 CREATE TABLE IF NOT EXISTS "user" (
   id TEXT PRIMARY KEY,
@@ -131,3 +138,4 @@ CREATE TABLE IF NOT EXISTS email_attachments (
 CREATE INDEX IF NOT EXISTS idx_sent_emails_participant ON sent_emails(to_participant_id, sent_at DESC);
 CREATE INDEX IF NOT EXISTS idx_sent_emails_user ON sent_emails(to_user_id, sent_at DESC);
 CREATE INDEX IF NOT EXISTS idx_sent_emails_type ON sent_emails(email_type, sent_at DESC);
+CREATE INDEX IF NOT EXISTS idx_volunteer_unavailable_performances_show_date ON volunteer_unavailable_performances(show_date_id);

@@ -198,6 +198,9 @@ export function renderBulkEmailTemplate(): string {
             <button class="email-tab" data-email-type="unfilled-shifts">
               🚨 Unfilled Shifts Email
             </button>
+            <button class="email-tab" data-email-type="availability-request">
+              📆 Availability Request
+            </button>
           </div>
 
           <!-- Show Week Email Content -->
@@ -249,6 +252,28 @@ export function renderBulkEmailTemplate(): string {
             </div>
 
             <div class="volunteer-list" id="unfilledVolunteersList">
+              <!-- Volunteers will be loaded here -->
+            </div>
+          </div>
+
+          <!-- Availability Request Email Content -->
+          <div class="email-content" id="availability-request-content">
+            <h3>Availability Request</h3>
+            <p>Ask volunteers to add the days they cannot work before shifts are filled for a new production.</p>
+            
+            <div class="selection-summary">
+              <div class="selection-count" id="availabilitySelectionCount">0 volunteers selected</div>
+            </div>
+
+            <div class="volunteer-actions">
+              <button class="btn btn-secondary" onclick="selectAllAvailabilityVolunteers()">Select All</button>
+              <button class="btn btn-secondary" onclick="deselectAllAvailabilityVolunteers()">Deselect All</button>
+              <button class="btn btn-primary" onclick="sendAvailabilityRequestEmails()" id="sendAvailabilityBtn" disabled>
+                Send Availability Requests
+              </button>
+            </div>
+
+            <div class="volunteer-list" id="availabilityVolunteersList">
               <!-- Volunteers will be loaded here -->
             </div>
           </div>

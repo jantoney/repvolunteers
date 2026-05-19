@@ -1,5 +1,10 @@
 import type { RouterContext } from "oak";
 import { getPool } from "../models/db.ts";
+import {
+  getVolunteerUnavailablePerformances,
+  normalizeUnavailablePerformanceIds,
+  setVolunteerUnavailablePerformances,
+} from "../utils/availability.ts";
 import { render } from "../utils/template.ts";
 
 // ...existing code...
@@ -15,7 +20,10 @@ export async function viewSignup(ctx: RouterContext<string>) {
   const pool = getPool();
   const client = await pool.connect();
   try {
-    const volunteerRes = await client.queryObject<VolunteerRecord>("SELECT * FROM participants WHERE id=$1", [id]);
+    const volunteerRes = await client.queryObject<VolunteerRecord>(
+      "SELECT * FROM participants WHERE id=$1",
+      [id],
+    );
     if (volunteerRes.rows.length === 0) {
       ctx.throw(404, "Volunteer not found");
     }
@@ -31,6 +39,7 @@ export async function viewSignup(ctx: RouterContext<string>) {
       depart_time: string;
       start_time: string;
       end_time: string;
+      is_unavailable_performance?: boolean;
     };
 
     // Get assigned shifts
@@ -48,7 +57,7 @@ export async function viewSignup(ctx: RouterContext<string>) {
        JOIN participant_shifts vs ON vs.shift_id = s.id
        WHERE vs.participant_id = $1
        ORDER BY sh.name, sd.start_time, s.arrive_time`,
-      [id]
+      [id],
     );
 
     // Get available shifts (not assigned to any participant)
@@ -59,15 +68,23 @@ export async function viewSignup(ctx: RouterContext<string>) {
               s.show_date_id,
               sh.name as show_name, sh.id as show_id,
               TO_CHAR(sd.start_time AT TIME ZONE 'Australia/Adelaide', 'YYYY-MM-DD"T"HH24:MI:SS') as start_time,
-              TO_CHAR(sd.end_time AT TIME ZONE 'Australia/Adelaide', 'YYYY-MM-DD"T"HH24:MI:SS') as end_time
+              TO_CHAR(sd.end_time AT TIME ZONE 'Australia/Adelaide', 'YYYY-MM-DD"T"HH24:MI:SS') as end_time,
+              EXISTS (
+                SELECT 1
+                FROM volunteer_unavailable_performances vup
+                WHERE vup.participant_id = $1
+                  AND vup.show_date_id = s.show_date_id
+              ) as is_unavailable_performance
        FROM shifts s
        JOIN show_dates sd ON sd.id = s.show_date_id
        JOIN shows sh ON sh.id = sd.show_id
        LEFT JOIN participant_shifts vs ON vs.shift_id = s.id
        WHERE vs.participant_id IS NULL
        ORDER BY sh.name, sd.start_time, s.arrive_time`,
-      [],
+      [id],
     );
+
+    const unavailablePerformances = await getVolunteerUnavailablePerformances(id);
 
     // Group assigned shifts by show, then by performance
     // ...existing code...
@@ -80,30 +97,33 @@ export async function viewSignup(ctx: RouterContext<string>) {
             start_time: string;
             end_time: string;
             shifts: ShiftRow[];
-          }
-        }
-      }
+          };
+        };
+      };
     } = {};
     for (const row of assignedShiftsRes.rows) {
       // Add a 'date' field (YYYY-MM-DD) for frontend compatibility
       let startTimeStr: string;
-      if (typeof row.start_time === 'string') {
+      if (typeof row.start_time === "string") {
         startTimeStr = row.start_time;
       } else {
         try {
           startTimeStr = new Date(row.start_time).toISOString();
         } catch {
-          startTimeStr = '';
+          startTimeStr = "";
         }
       }
-      const date = startTimeStr && typeof startTimeStr === 'string' ? startTimeStr.split('T')[0] : '';
+      const date =
+        startTimeStr && typeof startTimeStr === "string"
+          ? startTimeStr.split("T")[0]
+          : "";
       const rowWithDate = { ...row, date };
       const showKey = `${row.show_id}`;
       if (!groupedAssigned[showKey]) {
         groupedAssigned[showKey] = {
           show_id: row.show_id,
           show_name: row.show_name,
-          performances: {}
+          performances: {},
         };
       }
       const perfKey = `${startTimeStr}`;
@@ -111,7 +131,7 @@ export async function viewSignup(ctx: RouterContext<string>) {
         groupedAssigned[showKey].performances[perfKey] = {
           start_time: startTimeStr,
           end_time: row.end_time,
-          shifts: []
+          shifts: [],
         };
       }
       groupedAssigned[showKey].performances[perfKey].shifts.push(rowWithDate);
@@ -128,30 +148,33 @@ export async function viewSignup(ctx: RouterContext<string>) {
             start_time: string;
             end_time: string;
             shifts: ShiftRow[];
-          }
-        }
-      }
+          };
+        };
+      };
     } = {};
     for (const row of shiftsRes.rows) {
       // Add a 'date' field (YYYY-MM-DD) for frontend compatibility
       let startTimeStr: string;
-      if (typeof row.start_time === 'string') {
+      if (typeof row.start_time === "string") {
         startTimeStr = row.start_time;
       } else {
         try {
           startTimeStr = new Date(row.start_time).toISOString();
         } catch {
-          startTimeStr = '';
+          startTimeStr = "";
         }
       }
-      const date = startTimeStr && typeof startTimeStr === 'string' ? startTimeStr.split('T')[0] : '';
+      const date =
+        startTimeStr && typeof startTimeStr === "string"
+          ? startTimeStr.split("T")[0]
+          : "";
       const rowWithDate = { ...row, date };
       const showKey = `${row.show_id}`;
       if (!groupedAvailable[showKey]) {
         groupedAvailable[showKey] = {
           show_id: row.show_id,
           show_name: row.show_name,
-          performances: {}
+          performances: {},
         };
       }
       const perfKey = `${startTimeStr}`;
@@ -159,48 +182,76 @@ export async function viewSignup(ctx: RouterContext<string>) {
         groupedAvailable[showKey].performances[perfKey] = {
           start_time: startTimeStr,
           end_time: row.end_time,
-          shifts: []
+          shifts: [],
         };
       }
       groupedAvailable[showKey].performances[perfKey].shifts.push(rowWithDate);
     }
 
     // Convert to array structure
-    const assignedShiftsGrouped = Object.values(groupedAssigned).map(show => ({
-      show_id: show.show_id,
-      show_name: show.show_name,
-      performances: Object.values(show.performances)
-    }));
+    const assignedShiftsGrouped = Object.values(groupedAssigned).map(
+      (show) => ({
+        show_id: show.show_id,
+        show_name: show.show_name,
+        performances: Object.values(show.performances),
+      }),
+    );
 
-    const availableShiftsGrouped = Object.values(groupedAvailable).map(show => ({
-      show_id: show.show_id,
-      show_name: show.show_name,
-      performances: Object.values(show.performances)
-    }));
+    const availableShiftsGrouped = Object.values(groupedAvailable).map(
+      (show) => ({
+        show_id: show.show_id,
+        show_name: show.show_name,
+        performances: Object.values(show.performances),
+      }),
+    );
 
     // Thoroughly sanitize JSON to prevent syntax errors
     // Convert objects to strings with built-in JSON.stringify which handles escaping correctly
     const assignedJSON = JSON.stringify(assignedShiftsGrouped);
     const availableJSON = JSON.stringify(availableShiftsGrouped);
+    const unavailablePerformancesJSON = JSON.stringify(unavailablePerformances);
 
     // Just use the JSON strings directly, no need for additional escaping
     // JSON.stringify already properly escapes special characters for JSON context
     const safeAssignedJSON = assignedJSON;
     const safeAvailableJSON = availableJSON;
 
-    const html = await render(
-      "views/signup.html", {
+    const html = await render("views/signup.html", {
       name: volunteerRes.rows[0].name,
       volunteerId: id,
       assignedShiftsJson: safeAssignedJSON,
       shiftsJson: safeAvailableJSON,
-    },
-    );
+      unavailablePerformancesJson: unavailablePerformancesJSON,
+    });
 
     ctx.response.headers.set("Content-Type", "text/html; charset=utf-8");
     ctx.response.body = html;
   } finally {
     client.release();
+  }
+}
+
+export async function updateUnavailablePerformances(
+  ctx: RouterContext<string>,
+) {
+  const id = ctx.params.id;
+  const body = await ctx.request.body.json();
+
+  try {
+    const performanceIds = normalizeUnavailablePerformanceIds(
+      body.performanceIds,
+    );
+    await setVolunteerUnavailablePerformances(id, performanceIds);
+    ctx.response.status = 200;
+    ctx.response.body = { success: true, performanceIds };
+  } catch (error) {
+    ctx.response.status = 400;
+    ctx.response.body = {
+      error:
+        error instanceof Error
+          ? error.message
+          : "Failed to update unavailable performances",
+    };
   }
 }
 
@@ -216,9 +267,21 @@ export async function submitSignup(ctx: RouterContext<string>) {
     // Check for conflicts before inserting any shifts
     for (const shiftId of shiftIds) {
       // Get the show_date_id for the shift being added
-      const shiftResult = await client.queryObject<{ show_date_id: number }>(
-        "SELECT show_date_id FROM shifts WHERE id = $1",
-        [shiftId]
+      const shiftResult = await client.queryObject<{
+        show_date_id: number;
+        show_name: string;
+        performance_label: string;
+      }>(
+        `SELECT s.show_date_id,
+                sh.name as show_name,
+                sh.name || ' - ' ||
+                  TO_CHAR(sd.start_time AT TIME ZONE 'Australia/Adelaide', 'YYYY-MM-DD HH24:MI') || '-' ||
+                  TO_CHAR(sd.end_time AT TIME ZONE 'Australia/Adelaide', 'HH24:MI') as performance_label
+         FROM shifts s
+         JOIN show_dates sd ON sd.id = s.show_date_id
+         JOIN shows sh ON sh.id = sd.show_id
+         WHERE s.id = $1`,
+        [shiftId],
       );
 
       if (shiftResult.rows.length === 0) {
@@ -227,20 +290,47 @@ export async function submitSignup(ctx: RouterContext<string>) {
         ctx.response.body = {
           error: "Invalid shift ID",
           conflictType: "invalid_shift",
-          shiftId
+          shiftId,
         };
         return;
       }
 
       const showDateId = shiftResult.rows[0].show_date_id;
 
+      const unavailableResult = await client.queryObject<{
+        show_date_id: number;
+      }>(
+        `SELECT show_date_id
+         FROM volunteer_unavailable_performances
+         WHERE participant_id = $1
+           AND show_date_id = $2`,
+        [id, showDateId],
+      );
+
+      if (unavailableResult.rows.length > 0) {
+        await client.queryObject("ROLLBACK");
+        ctx.response.status = 409;
+        ctx.response.body = {
+          error: "You marked yourself unavailable for this performance",
+          conflictType: "unavailable_performance",
+          performanceId: showDateId,
+          performanceLabel: shiftResult.rows[0].performance_label,
+          showName: shiftResult.rows[0].show_name,
+          requestedShiftId: shiftId,
+        };
+        return;
+      }
+
       // Check if volunteer already has a shift for this show_date_id
-      const existingShift = await client.queryObject<{ shift_id: number; role: string }>(
+      const existingShift = await client.queryObject<{
+        shift_id: number;
+        role: string;
+      }>(
         `SELECT s.id as shift_id, s.role 
          FROM shifts s
          JOIN participant_shifts vs ON vs.shift_id = s.id
          WHERE vs.participant_id = $1 AND s.show_date_id = $2`,
-        [id, showDateId]
+        [id, showDateId],
       );
 
       if (existingShift.rows.length > 0) {
@@ -255,7 +345,7 @@ export async function submitSignup(ctx: RouterContext<string>) {
            FROM show_dates sd
            JOIN shows sh ON sh.id = sd.show_id
            WHERE sd.id = $1`,
-          [showDateId]
+          [showDateId],
         );
 
         await client.queryObject("ROLLBACK");
@@ -265,10 +355,10 @@ export async function submitSignup(ctx: RouterContext<string>) {
           conflictType: "performance_conflict",
           existingShift: {
             id: existingShift.rows[0].shift_id,
-            role: existingShift.rows[0].role
+            role: existingShift.rows[0].role,
           },
           performance: performanceResult.rows[0],
-          requestedShiftId: shiftId
+          requestedShiftId: shiftId,
         };
         return;
       }
@@ -284,7 +374,10 @@ export async function submitSignup(ctx: RouterContext<string>) {
 
     await client.queryObject("COMMIT");
     ctx.response.status = 201;
-    ctx.response.body = { success: true, message: `Successfully signed up for ${shiftIds.length} shift(s)` };
+    ctx.response.body = {
+      success: true,
+      message: `Successfully signed up for ${shiftIds.length} shift(s)`,
+    };
   } catch (error) {
     await client.queryObject("ROLLBACK");
     throw error;
@@ -302,7 +395,7 @@ export async function removeFromShift(ctx: RouterContext<string>) {
   try {
     await client.queryObject(
       "DELETE FROM participant_shifts WHERE participant_id = $1 AND shift_id = $2",
-      [volunteerId, shiftId]
+      [volunteerId, shiftId],
     );
     ctx.response.status = 200;
     ctx.response.body = { success: true };
@@ -314,7 +407,10 @@ export async function removeFromShift(ctx: RouterContext<string>) {
 export async function swapShift(ctx: RouterContext<string>) {
   const volunteerId = ctx.params.id;
   const body = await ctx.request.body.json();
-  const { oldShiftId, newShiftId } = body as { oldShiftId: string; newShiftId: string };
+  const { oldShiftId, newShiftId } = body as {
+    oldShiftId: string;
+    newShiftId: string;
+  };
   const pool = getPool();
   const client = await pool.connect();
   try {
@@ -325,11 +421,26 @@ export async function swapShift(ctx: RouterContext<string>) {
       shift_id: number;
       show_date_id: number;
       role: string;
+      performance_label: string;
+      is_unavailable: boolean;
     }>(
-      `SELECT id as shift_id, show_date_id, role 
-       FROM shifts 
-       WHERE id IN ($1, $2)`,
-      [oldShiftId, newShiftId]
+      `SELECT s.id as shift_id,
+              s.show_date_id,
+              s.role,
+              sh.name || ' - ' ||
+                TO_CHAR(sd.start_time AT TIME ZONE 'Australia/Adelaide', 'YYYY-MM-DD HH24:MI') || '-' ||
+                TO_CHAR(sd.end_time AT TIME ZONE 'Australia/Adelaide', 'HH24:MI') as performance_label,
+              EXISTS (
+                SELECT 1
+                FROM volunteer_unavailable_performances vup
+                WHERE vup.participant_id = $3
+                  AND vup.show_date_id = s.show_date_id
+              ) as is_unavailable
+       FROM shifts s
+       JOIN show_dates sd ON sd.id = s.show_date_id
+       JOIN shows sh ON sh.id = sd.show_id
+       WHERE s.id IN ($1, $2)`,
+      [oldShiftId, newShiftId, volunteerId],
     );
 
     if (shiftsResult.rows.length !== 2) {
@@ -347,21 +458,38 @@ export async function swapShift(ctx: RouterContext<string>) {
       return;
     }
 
+    const newShift =
+      String(shift1.shift_id) === String(newShiftId) ? shift1 : shift2;
+    if (newShift.is_unavailable) {
+      await client.queryObject("ROLLBACK");
+      ctx.response.status = 409;
+      ctx.response.body = {
+        error: "You marked yourself unavailable for this performance",
+        conflictType: "unavailable_performance",
+        performanceId: newShift.show_date_id,
+        performanceLabel: newShift.performance_label,
+      };
+      return;
+    }
+
     // Remove old assignment
     await client.queryObject(
       "DELETE FROM participant_shifts WHERE participant_id = $1 AND shift_id = $2",
-      [volunteerId, oldShiftId]
+      [volunteerId, oldShiftId],
     );
 
     // Add new assignment
     await client.queryObject(
       "INSERT INTO participant_shifts (participant_id, shift_id) VALUES ($1, $2)",
-      [volunteerId, newShiftId]
+      [volunteerId, newShiftId],
     );
 
     await client.queryObject("COMMIT");
     ctx.response.status = 200;
-    ctx.response.body = { success: true, message: "Shift swapped successfully" };
+    ctx.response.body = {
+      success: true,
+      message: "Shift swapped successfully",
+    };
   } catch (error) {
     await client.queryObject("ROLLBACK");
     throw error;
@@ -374,16 +502,21 @@ export async function downloadPDF(ctx: RouterContext<string>) {
   const id = ctx.params.id;
 
   try {
-    const { generateVolunteerPDFData } = await import("../utils/pdf-generator.ts");
-    const { generateServerSidePDF } = await import("../utils/server-pdf-generator.ts");
+    const { generateVolunteerPDFData } =
+      await import("../utils/pdf-generator.ts");
+    const { generateServerSidePDF } =
+      await import("../utils/server-pdf-generator.ts");
 
     const pdfData = await generateVolunteerPDFData(id);
     const pdfBuffer = await generateServerSidePDF(pdfData);
 
-    const filename = `theatre-shifts-${pdfData.volunteer.name.replace(/[^a-zA-Z0-9]/g, '-')}-${new Date().toISOString().split('T')[0]}.pdf`;
+    const filename = `theatre-shifts-${pdfData.volunteer.name.replace(/[^a-zA-Z0-9]/g, "-")}-${new Date().toISOString().split("T")[0]}.pdf`;
 
     ctx.response.headers.set("Content-Type", "application/pdf");
-    ctx.response.headers.set("Content-Disposition", `attachment; filename="${filename}"`);
+    ctx.response.headers.set(
+      "Content-Disposition",
+      `attachment; filename="${filename}"`,
+    );
     ctx.response.body = pdfBuffer;
   } catch (error) {
     console.error("Error generating PDF:", error);
@@ -396,16 +529,21 @@ export async function downloadSchedulePDF(ctx: RouterContext<string>) {
   const id = ctx.params.id;
 
   try {
-    const { generateVolunteerPDFData } = await import("../utils/pdf-generator.ts");
-    const { generateServerSidePDF } = await import("../utils/server-pdf-generator.ts");
+    const { generateVolunteerPDFData } =
+      await import("../utils/pdf-generator.ts");
+    const { generateServerSidePDF } =
+      await import("../utils/server-pdf-generator.ts");
 
     const pdfData = await generateVolunteerPDFData(id);
     const pdfBuffer = await generateServerSidePDF(pdfData);
 
-    const filename = `theatre-shifts-${pdfData.volunteer.name.replace(/[^a-zA-Z0-9]/g, '-')}-${new Date().toISOString().split('T')[0]}.pdf`;
+    const filename = `theatre-shifts-${pdfData.volunteer.name.replace(/[^a-zA-Z0-9]/g, "-")}-${new Date().toISOString().split("T")[0]}.pdf`;
 
     ctx.response.headers.set("Content-Type", "application/pdf");
-    ctx.response.headers.set("Content-Disposition", `inline; filename="${filename}"`);
+    ctx.response.headers.set(
+      "Content-Disposition",
+      `inline; filename="${filename}"`,
+    );
     ctx.response.body = pdfBuffer;
   } catch (error) {
     console.error("Error generating volunteer schedule PDF:", error);

@@ -31,8 +31,8 @@ jobs:
         SESSION_SECRET=${{ secrets.SESSION_SECRET }}
         RESEND_API_KEY=${{ secrets.RESEND_API_KEY }}
         BASE_URL=${{ secrets.BASE_URL }}
-        FROM_EMAIL=${{ secrets.FROM_EMAIL }}
-        FROM_NAME=${{ secrets.FROM_NAME }}
+        FROM_EMAIL=${{ vars.FROM_EMAIL }}
+        FROM_NAME=${{ vars.FROM_NAME }}
         ADMIN_USER=${{ secrets.ADMIN_USER }}
         ADMIN_PASS=${{ secrets.ADMIN_PASS }}
         BETTER_AUTH_SECRET=${{ secrets.BETTER_AUTH_SECRET }}

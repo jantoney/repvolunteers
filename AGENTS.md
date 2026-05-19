@@ -77,7 +77,6 @@ Use the Deno tasks when running directly:
 deno task start
 deno task dev
 deno task migrate
-deno task create-admin
 ```
 
 For Docker development on Windows:
@@ -120,7 +119,10 @@ Expected configuration includes:
 - `FROM_EMAIL`
 - `FROM_NAME`
 - `DENO_ENV`
-- `ADMIN_USER`
+- `MICROSOFT_TENANT_ID`
+- `MICROSOFT_CLIENT_ID`
+- `MICROSOFT_CLIENT_SECRET`
+- `MICROSOFT_ADMIN_GROUP_ID`
 
 Do not commit real secrets. Use `.env.example` or `.env.template` for
 placeholder values only.

@@ -139,6 +139,14 @@ router.get("/api/volunteers", adminController.listVolunteers);
 router.post("/api/volunteers", adminController.createVolunteer);
 router.get("/api/volunteers/:id", adminController.getVolunteer);
 router.put("/api/volunteers/:id", adminController.updateVolunteer);
+router.get(
+  "/api/volunteers/:id/unavailable-performances",
+  adminController.getVolunteerUnavailablePerformancesForAdmin,
+);
+router.put(
+  "/api/volunteers/:id/unavailable-performances",
+  adminController.updateVolunteerUnavailablePerformances,
+);
 router.put(
   "/api/volunteers/:id/approval",
   adminController.toggleVolunteerApproval,
@@ -162,6 +170,10 @@ router.post(
 router.post(
   "/api/volunteers/:id/email-last-minute-shifts",
   adminController.emailLastMinuteShifts,
+);
+router.post(
+  "/api/volunteers/:id/email-availability-request",
+  adminController.emailAvailabilityRequest,
 );
 router.get(
   "/api/volunteers/:id/emails",
@@ -219,6 +231,10 @@ router.get(
   "/api/bulk-email/volunteers/unfilled-shifts",
   adminController.getVolunteersForUnfilledShifts,
 );
+router.get(
+  "/api/bulk-email/volunteers/availability-request",
+  adminController.getVolunteersForAvailabilityRequest,
+);
 router.post(
   "/api/bulk-email/send-show-week",
   adminController.sendBulkShowWeekEmails,
@@ -226,6 +242,10 @@ router.post(
 router.post(
   "/api/bulk-email/send-unfilled-shifts",
   adminController.sendBulkUnfilledShiftsEmails,
+);
+router.post(
+  "/api/bulk-email/send-availability-request",
+  adminController.sendBulkAvailabilityRequestEmails,
 );
 
 // Server time API endpoint

@@ -1,4 +1,8 @@
-import { getAdminNavigation, getAdminStyles, getAdminScripts } from "../components/navigation.ts";
+import {
+  getAdminNavigation,
+  getAdminStyles,
+  getAdminScripts,
+} from "../components/navigation.ts";
 
 export interface Volunteer {
   id: number;
@@ -11,9 +15,11 @@ export interface EditVolunteerPageData {
   volunteer: Volunteer;
 }
 
-export function renderEditVolunteerTemplate(data: EditVolunteerPageData): string {
+export function renderEditVolunteerTemplate(
+  data: EditVolunteerPageData,
+): string {
   const { volunteer } = data;
-  
+
   return `
     <!DOCTYPE html>
     <html>
@@ -32,7 +38,7 @@ export function renderEditVolunteerTemplate(data: EditVolunteerPageData): string
       <link rel="stylesheet" href="/src/views/admin/edit-volunteer.css">
     </head>
     <body>
-      ${getAdminNavigation('volunteers')}
+      ${getAdminNavigation("volunteers")}
       
       <!-- Main Content -->
       <div class="main-content">
@@ -49,12 +55,12 @@ export function renderEditVolunteerTemplate(data: EditVolunteerPageData): string
             
             <div class="form-group">
               <label for="email">Email (optional):</label>
-              <input type="email" id="email" name="email" value="${volunteer.email || ''}">
+              <input type="email" id="email" name="email" value="${volunteer.email || ""}">
             </div>
             
             <div class="form-group">
               <label for="phone">Phone (optional):</label>
-              <input type="tel" id="phone" name="phone" value="${volunteer.phone || ''}">
+              <input type="tel" id="phone" name="phone" value="${volunteer.phone || ""}">
             </div>
             
             <div class="form-actions">
@@ -62,6 +68,23 @@ export function renderEditVolunteerTemplate(data: EditVolunteerPageData): string
               <a href="/admin/volunteers" class="btn btn-secondary">Cancel</a>
             </div>
           </form>
+        </div>
+
+        <div class="availability-section">
+          <div class="section-header">
+            <h2>Unavailable Performances</h2>
+            <p class="text-muted">Performances this volunteer cannot work.</p>
+          </div>
+          <div class="availability-controls">
+            <div class="form-group">
+              <label for="unavailablePerformanceSelect">Performance:</label>
+              <select id="unavailablePerformanceSelect"></select>
+            </div>
+            <button type="button" class="btn btn-secondary" id="addUnavailablePerformanceBtn">Add Performance</button>
+            <button type="button" class="btn btn-primary" id="saveUnavailablePerformancesBtn">Save</button>
+          </div>
+          <div id="unavailablePerformancesList" class="unavailable-performances-list"></div>
+          <div id="unavailablePerformancesStatus" class="availability-status"></div>
         </div>
 
         <!-- Email History Section -->

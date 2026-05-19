@@ -1,11 +1,14 @@
 let showVolunteers = [];
 let unfilledVolunteers = [];
+let availabilityVolunteers = [];
 const selectedShowVolunteers = new Set();
 const selectedUnfilledVolunteers = new Set();
+const selectedAvailabilityVolunteers = new Set();
 
 document.addEventListener("DOMContentLoaded", function () {
   loadShows();
   loadUnfilledVolunteers();
+  loadAvailabilityVolunteers();
   setupEventListeners();
 });
 
@@ -46,13 +49,15 @@ async function loadShows() {
       AdminDOM.el("option", { value: "" }, "-- Select a production --"),
     );
     shows.forEach((show) => {
-      select.appendChild(AdminDOM.el(
-        "option",
-        {
-          value: show.id,
-        },
-        `${show.name} (${show.volunteers_with_shifts} volunteers with shifts)`,
-      ));
+      select.appendChild(
+        AdminDOM.el(
+          "option",
+          {
+            value: show.id,
+          },
+          `${show.name} (${show.volunteers_with_shifts} volunteers with shifts)`,
+        ),
+      );
     });
   } catch (error) {
     console.error("Error loading shows:", error);
@@ -93,6 +98,20 @@ async function loadUnfilledVolunteers() {
   }
 }
 
+async function loadAvailabilityVolunteers() {
+  try {
+    const response = await fetch(
+      "/admin/api/bulk-email/volunteers/availability-request",
+    );
+    availabilityVolunteers = await response.json();
+    renderAvailabilityVolunteers();
+    updateAvailabilitySelectionCount();
+  } catch (error) {
+    console.error("Error loading availability volunteers:", error);
+    showStatus("Error loading volunteers", "error");
+  }
+}
+
 function createVolunteerItem(volunteer, details, onChange) {
   return AdminDOM.el("div", { className: "volunteer-item" }, [
     AdminDOM.el("input", {
@@ -119,7 +138,7 @@ function renderShowVolunteers() {
           volunteer.next_shift_date || "N/A"
         }`,
         updateShowSelection,
-      )
+      ),
     ),
   );
 
@@ -136,12 +155,29 @@ function renderUnfilledVolunteers() {
         volunteer,
         `${volunteer.email} - Total shifts: ${volunteer.total_shifts} - Upcoming: ${volunteer.upcoming_shifts}`,
         updateUnfilledSelection,
-      )
+      ),
     ),
   );
 
   selectedUnfilledVolunteers.clear();
   updateUnfilledSelectionCount();
+}
+
+function renderAvailabilityVolunteers() {
+  const container = document.getElementById("availabilityVolunteersList");
+  AdminDOM.setChildren(
+    container,
+    availabilityVolunteers.map((volunteer) =>
+      createVolunteerItem(
+        volunteer,
+        `${volunteer.email} - Unavailable performances saved: ${volunteer.unavailable_performances_count}`,
+        updateAvailabilitySelection,
+      ),
+    ),
+  );
+
+  selectedAvailabilityVolunteers.clear();
+  updateAvailabilitySelectionCount();
 }
 
 function updateShowSelection(volunteerId, checked) {
@@ -152,6 +188,11 @@ function updateShowSelection(volunteerId, checked) {
 function updateUnfilledSelection(volunteerId, checked) {
   updateSelection(selectedUnfilledVolunteers, volunteerId, checked);
   updateUnfilledSelectionCount();
+}
+
+function updateAvailabilitySelection(volunteerId, checked) {
+  updateSelection(selectedAvailabilityVolunteers, volunteerId, checked);
+  updateAvailabilitySelectionCount();
 }
 
 function updateSelection(selection, volunteerId, checked) {
@@ -174,6 +215,13 @@ function updateUnfilledSelectionCount() {
   document.getElementById("unfilledSelectionCount").textContent =
     `${count} volunteers selected`;
   document.getElementById("sendUnfilledBtn").disabled = count === 0;
+}
+
+function updateAvailabilitySelectionCount() {
+  const count = selectedAvailabilityVolunteers.size;
+  document.getElementById("availabilitySelectionCount").textContent =
+    `${count} volunteers selected`;
+  document.getElementById("sendAvailabilityBtn").disabled = count === 0;
 }
 
 function setAll(containerSelector, selection, checked) {
@@ -209,6 +257,16 @@ function selectAllUnfilledVolunteers() {
 function deselectAllUnfilledVolunteers() {
   setAll("#unfilledVolunteersList", selectedUnfilledVolunteers, false);
   updateUnfilledSelectionCount();
+}
+
+function selectAllAvailabilityVolunteers() {
+  setAll("#availabilityVolunteersList", selectedAvailabilityVolunteers, true);
+  updateAvailabilitySelectionCount();
+}
+
+function deselectAllAvailabilityVolunteers() {
+  setAll("#availabilityVolunteersList", selectedAvailabilityVolunteers, false);
+  updateAvailabilitySelectionCount();
 }
 
 async function sendShowWeekEmails() {
@@ -288,6 +346,44 @@ async function sendUnfilledShiftsEmails() {
   }
 }
 
+async function sendAvailabilityRequestEmails() {
+  if (selectedAvailabilityVolunteers.size === 0) {
+    showStatus("Please select at least one volunteer", "error");
+    return;
+  }
+
+  const btn = document.getElementById("sendAvailabilityBtn");
+  btn.disabled = true;
+  btn.textContent = "Sending...";
+
+  try {
+    const response = await fetch(
+      "/admin/api/bulk-email/send-availability-request",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          volunteerIds: Array.from(selectedAvailabilityVolunteers),
+        }),
+      },
+    );
+
+    const result = await response.json();
+    if (result.success) {
+      showStatus(result.message, "success");
+      deselectAllAvailabilityVolunteers();
+    } else {
+      showStatus(result.error || "Failed to send emails", "error");
+    }
+  } catch (error) {
+    console.error("Error sending availability request emails:", error);
+    showStatus("Error sending emails", "error");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Send Availability Requests";
+  }
+}
+
 function showStatus(message, type) {
   const statusElement = document.getElementById("statusMessage");
   statusElement.textContent = message;
@@ -299,5 +395,8 @@ window.selectAllShowVolunteers = selectAllShowVolunteers;
 window.deselectAllShowVolunteers = deselectAllShowVolunteers;
 window.selectAllUnfilledVolunteers = selectAllUnfilledVolunteers;
 window.deselectAllUnfilledVolunteers = deselectAllUnfilledVolunteers;
+window.selectAllAvailabilityVolunteers = selectAllAvailabilityVolunteers;
+window.deselectAllAvailabilityVolunteers = deselectAllAvailabilityVolunteers;
 window.sendShowWeekEmails = sendShowWeekEmails;
 window.sendUnfilledShiftsEmails = sendUnfilledShiftsEmails;
+window.sendAvailabilityRequestEmails = sendAvailabilityRequestEmails;

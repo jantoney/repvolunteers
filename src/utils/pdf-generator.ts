@@ -39,14 +39,26 @@ interface ShiftRow {
   end_time: string;
 }
 
+export interface UnavailablePerformanceRow {
+  id: number;
+  show_name: string;
+  show_date: string;
+  start_time: string;
+  end_time: string;
+}
+
 export interface PDFData {
   volunteer: VolunteerRecord;
   assignedShifts: ShiftRow[];
   availableShifts: ShiftRow[];
+  unavailablePerformances: UnavailablePerformanceRow[];
   generatedAt: string;
 }
 
-export function generateShiftRemovalPDF(volunteer: VolunteerData, shifts: ShiftData[]): Uint8Array {
+export function generateShiftRemovalPDF(
+  volunteer: VolunteerData,
+  shifts: ShiftData[],
+): Uint8Array {
   const content = generatePDFContent(volunteer, shifts);
 
   // For a simple implementation, we'll return a plain text file
@@ -54,17 +66,20 @@ export function generateShiftRemovalPDF(volunteer: VolunteerData, shifts: ShiftD
   return new TextEncoder().encode(content);
 }
 
-function generatePDFContent(volunteer: VolunteerData, shifts: ShiftData[]): string {
-  const currentDate = new Date().toLocaleDateString('en-AU', {
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric'
+function generatePDFContent(
+  volunteer: VolunteerData,
+  shifts: ShiftData[],
+): string {
+  const currentDate = new Date().toLocaleDateString("en-AU", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
   });
 
-  const currentTime = new Date().toLocaleTimeString('en-AU', {
-    hour: '2-digit',
-    minute: '2-digit'
+  const currentTime = new Date().toLocaleTimeString("en-AU", {
+    hour: "2-digit",
+    minute: "2-digit",
   });
 
   return `THEATRE SHIFTS - VOLUNTEER REMOVAL REPORT
@@ -76,19 +91,26 @@ Administrator: System Automated Process
 VOLUNTEER INFORMATION
 ====================
 Name: ${volunteer.name}
-Email: ${volunteer.email || 'Not provided'}
+Email: ${volunteer.email || "Not provided"}
 Status: Login access disabled
 
 REMOVED SHIFTS
 ==============
-${shifts.length === 0 ? 'No future shifts were assigned to this volunteer.' :
-      shifts.map((shift, index) => `
+${
+  shifts.length === 0
+    ? "No future shifts were assigned to this volunteer."
+    : shifts
+        .map(
+          (shift, index) => `
 ${index + 1}. SHOW: ${shift.show_name}
    ROLE: ${shift.role}
    DATE: ${shift.date}
    TIME: ${shift.time}
    STATUS: Removed from assignment
-`).join('')}
+`,
+        )
+        .join("")
+}
 
 SUMMARY
 =======
@@ -98,12 +120,14 @@ Reason: Administrative action - login access revoked
 
 IMPACT
 ======
-${shifts.length > 0 ?
-      `The following ${shifts.length} shift${shifts.length > 1 ? 's' : ''} ${shifts.length > 1 ? 'are' : 'is'} now available for reassignment:
-${shifts.map(shift => `- ${shift.show_name} (${shift.role}) on ${shift.date}`).join('\n')}
+${
+  shifts.length > 0
+    ? `The following ${shifts.length} shift${shifts.length > 1 ? "s" : ""} ${shifts.length > 1 ? "are" : "is"} now available for reassignment:
+${shifts.map((shift) => `- ${shift.show_name} (${shift.role}) on ${shift.date}`).join("\n")}
 
-Please ensure these shifts are reassigned to other volunteers before the performance dates.` :
-      'No shifts were affected by this action.'}
+Please ensure these shifts are reassigned to other volunteers before the performance dates.`
+    : "No shifts were affected by this action."
+}
 
 NEXT ACTIONS
 ============
@@ -147,17 +171,21 @@ export function generateRunSheetPDF(data: {
     departTime: string;
   }>;
 }): Uint8Array {
-  const currentDate = new Date().toLocaleDateString('en-AU', {
-    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+  const currentDate = new Date().toLocaleDateString("en-AU", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
   });
-  const currentTime = new Date().toLocaleTimeString('en-AU', {
-    hour: '2-digit', minute: '2-digit'
+  const currentTime = new Date().toLocaleTimeString("en-AU", {
+    hour: "2-digit",
+    minute: "2-digit",
   });
 
   let content = `THEATRE SHIFTS - PERFORMANCE RUNNING SHEET\n==========================================\n\nGenerated: ${currentDate} at ${currentTime}\n\nSHOW INFORMATION\n================\nShow: ${data.showName}\nDate: ${data.date}\nPerformance Time: ${data.performanceTime}\n\nVOLUNTEERS\n==========\n`;
 
   if (data.participants.length === 0) {
-    content += 'No volunteers assigned for this performance.\n';
+    content += "No volunteers assigned for this performance.\n";
   } else {
     data.participants.forEach((p, idx) => {
       content += `${idx + 1}. Name: ${p.name}\n   Role: ${p.role}\n   Arrive: ${p.arriveTime}\n   Depart: ${p.departTime}\n`;
@@ -166,7 +194,7 @@ export function generateRunSheetPDF(data: {
 
   content += `\nUNFILLED SHIFTS\n===============\n`;
   if (data.unfilledShifts.length === 0) {
-    content += 'All shifts are filled.\n';
+    content += "All shifts are filled.\n";
   } else {
     data.unfilledShifts.forEach((s, idx) => {
       content += `${idx + 1}. Role: ${s.role}\n   Arrive: ${s.arriveTime}\n   Depart: ${s.departTime}\n`;
@@ -185,14 +213,17 @@ export function generateRunSheetPDF(data: {
 /**
  * Generates PDF data for a volunteer by participant ID
  */
-export async function generateVolunteerPDFData(volunteerId: string): Promise<PDFData> {
+export async function generateVolunteerPDFData(
+  volunteerId: string,
+): Promise<PDFData> {
   const pool = getPool();
   const client = await pool.connect();
 
   try {
     // Get volunteer details
     const volunteerRes = await client.queryObject<VolunteerRecord>(
-      "SELECT * FROM participants WHERE id=$1", [volunteerId]
+      "SELECT * FROM participants WHERE id=$1",
+      [volunteerId],
     );
 
     if (volunteerRes.rows.length === 0) {
@@ -213,7 +244,7 @@ export async function generateVolunteerPDFData(volunteerId: string): Promise<PDF
        JOIN participant_shifts vs ON vs.shift_id = s.id
        WHERE vs.participant_id = $1
        ORDER BY sh.name, sd.start_time AT TIME ZONE 'Australia/Adelaide', s.arrive_time AT TIME ZONE 'Australia/Adelaide'`,
-      [volunteerId]
+      [volunteerId],
     );
 
     // Get available shifts (not assigned to this volunteer) - retrieve timestamps in Adelaide timezone
@@ -230,31 +261,54 @@ export async function generateVolunteerPDFData(volunteerId: string): Promise<PDF
        LEFT JOIN participant_shifts vs ON vs.shift_id = s.id AND vs.participant_id = $1
        WHERE vs.participant_id IS NULL
        ORDER BY sh.name, sd.start_time AT TIME ZONE 'Australia/Adelaide', s.arrive_time AT TIME ZONE 'Australia/Adelaide'`,
-      [volunteerId]
+      [volunteerId],
     );
+
+    const unavailablePerformancesRes =
+      await client.queryObject<UnavailablePerformanceRow>(
+        `SELECT sd.id,
+              sh.name as show_name,
+              TO_CHAR(sd.start_time AT TIME ZONE 'Australia/Adelaide', 'YYYY-MM-DD') as show_date,
+              sd.start_time AT TIME ZONE 'Australia/Adelaide' as start_time,
+              sd.end_time AT TIME ZONE 'Australia/Adelaide' as end_time
+       FROM volunteer_unavailable_performances vup
+       JOIN show_dates sd ON sd.id = vup.show_date_id
+       JOIN shows sh ON sh.id = sd.show_id
+       WHERE vup.participant_id = $1
+         AND sd.end_time >= NOW() - INTERVAL '3 hours'
+       ORDER BY sd.start_time, sh.name`,
+        [volunteerId],
+      );
 
     // Ensure show_date is always a string in YYYY-MM-DD format
     const normalizeDate = (d: unknown) => {
-      if (!d) return '';
-      if (typeof d === 'string') return d.length > 10 ? d.split('T')[0] : d;
-      if (d instanceof Date) return d.toISOString().split('T')[0];
+      if (!d) return "";
+      if (typeof d === "string") return d.length > 10 ? d.split("T")[0] : d;
+      if (d instanceof Date) return d.toISOString().split("T")[0];
       return String(d);
     };
 
-    const assignedShifts = assignedShiftsRes.rows.map(shift => ({
+    const assignedShifts = assignedShiftsRes.rows.map((shift) => ({
       ...shift,
-      show_date: normalizeDate(shift.show_date)
+      show_date: normalizeDate(shift.show_date),
     }));
-    const availableShifts = shiftsRes.rows.map(shift => ({
+    const availableShifts = shiftsRes.rows.map((shift) => ({
       ...shift,
-      show_date: normalizeDate(shift.show_date)
+      show_date: normalizeDate(shift.show_date),
     }));
+    const unavailablePerformances = unavailablePerformancesRes.rows.map(
+      (performance) => ({
+        ...performance,
+        show_date: normalizeDate(performance.show_date),
+      }),
+    );
 
     return {
       volunteer: volunteerRes.rows[0],
       assignedShifts,
       availableShifts,
-      generatedAt: formatDateTime(new Date())
+      unavailablePerformances,
+      generatedAt: formatDateTime(new Date()),
     };
   } finally {
     client.release();
@@ -389,22 +443,24 @@ Shift Times: 14:45 - 16:15 +1 day (+1d) | FOH Manager
   <div class="volunteer-info">
     <h3>Volunteer Information</h3>
     <p><strong>Name:</strong> ${volunteer.name}</p>
-    ${volunteer.email ? `<p><strong>Email:</strong> ${volunteer.email}</p>` : ''}
-    ${volunteer.phone ? `<p><strong>Phone:</strong> ${volunteer.phone}</p>` : ''}
+    ${volunteer.email ? `<p><strong>Email:</strong> ${volunteer.email}</p>` : ""}
+    ${volunteer.phone ? `<p><strong>Phone:</strong> ${volunteer.phone}</p>` : ""}
     <p><strong>Generated:</strong> ${generatedAt}</p>
-    <p><strong>For updates visit:</strong> ${Deno.env.get('BASE_URL')}/volunteer/signup/${volunteer.id} || 'https://theatre-shifts.com/volunteer/signup/${volunteer.id}'</p>
+    <p><strong>For updates visit:</strong> ${Deno.env.get("BASE_URL")}/volunteer/signup/${volunteer.id} || 'https://theatre-shifts.com/volunteer/signup/${volunteer.id}'</p>
   </div>
 
   <div class="shifts-section">
     <h3>Assigned Shifts (${currentAndFutureShifts.length} total)</h3>
-    ${currentAndFutureShifts.length > 0 ?
-    currentAndFutureShifts.map((shift, index) => {
-    // Use arrive_time for date and time, depart_time for end time
-    const date = formatDateForDisplay(shift.arrive_time);
-    const arriveTime = formatTimeForDisplay(shift.arrive_time);
-    const departTime = formatTimeForDisplay(shift.depart_time);
+    ${
+      currentAndFutureShifts.length > 0
+        ? currentAndFutureShifts
+            .map((shift, index) => {
+              // Use arrive_time for date and time, depart_time for end time
+              const date = formatDateForDisplay(shift.arrive_time);
+              const arriveTime = formatTimeForDisplay(shift.arrive_time);
+              const departTime = formatTimeForDisplay(shift.depart_time);
 
-    return `
+              return `
     <div class="shift">
       <div class="shift-header">${index + 1}. ${shift.show_name}</div>
       <div class="shift-details">
@@ -414,14 +470,15 @@ Shift Times: 14:45 - 16:15 +1 day (+1d) | FOH Manager
         <div><strong>Role:</strong> ${shift.role}</div>
       </div>
     </div>`;
-    }).join('') :
-    `
+            })
+            .join("")
+        : `
     <div class="no-shifts">
       <p><strong>No shifts assigned</strong></p>
       <p>You don't have any shifts assigned for the current month and future dates.<br>
       Please visit the online schedule to sign up for available shifts.</p>
     </div>`
-  }
+    }
   </div>
     
   <div class="important">
@@ -459,34 +516,34 @@ export function filterCurrentAndFutureShifts(shifts: ShiftRow[]): ShiftRow[] {
   // Get current date in Adelaide timezone for comparison
   // Use a more reliable method to get Adelaide's current date
   const now = new Date();
-  const adelaide = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Australia/Adelaide',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit'
+  const adelaide = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Australia/Adelaide",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
   }).format(now); // Returns YYYY-MM-DD format
-  
-  const [todayYear, todayMonth, todayDay] = adelaide.split('-').map(Number);
+
+  const [todayYear, todayMonth, todayDay] = adelaide.split("-").map(Number);
   const today = new Date(todayYear, todayMonth - 1, todayDay);
 
   return shifts
-    .filter(shift => {
+    .filter((shift) => {
       if (shift && shift.show_date) {
         // Parse the show_date as a local date (since it's already in Adelaide timezone from the DB)
-        const [year, month, day] = shift.show_date.split('-').map(Number);
+        const [year, month, day] = shift.show_date.split("-").map(Number);
         const shiftDate = new Date(year, month - 1, day);
-        
+
         return shiftDate >= today;
       }
       return false;
     })
     .sort((a, b) => {
       // Parse dates correctly for sorting
-      const [yearA, monthA, dayA] = a.show_date.split('-').map(Number);
-      const [yearB, monthB, dayB] = b.show_date.split('-').map(Number);
+      const [yearA, monthA, dayA] = a.show_date.split("-").map(Number);
+      const [yearB, monthB, dayB] = b.show_date.split("-").map(Number);
       const dateA = new Date(yearA, monthA - 1, dayA);
       const dateB = new Date(yearB, monthB - 1, dayB);
-      
+
       return dateA.getTime() - dateB.getTime();
     });
 }
@@ -494,31 +551,31 @@ export function filterCurrentAndFutureShifts(shifts: ShiftRow[]): ShiftRow[] {
 function formatDateForDisplay(dateString: string): string {
   // The database returns timestamps already in Adelaide timezone
   // We need to parse them as local time without timezone conversion
-  
-  if (dateString.includes('T')) {
+
+  if (dateString.includes("T")) {
     // Format: 2025-07-15T18:00:00 (already in Adelaide time)
-    const datePart = dateString.split('T')[0];
-    const [year, month, day] = datePart.split('-').map(Number);
-    
+    const datePart = dateString.split("T")[0];
+    const [year, month, day] = datePart.split("-").map(Number);
+
     // Create a date object directly from the components to avoid timezone issues
     const date = new Date(year, month - 1, day, 12, 0, 0); // Use noon to avoid DST edge cases
-    
-    return date.toLocaleDateString('en-AU', {
-      weekday: 'short',
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric'
+
+    return date.toLocaleDateString("en-AU", {
+      weekday: "short",
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
     });
   } else {
     // Format: 2025-07-15 (date only)
-    const [year, month, day] = dateString.split('-').map(Number);
+    const [year, month, day] = dateString.split("-").map(Number);
     const date = new Date(year, month - 1, day, 12, 0, 0); // Use noon to avoid DST edge cases
-    
-    return date.toLocaleDateString('en-AU', {
-      weekday: 'short',
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric'
+
+    return date.toLocaleDateString("en-AU", {
+      weekday: "short",
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
     });
   }
 }
@@ -526,20 +583,20 @@ function formatDateForDisplay(dateString: string): string {
 function formatTimeForDisplay(timeString: string): string {
   // The database returns timestamps already in Adelaide timezone
   // We need to parse them as local time without timezone conversion
-  
-  if (timeString.includes('T')) {
+
+  if (timeString.includes("T")) {
     // Format: 2025-07-15T18:00:00 (already in Adelaide time)
-    const timePart = timeString.split('T')[1];
-    const [hours, minutes] = timePart.split(':').map(Number);
-    
+    const timePart = timeString.split("T")[1];
+    const [hours, minutes] = timePart.split(":").map(Number);
+
     // Create a date object using a fixed date but with the specific time
     // This avoids timezone conversion issues
     const time = new Date(2025, 0, 1, hours, minutes); // Use a fixed date to avoid DST issues
-    
-    return time.toLocaleTimeString('en-AU', {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true
+
+    return time.toLocaleTimeString("en-AU", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
     });
   } else {
     // Fallback: assume it's already a time string

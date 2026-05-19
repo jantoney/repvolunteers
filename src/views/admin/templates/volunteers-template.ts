@@ -97,8 +97,8 @@ export function renderVolunteersTemplate(data: VolunteersPageData): string {
                       <span class="approval-status ${
                         volunteer.approved ? "approved" : "pending"
                       }" data-volunteer-id="${volunteer.id}">${
-        volunteer.approved ? "Enabled" : "Disabled"
-      }</span>
+                        volunteer.approved ? "Enabled" : "Disabled"
+                      }</span>
                     </div>
                   </td>
                   <td data-label="Actions">
@@ -107,8 +107,8 @@ export function renderVolunteersTemplate(data: VolunteersPageData): string {
                         volunteer.id
                       }" readonly id="url-${volunteer.id}" data-full-url="">
                       <button type="button" class="actions-toggle" aria-haspopup="true" aria-expanded="false" aria-label='Toggle actions menu for ${ariaName}' aria-controls="actions-menu-${
-        volunteer.id
-      }" style="anchor-name: --actions-toggle-${volunteer.id};">
+                        volunteer.id
+                      }" style="anchor-name: --actions-toggle-${volunteer.id};">
                         <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
                           <circle cx="8" cy="2" r="1.5"></circle>
                           <circle cx="8" cy="8" r="1.5"></circle>
@@ -119,8 +119,8 @@ export function renderVolunteersTemplate(data: VolunteersPageData): string {
                       <div class="table-actions-list" id="actions-menu-${
                         volunteer.id
                       }" role="menu" aria-hidden="true" tabindex="-1" popover="manual" style="position-anchor: --actions-toggle-${
-        volunteer.id
-      };">
+                        volunteer.id
+                      };">
                         <a href="/admin/volunteers/${
                           volunteer.id
                         }/shifts" class="menu-item" role="menuitem">Shifts</a>
@@ -130,18 +130,31 @@ export function renderVolunteersTemplate(data: VolunteersPageData): string {
                         <button class="menu-item send-pdf-btn" type="button" data-volunteer-id="${
                           volunteer.id
                         }" data-volunteer-name="${ariaName}" data-volunteer-email="${emailAttr}" role="menuitem" ${
-        !volunteer.email ? 'disabled title="No email address"' : ""
-      }>📧 Send PDF</button>
+                          !volunteer.email
+                            ? 'disabled title="No email address"'
+                            : ""
+                        }>📧 Email Schedule PDF</button>
+                        <button class="menu-item send-availability-request-btn" type="button" data-volunteer-id="${
+                          volunteer.id
+                        }" data-volunteer-name="${ariaName}" data-volunteer-email="${emailAttr}" role="menuitem" ${
+                          !volunteer.email
+                            ? 'disabled title="No email address"'
+                            : ""
+                        }>📆 Availability Request</button>
                         <button class="menu-item send-show-week-btn" type="button" data-volunteer-id="${
                           volunteer.id
                         }" data-volunteer-name="${ariaName}" data-volunteer-email="${emailAttr}" role="menuitem" ${
-        !volunteer.email ? 'disabled title="No email address"' : ""
-      }>🎭 Show Week</button>
+                          !volunteer.email
+                            ? 'disabled title="No email address"'
+                            : ""
+                        }>🎭 Show Week</button>
                         <button class="menu-item send-last-minute-btn" type="button" data-volunteer-id="${
                           volunteer.id
                         }" data-volunteer-name="${ariaName}" data-volunteer-email="${emailAttr}" role="menuitem" ${
-        !volunteer.email ? 'disabled title="No email address"' : ""
-      }>🚨 Last Minute</button>
+                          !volunteer.email
+                            ? 'disabled title="No email address"'
+                            : ""
+                        }>🚨 Last Minute</button>
                         <button class="menu-item email-history-btn" type="button" data-volunteer-id="${
                           volunteer.id
                         }" data-volunteer-name="${ariaName}" role="menuitem">📧 History</button>
@@ -152,13 +165,13 @@ export function renderVolunteersTemplate(data: VolunteersPageData): string {
                         <button class="menu-item" type="button" onclick="copySignupUrl('${
                           volunteer.id
                         }')" id="copy-btn-${
-        volunteer.id
-      }" aria-label='Copy signup link for ${ariaName}' role="menuitem">Copy Signup Link</button>
+                          volunteer.id
+                        }" aria-label='Copy signup link for ${ariaName}' role="menuitem">Copy Signup Link</button>
                         <button class="menu-item" type="button" onclick="openSignupUrl('${
                           volunteer.id
                         }')" id="open-btn-${
-        volunteer.id
-      }" aria-label='Open signup link for ${ariaName}' role="menuitem">Open Signup Link</button>
+                          volunteer.id
+                        }" aria-label='Open signup link for ${ariaName}' role="menuitem">Open Signup Link</button>
                       </div>
                     </div>
                   </td>
@@ -795,7 +808,7 @@ export function renderVolunteersTemplate(data: VolunteersPageData): string {
             input.setAttribute('value', fullUrl);
           });
 
-          // Add event listeners for Send PDF buttons
+          // Add event listeners for schedule PDF buttons
           const sendPdfButtons = document.querySelectorAll('.send-pdf-btn');
           sendPdfButtons.forEach(button => {
             button.addEventListener('click', function() {
@@ -803,10 +816,26 @@ export function renderVolunteersTemplate(data: VolunteersPageData): string {
               const volunteerName = this.getAttribute('data-volunteer-name');
               const volunteerEmail = this.getAttribute('data-volunteer-email');
 
-              console.log('Send PDF clicked:', { volunteerId, volunteerName, volunteerEmail });
+              console.log('Email Schedule PDF clicked:', { volunteerId, volunteerName, volunteerEmail });
 
               if (volunteerId && volunteerName) {
                 sendSchedulePDF(volunteerId, volunteerName, volunteerEmail);
+              }
+            });
+          });
+
+          // Add event listeners for Availability Request buttons
+          const sendAvailabilityButtons = document.querySelectorAll('.send-availability-request-btn');
+          sendAvailabilityButtons.forEach(button => {
+            button.addEventListener('click', function() {
+              const volunteerId = this.getAttribute('data-volunteer-id');
+              const volunteerName = this.getAttribute('data-volunteer-name');
+              const volunteerEmail = this.getAttribute('data-volunteer-email');
+
+              console.log('Availability Request clicked:', { volunteerId, volunteerName, volunteerEmail });
+
+              if (volunteerId && volunteerName) {
+                sendAvailabilityRequestEmail(volunteerId, volunteerName, volunteerEmail);
               }
             });
           });
@@ -1319,9 +1348,9 @@ export function renderVolunteersTemplate(data: VolunteersPageData): string {
           
           if (!volunteerEmail) {
             if (typeof Modal !== 'undefined') {
-              Modal.error('Cannot Send PDF', 'This volunteer does not have an email address on file.');
+              Modal.error('Cannot Email Schedule PDF', 'This volunteer does not have an email address on file.');
             } else {
-              alert('Cannot send PDF: No email address on file');
+              alert('Cannot email schedule PDF: No email address on file');
             }
             return;
           }
@@ -1332,7 +1361,7 @@ export function renderVolunteersTemplate(data: VolunteersPageData): string {
           if (typeof Modal !== 'undefined') {
             // Generate unique modal ID to prevent caching issues
             const uniqueModalId = \`send-pdf-\${Date.now()}-\${Math.random().toString(36).substr(2, 9)}\`;
-            const modalTitle = 'Send Schedule PDF';
+            const modalTitle = 'Email Schedule PDF';
             const modalMessage = \`Send \${volunteerName}'s schedule PDF to \${volunteerEmail}?\`;
             
             console.log('Modal message will be:', modalMessage);
@@ -1348,11 +1377,11 @@ export function renderVolunteersTemplate(data: VolunteersPageData): string {
                   className: 'modal-btn-outline',
                   action: 'cancel',
                   handler: () => {
-                    console.log('Send PDF cancelled');
+                    console.log('Email Schedule PDF cancelled');
                   }
                 },
                 {
-                  text: 'Send PDF',
+                  text: 'Email PDF',
                   className: 'modal-btn-primary',
                   action: 'confirm',
                   handler: async () => {
@@ -1384,11 +1413,11 @@ export function renderVolunteersTemplate(data: VolunteersPageData): string {
                         Toast.success(message, 4000);
                       } else {
                         const error = await response.json();
-                        Toast.error('Failed to send PDF: ' + (error.error || 'Unknown error'));
+                        Toast.error('Failed to email schedule PDF: ' + (error.error || 'Unknown error'));
                       }
                     } catch (error) {
                       console.error('Error sending PDF:', error);
-                      Toast.error('Error sending schedule PDF');
+                      Toast.error('Error emailing schedule PDF');
                     }
                   }
                 }
@@ -1418,19 +1447,79 @@ export function renderVolunteersTemplate(data: VolunteersPageData): string {
                 } else {
                   const error = await response.json();
                   if (typeof Toast !== 'undefined') {
-                    Toast.error('Failed to send PDF: ' + (error.error || 'Unknown error'));
+                    Toast.error('Failed to email schedule PDF: ' + (error.error || 'Unknown error'));
                   } else {
-                    alert('Failed to send PDF: ' + (error.error || 'Unknown error'));
+                    alert('Failed to email schedule PDF: ' + (error.error || 'Unknown error'));
                   }
                 }
               } catch (error) {
                 console.error('Error sending PDF:', error);
                 if (typeof Toast !== 'undefined') {
-                  Toast.error('Error sending schedule PDF');
+                  Toast.error('Error emailing schedule PDF');
                 } else {
-                  alert('Error sending schedule PDF');
+                  alert('Error emailing schedule PDF');
                 }
               }
+            }
+          }
+        }
+
+        async function sendAvailabilityRequestEmail(volunteerId, volunteerName, volunteerEmail) {
+          if (!volunteerEmail) {
+            if (typeof Modal !== 'undefined') {
+              Modal.error('Cannot Send Availability Request', 'This volunteer does not have an email address on file.');
+            } else {
+              alert('Cannot send availability request: No email address on file');
+            }
+            return;
+          }
+
+          const sendRequest = async () => {
+            const response = await fetch(getAPIURL(\`/admin/api/volunteers/\${volunteerId}/email-availability-request\`), {
+              method: 'POST',
+              credentials: 'include'
+            });
+
+            if (response.ok) {
+              Toast.success(\`Availability request sent to \${volunteerEmail}.\`, 4000);
+            } else {
+              const error = await response.json();
+              Toast.error('Failed to send availability request: ' + (error.error || 'Unknown error'));
+            }
+          };
+
+          if (typeof Modal !== 'undefined') {
+            const uniqueModalId = \`send-availability-request-\${Date.now()}-\${Math.random().toString(36).substr(2, 9)}\`;
+            Modal.showModal(uniqueModalId, {
+              title: 'Send Availability Request',
+              body: \`<p>Ask \${volunteerName} to add performances they cannot work at \${volunteerEmail}?</p>\`,
+              buttons: [
+                {
+                  text: 'Cancel',
+                  className: 'modal-btn-outline',
+                  action: 'cancel'
+                },
+                {
+                  text: 'Send Request',
+                  className: 'modal-btn-primary',
+                  action: 'send',
+                  handler: async () => {
+                    try {
+                      await sendRequest();
+                    } catch (error) {
+                      console.error('Error sending availability request:', error);
+                      Toast.error('Error sending availability request');
+                    }
+                  }
+                }
+              ]
+            });
+          } else if (confirm(\`Ask \${volunteerName} to add performances they cannot work at \${volunteerEmail}?\`)) {
+            try {
+              await sendRequest();
+            } catch (error) {
+              console.error('Error sending availability request:', error);
+              alert('Error sending availability request');
             }
           }
         }
@@ -1729,7 +1818,8 @@ export function renderVolunteersTemplate(data: VolunteersPageData): string {
                     'volunteer_login': '🔑',
                     'volunteer_schedule': '📅',
                     'show_week': '🎭',
-                    'last_minute_shifts': '🚨'
+                    'last_minute_shifts': '🚨',
+                    'availability_request': '📆'
                   }[email.email_type] || '📧';
                   
                   const statusIcon = {

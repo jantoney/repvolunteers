@@ -1,1074 +1,1474 @@
-<!DOCTYPE html>
+<!doctype html>
 <html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Theatre Shifts</title>
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta
+      name="apple-mobile-web-app-status-bar-style"
+      content="black-translucent"
+    />
+    <meta name="apple-mobile-web-app-title" content="Theatre Shifts" />
+    <link rel="apple-touch-icon" href="/icons/ios/180.png" />
+    <link rel="apple-touch-icon" sizes="152x152" href="/icons/ios/152.png" />
+    <link rel="apple-touch-icon" sizes="167x167" href="/icons/ios/167.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/icons/ios/180.png" />
+    <meta name="theme-color" content="#007bff" />
+    <meta name="msapplication-TileColor" content="#007bff" />
+    <meta
+      name="msapplication-TileImage"
+      content="/icons/windows11/Square150x150Logo.scale-200.png"
+    />
 
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Theatre Shifts</title>
-  <!-- PWA Manifest -->
-  <link rel="manifest" href="/manifest.webmanifest">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="Theatre Shifts">
-  <link rel="apple-touch-icon" href="/icons/ios/180.png">
-  <link rel="apple-touch-icon" sizes="152x152" href="/icons/ios/152.png">
-  <link rel="apple-touch-icon" sizes="167x167" href="/icons/ios/167.png">
-  <link rel="apple-touch-icon" sizes="180x180" href="/icons/ios/180.png">
-  <meta name="theme-color" content="#007bff">
-  <meta name="msapplication-TileColor" content="#007bff">
-  <meta name="msapplication-TileImage" content="/icons/windows11/Square150x150Logo.scale-200.png">
-
-  <style>
-    body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      max-width: 1000px;
-      margin: 0 auto;
-      padding: 2rem;
-      background-color: #f8f9fa;
-      padding-bottom: 6rem;
-      /* Extra space for potential iOS banner */
-    }
-
-    @media (max-width: 768px) {
+    <style>
       body {
-        padding: 1rem;
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        max-width: 1000px;
+        margin: 0 auto;
+        padding: 2rem;
+        background-color: #f8f9fa;
         padding-bottom: 6rem;
+        /* Extra space for potential iOS banner */
       }
-    }
 
-    .container {
-      background: white;
-      padding: 2rem;
-      border-radius: 8px;
-      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-    }
+      @media (max-width: 768px) {
+        body {
+          padding: 1rem;
+          padding-bottom: 6rem;
+        }
+      }
 
-    h1 {
-      color: #333;
-      margin-bottom: 1rem;
-      text-align: center;
-    }
+      .container {
+        background: white;
+        padding: 2rem;
+        border-radius: 8px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      }
 
-    h2 {
-      color: #333;
-      margin-top: 2rem;
-      margin-bottom: 1rem;
-      border-bottom: 2px solid #007bff;
-      padding-bottom: 0.5rem;
-    }
+      h1 {
+        color: #333;
+        margin-bottom: 1rem;
+        text-align: center;
+      }
 
-    .welcome-text {
-      text-align: center;
-      color: #666;
-      margin-bottom: 2rem;
-      font-size: 1.1rem;
-    }
+      h2 {
+        color: #333;
+        margin-top: 2rem;
+        margin-bottom: 1rem;
+        border-bottom: 2px solid #007bff;
+        padding-bottom: 0.5rem;
+      }
 
-    .header-actions {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 2rem;
-    }
+      .welcome-text {
+        text-align: center;
+        color: #666;
+        margin-bottom: 2rem;
+        font-size: 1.1rem;
+      }
 
-    .pdf-button {
-      background: #6f42c1;
-      color: white;
-      border: none;
-      padding: 0.5rem 1rem;
-      border-radius: 6px;
-      cursor: pointer;
-      font-size: 0.9rem;
-      transition: background-color 0.2s;
-    }
-
-    .pdf-button:hover {
-      background: #5a32a3;
-    }
-
-    .logout-button {
-      background: #dc3545;
-      color: white;
-      border: none;
-      padding: 0.5rem 1rem;
-      border-radius: 6px;
-      cursor: pointer;
-      font-size: 0.9rem;
-      transition: background-color 0.2s;
-      margin-left: 0.5rem;
-    }
-
-    .logout-button:hover {
-      background: #c82333;
-    }
-
-    /* Mobile floating PDF and logout buttons */
-    @media (max-width: 768px) {
       .header-actions {
-        justify-content: center;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 2rem;
       }
 
       .pdf-button {
-        position: fixed;
-        top: 1rem;
-        right: 1rem;
-        z-index: 1001;
-        border-radius: 50%;
-        width: 3rem;
-        height: 3rem;
-        padding: 0;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 1.2rem;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        background: #6f42c1;
+        color: white;
+        border: none;
+        padding: 0.5rem 1rem;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 0.9rem;
+        transition: background-color 0.2s;
+      }
+
+      .pdf-button:hover {
+        background: #5a32a3;
       }
 
       .logout-button {
+        background: #dc3545;
+        color: white;
+        border: none;
+        padding: 0.5rem 1rem;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 0.9rem;
+        transition: background-color 0.2s;
+        margin-left: 0.5rem;
+      }
+
+      .logout-button:hover {
+        background: #c82333;
+      }
+
+      /* Mobile floating PDF and logout buttons */
+      @media (max-width: 768px) {
+        .header-actions {
+          justify-content: center;
+        }
+
+        .pdf-button {
+          position: fixed;
+          top: 1rem;
+          right: 1rem;
+          z-index: 1001;
+          border-radius: 50%;
+          width: 3rem;
+          height: 3rem;
+          padding: 0;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 1.2rem;
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+
+        .logout-button {
+          position: fixed;
+          top: 1rem;
+          left: 1rem;
+          z-index: 1001;
+          border-radius: 50%;
+          width: 3rem;
+          height: 3rem;
+          padding: 0;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 1.2rem;
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+          margin-left: 0;
+        }
+
+        .pdf-button:hover,
+        .logout-button:hover {
+          transform: scale(1.05);
+        }
+
+        .pdf-button-text,
+        .logout-button-text {
+          display: none;
+        }
+
+        .pdf-button-icon,
+        .logout-button-icon {
+          display: inline;
+        }
+      }
+
+      @media (min-width: 769px) {
+        .pdf-button-text,
+        .logout-button-text {
+          display: inline;
+        }
+
+        .pdf-button-icon,
+        .logout-button-icon {
+          display: none;
+        }
+      }
+
+      /* iOS PWA Install Banner */
+      .ios-install-banner {
         position: fixed;
-        top: 1rem;
-        left: 1rem;
-        z-index: 1001;
-        border-radius: 50%;
-        width: 3rem;
-        height: 3rem;
-        padding: 0;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: #fff;
+        border-top: 1px solid #ccc;
+        padding: 1rem;
+        text-align: center;
+        font-family: inherit;
+        z-index: 1000;
+        box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
+      }
+
+      .ios-install-banner .close-btn {
+        background: #dc3545;
+        color: white;
+        border: none;
+        padding: 0.25rem 0.5rem;
+        border-radius: 4px;
+        margin-left: 0.5rem;
+        cursor: pointer;
+        font-size: 0.8rem;
+      }
+
+      .ios-install-banner .close-btn:hover {
+        background: #c82333;
+      }
+
+      /* Calendar Styles */
+      .calendar-section {
+        margin: 2rem 0;
+      }
+
+      .calendar-header {
         display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1rem;
+        flex-wrap: wrap;
+        gap: 1rem;
+      }
+
+      @media (max-width: 768px) {
+        .calendar-header {
+          flex-direction: column;
+          align-items: stretch;
+          text-align: center;
+        }
+
+        .calendar-header h2 {
+          margin: 0 0 1rem 0;
+          border-bottom: none;
+          padding-bottom: 0;
+        }
+      }
+
+      .calendar-nav {
+        display: flex;
+        gap: 1rem;
         align-items: center;
         justify-content: center;
-        font-size: 1.2rem;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-        margin-left: 0;
       }
 
-      .pdf-button:hover,
-      .logout-button:hover {
-        transform: scale(1.05);
-      }
+      @media (max-width: 768px) {
+        .calendar-nav {
+          width: 100%;
+          justify-content: space-between;
+        }
 
-      .pdf-button-text,
-      .logout-button-text {
-        display: none;
-      }
+        .calendar-nav button {
+          flex: 1;
+          max-width: 120px;
+        }
 
-      .pdf-button-icon,
-      .logout-button-icon {
-        display: inline;
-      }
-    }
-
-    @media (min-width: 769px) {
-
-      .pdf-button-text,
-      .logout-button-text {
-        display: inline;
-      }
-
-      .pdf-button-icon,
-      .logout-button-icon {
-        display: none;
-      }
-    }
-
-    /* iOS PWA Install Banner */
-    .ios-install-banner {
-      position: fixed;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      background: #fff;
-      border-top: 1px solid #ccc;
-      padding: 1rem;
-      text-align: center;
-      font-family: inherit;
-      z-index: 1000;
-      box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
-    }
-
-    .ios-install-banner .close-btn {
-      background: #dc3545;
-      color: white;
-      border: none;
-      padding: 0.25rem 0.5rem;
-      border-radius: 4px;
-      margin-left: 0.5rem;
-      cursor: pointer;
-      font-size: 0.8rem;
-    }
-
-    .ios-install-banner .close-btn:hover {
-      background: #c82333;
-    }
-
-    /* Calendar Styles */
-    .calendar-section {
-      margin: 2rem 0;
-    }
-
-    .calendar-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 1rem;
-      flex-wrap: wrap;
-      gap: 1rem;
-    }
-
-    @media (max-width: 768px) {
-      .calendar-header {
-        flex-direction: column;
-        align-items: stretch;
-        text-align: center;
-      }
-
-      .calendar-header h2 {
-        margin: 0 0 1rem 0;
-        border-bottom: none;
-        padding-bottom: 0;
-      }
-    }
-
-    .calendar-nav {
-      display: flex;
-      gap: 1rem;
-      align-items: center;
-      justify-content: center;
-    }
-
-    @media (max-width: 768px) {
-      .calendar-nav {
-        width: 100%;
-        justify-content: space-between;
+        .calendar-nav span {
+          flex: 2;
+          text-align: center;
+          font-weight: bold;
+          color: #333;
+        }
       }
 
       .calendar-nav button {
-        flex: 1;
-        max-width: 120px;
+        background: #007bff;
+        color: white;
+        border: none;
+        padding: 0.5rem 1rem;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 0.875rem;
+        transition: background-color 0.2s;
       }
 
-      .calendar-nav span {
-        flex: 2;
+      .calendar-nav button:hover {
+        background: #0056b3;
+      }
+
+      .calendar {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        gap: 1px;
+        background: #ddd;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        overflow: hidden;
+        margin-bottom: 1rem;
+      }
+
+      @media (max-width: 768px) {
+        .calendar {
+          font-size: 0.8rem;
+          min-width: 100%;
+          width: 100%;
+          grid-template-columns: repeat(7, minmax(0, 1fr));
+        }
+      }
+
+      .calendar-day-header {
+        background: #007bff;
+        color: white;
+        padding-top: 0.75rem;
+        padding-bottom: 0.75rem;
         text-align: center;
         font-weight: bold;
-        color: #333;
+        font-size: 0.9rem;
       }
-    }
 
-    .calendar-nav button {
-      background: #007bff;
-      color: white;
-      border: none;
-      padding: 0.5rem 1rem;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: 0.875rem;
-      transition: background-color 0.2s;
-    }
-
-    .calendar-nav button:hover {
-      background: #0056b3;
-    }
-
-    .calendar {
-      display: grid;
-      grid-template-columns: repeat(7, 1fr);
-      gap: 1px;
-      background: #ddd;
-      border: 1px solid #ddd;
-      border-radius: 8px;
-      overflow: hidden;
-      margin-bottom: 1rem;
-    }
-
-    @media (max-width: 768px) {
-      .calendar {
-        font-size: 0.8rem;
-        min-width: 100%;
-        width: 100%;
-        grid-template-columns: repeat(7, minmax(0, 1fr));
-      }
-    }
-
-    .calendar-day-header {
-      background: #007bff;
-      color: white;
-      padding-top: 0.75rem;
-      padding-bottom: 0.75rem;
-      text-align: center;
-      font-weight: bold;
-      font-size: 0.9rem;
-    }
-
-    .calendar-day {
-      background: white;
-      padding: 0.5rem;
-      min-height: 70px;
-      position: relative;
-      border: 1px solid #eee;
-      cursor: pointer;
-      transition: background-color 0.2s;
-    }
-
-    @media (max-width: 768px) {
       .calendar-day {
-        padding: 0.25rem;
-        min-height: 50px;
+        background: white;
+        padding: 0.5rem;
+        min-height: 70px;
+        position: relative;
+        border: 1px solid #eee;
+        cursor: pointer;
+        transition: background-color 0.2s;
       }
-    }
 
-    .calendar-day:hover {
-      background: #f8f9fa;
-    }
+      @media (max-width: 768px) {
+        .calendar-day {
+          padding: 0.25rem;
+          min-height: 50px;
+        }
+      }
 
-    .calendar-day.other-month {
-      background: #f0f0f0;
-      color: #ccc;
-      cursor: default;
-    }
+      .calendar-day:hover {
+        background: #f8f9fa;
+      }
 
-    .calendar-day.today {
-      background: #fff3cd;
-      border-color: #ffc107;
-      font-weight: bold;
-    }
+      .calendar-day.other-month {
+        background: #f0f0f0;
+        color: #ccc;
+        cursor: default;
+      }
 
-    .calendar-day-number {
-      font-weight: bold;
-      margin-bottom: 0.25rem;
-      font-size: 0.9rem;
-    }
+      .calendar-day.today {
+        background: #fff3cd;
+        border-color: #ffc107;
+        font-weight: bold;
+      }
 
-    .shift-indicators {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      display: flex;
-      flex-direction: column;
-      gap: 1px;
-    }
+      .calendar-day-number {
+        font-weight: bold;
+        margin-bottom: 0.25rem;
+        font-size: 0.9rem;
+      }
 
-    @media (max-width: 768px) {
       .shift-indicators {
-        top: 75%;
-        transform: translate(-50%, -75%);
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        display: flex;
+        flex-direction: column;
+        gap: 1px;
       }
-    }
 
-    .shift-icon {
-      width: 20px;
-      height: 20px;
-      border-radius: 0;
-      /* Square for assigned shifts */
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 14px;
-      font-weight: bold;
-      color: white;
-      line-height: 1;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
-    }
+      @media (max-width: 768px) {
+        .shift-indicators {
+          top: 75%;
+          transform: translate(-50%, -75%);
+        }
+      }
 
-    .shift-icon.available {
-      border-radius: 50%;
-      /* Make available shifts circular */
-      background: #6f42c1 !important;
-      /* Ensure purple is applied and not overridden */
-      box-shadow: 0 1px 3px rgba(111, 66, 193, 0.3);
-    }
+      .shift-icon {
+        width: 20px;
+        height: 20px;
+        border-radius: 0;
+        /* Square for assigned shifts */
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 14px;
+        font-weight: bold;
+        color: white;
+        line-height: 1;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+      }
 
-    .shift-icon.assigned {
-      background: #28a745;
-      /* Green for assigned shifts */
-    }
+      .shift-icon.available {
+        border-radius: 50%;
+        /* Make available shifts circular */
+        background: #6f42c1 !important;
+        /* Ensure purple is applied and not overridden */
+        box-shadow: 0 1px 3px rgba(111, 66, 193, 0.3);
+      }
 
-    .shift-icon.available {
-      background: #6f42c1;
-      /* Purple - colorblind safe alternative to orange */
-    }
+      .shift-icon.assigned {
+        background: #28a745;
+        /* Green for assigned shifts */
+      }
 
-    .calendar-legend {
-      display: flex;
-      gap: 2rem;
-      justify-content: center;
-      margin-top: 1rem;
-      font-size: 0.9rem;
-    }
+      .shift-icon.available {
+        background: #6f42c1;
+        /* Purple - colorblind safe alternative to orange */
+      }
 
-    .legend-item {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-    }
+      .shift-icon.unavailable {
+        border-radius: 4px;
+        background: #dc3545;
+        font-size: 11px;
+      }
 
-    .legend-dot {
-      width: 20px;
-      height: 20px;
-      border-radius: 0;
-      /* Square for assigned shifts */
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 14px;
-      font-weight: bold;
-      color: white;
-      line-height: 1;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
-    }
+      .calendar-legend {
+        display: flex;
+        gap: 2rem;
+        justify-content: center;
+        margin-top: 1rem;
+        font-size: 0.9rem;
+      }
 
-    .legend-dot.available {
-      border-radius: 50%;
-      /* Make available shifts legend circular */
-    }
+      .legend-item {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
 
-    .legend-dot.assigned {
-      background: #28a745;
-    }
+      .legend-dot {
+        width: 20px;
+        height: 20px;
+        border-radius: 0;
+        /* Square for assigned shifts */
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 14px;
+        font-weight: bold;
+        color: white;
+        line-height: 1;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+      }
 
-    .legend-dot.available {
-      background: #6f42c1;
-    }
+      .legend-dot.available {
+        border-radius: 50%;
+        /* Make available shifts legend circular */
+      }
 
-    .shifts-section {
-      margin: 2rem 0;
-    }
+      .legend-dot.assigned {
+        background: #28a745;
+      }
 
-    .shift {
-      margin-bottom: 1rem;
-      padding: 1rem;
-      border: 1px solid #e0e0e0;
-      border-radius: 6px;
-      background: #fafafa;
-      transition: background-color 0.2s;
-    }
+      .legend-dot.available {
+        background: #6f42c1;
+      }
 
-    .shift:hover {
-      background: #f0f0f0;
-    }
+      .legend-dot.unavailable {
+        border-radius: 4px;
+        background: #dc3545;
+      }
 
-    .assigned-shift {
-      background: #d4edda;
-      border-color: #c3e6cb;
-    }
+      .shifts-section {
+        margin: 2rem 0;
+      }
 
-    .assigned-shift:hover {
-      background: #c3e6cb;
-    }
+      .shift {
+        margin-bottom: 1rem;
+        padding: 1rem;
+        border: 1px solid #e0e0e0;
+        border-radius: 6px;
+        background: #fafafa;
+        transition: background-color 0.2s;
+      }
 
-    .shift input[type="checkbox"] {
-      margin-right: 0.75rem;
-      transform: scale(1.2);
-    }
+      .shift:hover {
+        background: #f0f0f0;
+      }
 
-    .shift-info {
-      display: flex;
-      flex-direction: column;
-      margin-left: 1.5rem;
-    }
+      .assigned-shift {
+        background: #d4edda;
+        border-color: #c3e6cb;
+      }
 
-    .shift-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
+      .assigned-shift:hover {
+        background: #c3e6cb;
+      }
 
-    .shift-details {
-      flex-grow: 1;
-    }
+      .shift input[type="checkbox"] {
+        margin-right: 0.75rem;
+        transform: scale(1.2);
+      }
 
-    .shift-role {
-      font-weight: bold;
-      color: #007bff;
-      margin-bottom: 0.25rem;
-    }
+      .shift-info {
+        display: flex;
+        flex-direction: column;
+        margin-left: 1.5rem;
+      }
 
-    .shift-time {
-      color: #666;
-      font-size: 0.95rem;
-    }
+      .shift-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
 
-    .show-name {
-      font-weight: 500;
-      color: #495057;
-      margin-bottom: 0.25rem;
-    }
+      .shift-details {
+        flex-grow: 1;
+      }
 
-    .shift-date {
-      font-weight: 500;
-      color: #495057;
-      margin-bottom: 0.25rem;
-    }
+      .shift-role {
+        font-weight: bold;
+        color: #007bff;
+        margin-bottom: 0.25rem;
+      }
 
-    .no-shifts {
-      text-align: center;
-      color: #666;
-      padding: 2rem;
-      background: #f8f9fa;
-      border-radius: 6px;
-      margin: 1rem 0;
-    }
+      .shift-time {
+        color: #666;
+        font-size: 0.95rem;
+      }
 
-    .form-actions {
-      margin-top: 2rem;
-      text-align: center;
-    }
+      .show-name {
+        font-weight: 500;
+        color: #495057;
+        margin-bottom: 0.25rem;
+      }
 
-    button,
-    .btn {
-      padding: 0.75rem 2rem;
-      background: #28a745;
-      color: white;
-      border: none;
-      border-radius: 6px;
-      font-size: 1rem;
-      cursor: pointer;
-      transition: background-color 0.2s;
-      margin: 0.25rem;
-    }
+      .shift-date {
+        font-weight: 500;
+        color: #495057;
+        margin-bottom: 0.25rem;
+      }
 
-    button:hover,
-    .btn:hover {
-      background: #218838;
-    }
+      .no-shifts {
+        text-align: center;
+        color: #666;
+        padding: 2rem;
+        background: #f8f9fa;
+        border-radius: 6px;
+        margin: 1rem 0;
+      }
 
-    button:disabled {
-      background: #6c757d;
-      cursor: not-allowed;
-    }
+      .form-actions {
+        margin-top: 2rem;
+        text-align: center;
+      }
 
-    .btn-danger {
-      background: #dc3545;
-      padding: 0.5rem 1rem;
-      font-size: 0.875rem;
-    }
+      button,
+      .btn {
+        padding: 0.75rem 2rem;
+        background: #28a745;
+        color: white;
+        border: none;
+        border-radius: 6px;
+        font-size: 1rem;
+        cursor: pointer;
+        transition: background-color 0.2s;
+        margin: 0.25rem;
+      }
 
-    .btn-danger:hover {
-      background: #c82333;
-    }
+      button:hover,
+      .btn:hover {
+        background: #218838;
+      }
 
-    .success-message {
-      background: #d4edda;
-      border: 1px solid #c3e6cb;
-      color: #155724;
-      padding: 1rem;
-      border-radius: 6px;
-      margin-top: 1rem;
-      text-align: center;
-      display: none;
-    }
+      button:disabled {
+        background: #6c757d;
+        cursor: not-allowed;
+      }
 
-    .error-message {
-      background: #f8d7da;
-      border: 1px solid #f5c6cb;
-      color: #721c24;
-      padding: 1rem;
-      border-radius: 6px;
-      margin-top: 1rem;
-      text-align: center;
-      display: none;
-    }
-  </style>
-</head>
+      .btn-danger {
+        background: #dc3545;
+        padding: 0.5rem 1rem;
+        font-size: 0.875rem;
+      }
 
-<body>
-  <div class="container">
-    <div class="header-actions">
-      <h1>Theatre Shifts</h1>
-      <div>
-        <button class="logout-button" onclick="logout()">
-          <span class="logout-button-text">🚪 Logout</span>
-          <span class="logout-button-icon">🚪</span>
-        </button>
-        <button class="pdf-button" onclick="downloadPDF()">
-          <span class="pdf-button-text">📄 Download PDF</span>
-          <span class="pdf-button-icon">📄</span>
-        </button>
-        <button class="pdf-button" onclick="quickDownloadPDF()">
-          <span class="pdf-button-text">📋 Quick Download</span>
-          <span class="pdf-button-icon">📋</span>
-        </button>
-      </div>
-    </div>
-    <div class="welcome-text">
-      Hello, <strong>{{name}}</strong>! Manage your shifts below.
-    </div>
-    <!-- Calendar Section -->
-    <div class="calendar-section">
-      <div class="calendar-header">
-        <h2>Shift Calendar</h2>
-        <div class="calendar-nav">
-          <button onclick="changeMonth(-1)">Previous</button>
-          <span id="currentMonth"></span>
-          <button onclick="changeMonth(1)">Next</button>
+      .btn-danger:hover {
+        background: #c82333;
+      }
+
+      .success-message {
+        background: #d4edda;
+        border: 1px solid #c3e6cb;
+        color: #155724;
+        padding: 1rem;
+        border-radius: 6px;
+        margin-top: 1rem;
+        text-align: center;
+        display: none;
+      }
+
+      .error-message {
+        background: #f8d7da;
+        border: 1px solid #f5c6cb;
+        color: #721c24;
+        padding: 1rem;
+        border-radius: 6px;
+        margin-top: 1rem;
+        text-align: center;
+        display: none;
+      }
+
+      .availability-status {
+        min-height: 1.25rem;
+        font-weight: 600;
+      }
+
+      .available-shift.unavailable-performance {
+        background: #fff5f5;
+        border-color: #f5c2c7;
+      }
+
+      .shift-actions {
+        flex: 0 0 auto;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+      }
+
+      .availability-toggle {
+        min-width: 130px;
+        margin: 0;
+      }
+
+      .availability-toggle.unavailable {
+        background: #dc3545;
+      }
+
+      .availability-toggle.available {
+        background: #28a745;
+      }
+
+      .availability-note {
+        color: #721c24;
+        font-weight: 600;
+      }
+
+      .availability-status.success {
+        color: #155724;
+      }
+
+      .availability-status.error {
+        color: #721c24;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="container">
+      <div class="header-actions">
+        <h1>Theatre Shifts</h1>
+        <div>
+          <button class="logout-button" onclick="logout()">
+            <span class="logout-button-text">🚪 Logout</span>
+            <span class="logout-button-icon">🚪</span>
+          </button>
+          <button class="pdf-button" onclick="downloadPDF()">
+            <span class="pdf-button-text">📄 Download PDF</span>
+            <span class="pdf-button-icon">📄</span>
+          </button>
+          <button class="pdf-button" onclick="quickDownloadPDF()">
+            <span class="pdf-button-text">📋 Quick Download</span>
+            <span class="pdf-button-icon">📋</span>
+          </button>
         </div>
       </div>
-      <div id="calendar"></div>
-      <div class="calendar-legend">
-        <div class="legend-item">
-          <div class="legend-dot assigned"></div>
-          <span>Your Shifts</span>
+      <div class="welcome-text">
+        Hello, <strong>{{name}}</strong>! Manage your shifts below.
+      </div>
+
+      <!-- Calendar Section -->
+      <div class="calendar-section">
+        <div class="calendar-header">
+          <h2>Shift Calendar</h2>
+          <div class="calendar-nav">
+            <button onclick="changeMonth(-1)">Previous</button>
+            <span id="currentMonth"></span>
+            <button onclick="changeMonth(1)">Next</button>
+          </div>
         </div>
-        <div class="legend-item">
-          <div class="legend-dot available"></div>
-          <span>Available shifts</span>
+        <div id="calendar"></div>
+        <div class="calendar-legend">
+          <div class="legend-item">
+            <div class="legend-dot assigned"></div>
+            <span>Your Shifts</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-dot available"></div>
+            <span>Available shifts</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-dot unavailable"></div>
+            <span>Unavailable</span>
+          </div>
         </div>
       </div>
-    </div>
 
-    <!-- Assigned Shifts Section -->
-    <div class="shifts-section">
-      <h2>Future Shifts</h2>
-      <div id="assignedShifts"></div>
-    </div>
-
-    <!-- Available Shifts Section -->
-    <form id="signupForm">
+      <!-- Assigned Shifts Section -->
       <div class="shifts-section">
-        <h2>Available Shifts</h2>
-        <div id="availableShifts"></div>
+        <h2>Future Shifts</h2>
+        <div id="assignedShifts"></div>
       </div>
 
-      <div class="form-actions">
-        <button type="submit" id="submitBtn">Sign Up for Selected Shifts</button>
+      <!-- Available Shifts Section -->
+      <form id="signupForm">
+        <div class="shifts-section">
+          <h2>Available Shifts</h2>
+          <div id="availableShifts"></div>
+        </div>
+
+        <div class="form-actions">
+          <button type="submit" id="submitBtn">
+            Sign Up for Selected Shifts
+          </button>
+        </div>
+      </form>
+
+      <div id="successMessage" class="success-message">
+        <strong>Success!</strong> Your shift assignments have been updated.
       </div>
-    </form>
 
-    <div id="successMessage" class="success-message">
-      <strong>Success!</strong> Your shift assignments have been updated.
+      <div id="errorMessage" class="error-message">
+        <strong>Oops!</strong> There was an error processing your request.
+        Please try again.
+      </div>
     </div>
 
-    <div id="errorMessage" class="error-message">
-      <strong>Oops!</strong> There was an error processing your request. Please try again.
-    </div>
-  </div>
+    <!-- Template data -->
+    <script type="application/json" id="assignedShiftsData">
+      {{{assignedShiftsJson}}}
+    </script>
+    <script type="application/json" id="availableShiftsData">
+      {{{shiftsJson}}}
+    </script>
+    <script type="application/json" id="unavailablePerformancesData">
+      {{{unavailablePerformancesJson}}}
+    </script>
+    <script type="application/json" id="volunteerData">
+      { "id": "{{volunteerId}}" }
+    </script>
+    <script src="/src/utils/modal.js"></script>
+    <script src="/src/utils/timezone-client.js"></script>
+    <script
+      src="https://unpkg.com/jspdf@latest/dist/jspdf.umd.min.js"
+      onload="console.log('jsPDF loaded successfully')"
+      onerror="loadJsPDFFallback()"
+    ></script>
 
-  <!-- Template data -->
-  <script type="application/json" id="assignedShiftsData">{{{assignedShiftsJson}}}</script>
-  <script type="application/json" id="availableShiftsData">{{{shiftsJson}}}</script>
-  <script type="application/json" id="volunteerData">{"id": "{{volunteerId}}"}</script>
-  <script src="/src/utils/modal.js"></script>
-  <script src="/src/utils/timezone-client.js"></script>
-  <script src="https://unpkg.com/jspdf@latest/dist/jspdf.umd.min.js" onload="console.log('jsPDF loaded successfully')"
-    onerror="loadJsPDFFallback()"></script>
-
-  <script>
-    function loadJsPDFFallback() {
-      console.warn('Primary jsPDF CDN failed, trying fallback...');
-      const script = document.createElement('script');
-      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js';
-      script.onload = () => console.log('jsPDF fallback loaded successfully');
-      script.onerror = () => {
-        console.error('Both jsPDF CDNs failed to load');
-        // Try one more fallback
-        const script2 = document.createElement('script');
-        script2.src = 'https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js';
-        script2.onload = () => console.log('jsPDF third fallback loaded successfully');
-        script2.onerror = () => console.error('All jsPDF CDNs failed to load');
-        document.head.appendChild(script2);
-      };
-      document.head.appendChild(script);
-    }
-  </script>
-
-  <!-- PWA Service Worker Registration -->
-  <script>
-    // Save volunteer info to localStorage when they visit their signup page
-    (function () {
-      const volunteer = JSON.parse(document.getElementById('volunteerData').textContent);
-      const volunteerName = document.querySelector('.welcome-text strong').textContent;
-
-      // Save current volunteer to localStorage
-      const savedVolunteers = JSON.parse(localStorage.getItem('savedVolunteers') || '[]');
-
-      // Check if this volunteer is already saved
-      const existingIndex = savedVolunteers.findIndex(v => v.id === volunteer.id);
-
-      const volunteerData = {
-        id: volunteer.id,
-        name: volunteerName,
-        lastVisited: new Date().toISOString()
-      };
-
-      if (existingIndex >= 0) {
-        // Update existing volunteer's last visited time
-        savedVolunteers[existingIndex] = volunteerData;
-      } else {
-        // Add new volunteer
-        savedVolunteers.push(volunteerData);
+    <script>
+      function loadJsPDFFallback() {
+        console.warn("Primary jsPDF CDN failed, trying fallback...");
+        const script = document.createElement("script");
+        script.src =
+          "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js";
+        script.onload = () => console.log("jsPDF fallback loaded successfully");
+        script.onerror = () => {
+          console.error("Both jsPDF CDNs failed to load");
+          // Try one more fallback
+          const script2 = document.createElement("script");
+          script2.src =
+            "https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js";
+          script2.onload = () =>
+            console.log("jsPDF third fallback loaded successfully");
+          script2.onerror = () =>
+            console.error("All jsPDF CDNs failed to load");
+          document.head.appendChild(script2);
+        };
+        document.head.appendChild(script);
       }
+    </script>
 
-      // Keep only the 10 most recent volunteers
-      savedVolunteers.sort((a, b) => new Date(b.lastVisited) - new Date(a.lastVisited));
-      if (savedVolunteers.length > 10) {
-        savedVolunteers.splice(10);
-      }
+    <!-- PWA Service Worker Registration -->
+    <script>
+      // Save volunteer info to localStorage when they visit their signup page
+      (function () {
+        const volunteer = JSON.parse(
+          document.getElementById("volunteerData").textContent,
+        );
+        const volunteerName = document.querySelector(
+          ".welcome-text strong",
+        ).textContent;
 
-      localStorage.setItem('savedVolunteers', JSON.stringify(savedVolunteers));
-    })();
+        // Save current volunteer to localStorage
+        const savedVolunteers = JSON.parse(
+          localStorage.getItem("savedVolunteers") || "[]",
+        );
 
-    // Register Service Worker
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/service-worker.js')
-        .then(() => console.log('SW registered'))
-        .catch(err => console.error('SW registration failed:', err));
-    }
+        // Check if this volunteer is already saved
+        const existingIndex = savedVolunteers.findIndex(
+          (v) => v.id === volunteer.id,
+        );
 
-    // iOS PWA Install Banner
-    function isIos() {
-      return /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase());
-    }
+        const volunteerData = {
+          id: volunteer.id,
+          name: volunteerName,
+          lastVisited: new Date().toISOString(),
+        };
 
-    function isInStandaloneMode() {
-      return window.navigator.standalone === true;
-    }
-
-    function showIOSInstallBanner() {
-      if (isIos() && !isInStandaloneMode()) {
-        // Check if banner was previously dismissed
-        if (localStorage.getItem('ios-install-banner-dismissed') === 'true') {
-          return;
+        if (existingIndex >= 0) {
+          // Update existing volunteer's last visited time
+          savedVolunteers[existingIndex] = volunteerData;
+        } else {
+          // Add new volunteer
+          savedVolunteers.push(volunteerData);
         }
 
-        const banner = document.createElement('div');
-        banner.className = 'ios-install-banner';
-        banner.innerHTML = `
+        // Keep only the 10 most recent volunteers
+        savedVolunteers.sort(
+          (a, b) => new Date(b.lastVisited) - new Date(a.lastVisited),
+        );
+        if (savedVolunteers.length > 10) {
+          savedVolunteers.splice(10);
+        }
+
+        localStorage.setItem(
+          "savedVolunteers",
+          JSON.stringify(savedVolunteers),
+        );
+      })();
+
+      // Register Service Worker
+      if ("serviceWorker" in navigator) {
+        navigator.serviceWorker
+          .register("/service-worker.js")
+          .then(() => console.log("SW registered"))
+          .catch((err) => console.error("SW registration failed:", err));
+      }
+
+      // iOS PWA Install Banner
+      function isIos() {
+        return /iphone|ipad|ipod/.test(
+          window.navigator.userAgent.toLowerCase(),
+        );
+      }
+
+      function isInStandaloneMode() {
+        return window.navigator.standalone === true;
+      }
+
+      function showIOSInstallBanner() {
+        if (isIos() && !isInStandaloneMode()) {
+          // Check if banner was previously dismissed
+          if (localStorage.getItem("ios-install-banner-dismissed") === "true") {
+            return;
+          }
+
+          const banner = document.createElement("div");
+          banner.className = "ios-install-banner";
+          banner.innerHTML = `
           📲 To install this app, tap <strong>Share</strong> then <strong>Add to Home Screen</strong>
           <button class="close-btn" onclick="dismissIOSBanner(this)">✖️</button>
         `;
-        document.body.appendChild(banner);
-      }
-    } function dismissIOSBanner(button) {
-      button.parentNode.remove();
-      localStorage.setItem('ios-install-banner-dismissed', 'true');
-    }
-
-    // Make dismissIOSBanner globally accessible
-    window.dismissIOSBanner = dismissIOSBanner;
-
-    // Android Install Prompt
-    let deferredPrompt;
-
-    window.addEventListener('beforeinstallprompt', e => {
-      e.preventDefault();
-      deferredPrompt = e;
-
-      // You could show a custom install button here if desired
-      console.log('Install prompt available');
-    });
-
-    // Show iOS banner after page loads
-    window.addEventListener('load', () => {
-      setTimeout(showIOSInstallBanner, 2000); // Delay to avoid interfering with page load
-    });
-  </script>
-
-  <script>// Load data from the template
-    const assignedShiftsElement = document.getElementById('assignedShiftsData');
-    const availableShiftsElement = document.getElementById('availableShiftsData');
-    const volunteerElement = document.getElementById('volunteerData');
-    const assignedShifts = JSON.parse(assignedShiftsElement.textContent);
-    const availableShifts = JSON.parse(availableShiftsElement.textContent);
-    const volunteer = JSON.parse(volunteerElement.textContent);
-    // Debug: Log the raw data to understand its structure
-    console.log('Raw assignedShifts data:', assignedShifts);
-    console.log('Raw availableShifts data:', availableShifts);
-
-    // Debug: Check the structure more deeply
-    if (assignedShifts && assignedShifts.length > 0) {
-      console.log('First assigned shift structure:', assignedShifts[0]);
-    }
-    if (availableShifts && availableShifts.length > 0) {
-      console.log('First available shift structure:', availableShifts[0]);
-    }
-
-    const assignedContainer = document.getElementById('assignedShifts');
-    const availableContainer = document.getElementById('availableShifts');
-    const submitBtn = document.getElementById('submitBtn');
-
-    // Calendar state - initialize in Adelaide timezone
-    let currentCalendarDate = new Date();
-    function formatShiftTime(arriveTime, departTime) {
-      return DateTimeFormat.formatShiftTime(arriveTime, departTime);
-    } function generateCalendar() {
-      const calendar = document.getElementById('calendar');
-      const monthSpan = document.getElementById('currentMonth');
-      const now = new Date();
-      const currentMonth = currentCalendarDate.getMonth();
-      const currentYear = currentCalendarDate.getFullYear();
-
-      // Set month header
-      if (monthSpan) {
-        monthSpan.textContent = DateTimeFormat.getMonthYear(currentCalendarDate);
-      }
-
-      // Show/hide previous button based on whether we're viewing current month
-      const prevButton = document.querySelector('.calendar-nav button');
-      if (prevButton) {
-        const isCurrentMonth = currentYear === now.getFullYear() && currentMonth === now.getMonth();
-        prevButton.style.display = isCurrentMonth ? 'none' : 'inline-block';
-      }
-      // Create calendar grid
-      const firstDay = new Date(currentYear, currentMonth, 1);
-      const lastDay = new Date(currentYear, currentMonth + 1, 0);
-      // Get first day of calendar (start from Monday of the week containing the 1st)
-      const startDate = new Date(firstDay);
-      const dayOfWeek = firstDay.getDay(); // 0 = Sunday, 1 = Monday, etc.
-      const mondayOffset = dayOfWeek === 0 ? -6 : -(dayOfWeek - 1); // If Sunday, go back 6 days, otherwise go back (dayOfWeek - 1) days
-      startDate.setDate(startDate.getDate() + mondayOffset);
-
-      // Get last day of calendar (end on Sunday of the week containing the last day)
-      const endDate = new Date(lastDay);
-      const lastDayOfWeek = lastDay.getDay();
-      const sundayOffset = lastDayOfWeek === 0 ? 0 : (7 - lastDayOfWeek); // If Sunday, no offset, otherwise add days to reach Sunday
-      endDate.setDate(endDate.getDate() + sundayOffset);
-
-      // Clear calendar
-      calendar.innerHTML = '';
-      calendar.className = 'calendar';
-
-      // Create day headers (Monday to Sunday)
-      const dayHeaders = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-      dayHeaders.forEach(day => {
-        const header = document.createElement('div');
-        header.className = 'calendar-day-header';
-        header.textContent = day;
-        calendar.appendChild(header);
-  });// Create shift lookup maps for efficient searching
-  // Map: date (YYYY-MM-DD) -> Set of assigned performance keys
-  const assignedShiftMap = new Map();
-  // Map: date (YYYY-MM-DD) -> Set of available performance keys
-  const availableShiftMap = new Map();
-      // Helper function to safely convert date to YYYY-MM-DD format in Adelaide timezone
-      function dateToString(dateValue) {
-        // Always extract YYYY-MM-DD from any ISO string or Date
-        if (typeof dateValue === 'string') {
-          // If it's already YYYY-MM-DD, return as is
-          if (/^\d{4}-\d{2}-\d{2}$/.test(dateValue)) return dateValue;
-          // If it's ISO with time, extract date part
-          if (/^\d{4}-\d{2}-\d{2}T/.test(dateValue)) return dateValue.split('T')[0];
+          document.body.appendChild(banner);
         }
-        // Fallback to DateTimeFormat
-        return DateTimeFormat.formatDateForInput(dateValue);
       }
-      // Build assigned shift map: date -> Set of assigned performance keys
-      if (assignedShifts && Array.isArray(assignedShifts)) {
-        const now = new Date();
-        const currentYear = now.getFullYear();
-        const currentMonth = now.getMonth();
-        const currentMonthStart = new Date(currentYear, currentMonth, 1);
+      function dismissIOSBanner(button) {
+        button.parentNode.remove();
+        localStorage.setItem("ios-install-banner-dismissed", "true");
+      }
 
-        assignedShifts.forEach((show) => {
-          // Flattened structure
-          if (show.show_date && show.depart_time) {
-            const showDate = new Date(show.show_date);
-            if (showDate >= currentMonthStart) {
-              const dateOnly = dateToString(show.show_date);
-              const perfKey = show.show_date + 'T' + (show.start_time || '');
-              if (dateOnly && perfKey) {
-                if (!assignedShiftMap.has(dateOnly)) assignedShiftMap.set(dateOnly, new Set());
-                assignedShiftMap.get(dateOnly).add(perfKey);
+      // Make dismissIOSBanner globally accessible
+      window.dismissIOSBanner = dismissIOSBanner;
+
+      // Android Install Prompt
+      let deferredPrompt;
+
+      window.addEventListener("beforeinstallprompt", (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+
+        // You could show a custom install button here if desired
+        console.log("Install prompt available");
+      });
+
+      // Show iOS banner after page loads
+      window.addEventListener("load", () => {
+        setTimeout(showIOSInstallBanner, 2000); // Delay to avoid interfering with page load
+      });
+    </script>
+
+    <script>
+      // Load data from the template
+      const assignedShiftsElement =
+        document.getElementById("assignedShiftsData");
+      const availableShiftsElement = document.getElementById(
+        "availableShiftsData",
+      );
+      const unavailablePerformancesElement = document.getElementById(
+        "unavailablePerformancesData",
+      );
+      const volunteerElement = document.getElementById("volunteerData");
+      const assignedShifts = JSON.parse(assignedShiftsElement.textContent);
+      const availableShifts = JSON.parse(availableShiftsElement.textContent);
+      const unavailablePerformances = JSON.parse(
+        unavailablePerformancesElement.textContent,
+      );
+      const unavailablePerformanceIds = new Set(
+        unavailablePerformances.map((performance) => String(performance.id)),
+      );
+      const volunteer = JSON.parse(volunteerElement.textContent);
+      // Debug: Log the raw data to understand its structure
+      console.log("Raw assignedShifts data:", assignedShifts);
+      console.log("Raw availableShifts data:", availableShifts);
+
+      // Debug: Check the structure more deeply
+      if (assignedShifts && assignedShifts.length > 0) {
+        console.log("First assigned shift structure:", assignedShifts[0]);
+      }
+      if (availableShifts && availableShifts.length > 0) {
+        console.log("First available shift structure:", availableShifts[0]);
+      }
+
+      const assignedContainer = document.getElementById("assignedShifts");
+      const availableContainer = document.getElementById("availableShifts");
+      const submitBtn = document.getElementById("submitBtn");
+
+      async function saveUnavailablePerformances(button) {
+        const originalText = button ? button.textContent : "";
+        if (button) {
+          button.disabled = true;
+          button.textContent = "Saving...";
+        }
+
+        try {
+          const response = await fetch(
+            `/volunteer/signup/${volunteer.id}/unavailable-performances`,
+            {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                performanceIds: Array.from(unavailablePerformanceIds)
+                  .map(Number)
+                  .sort((a, b) => a - b),
+              }),
+            },
+          );
+
+          if (!response.ok) {
+            const error = await response.json();
+            throw new Error(
+              error.error || "Failed to save unavailable performances",
+            );
+          }
+        } finally {
+          if (button) {
+            button.disabled = false;
+            button.textContent = originalText;
+          }
+        }
+      }
+
+      async function togglePerformanceAvailability(button, performanceId) {
+        const normalizedPerformanceId = String(performanceId);
+        const wasUnavailable = unavailablePerformanceIds.has(
+          normalizedPerformanceId,
+        );
+
+        function setUnavailablePerformanceDetail(isUnavailable) {
+          const existingIndex = unavailablePerformances.findIndex(
+            (performance) => String(performance.id) === normalizedPerformanceId,
+          );
+          if (isUnavailable && existingIndex === -1) {
+            unavailablePerformances.push({
+              id: Number(normalizedPerformanceId),
+              date: button.dataset.performanceDate,
+            });
+          } else if (!isUnavailable && existingIndex !== -1) {
+            unavailablePerformances.splice(existingIndex, 1);
+          }
+        }
+
+        if (wasUnavailable) {
+          unavailablePerformanceIds.delete(normalizedPerformanceId);
+          setUnavailablePerformanceDetail(false);
+        } else {
+          unavailablePerformanceIds.add(normalizedPerformanceId);
+          setUnavailablePerformanceDetail(true);
+          selectedShiftsByPerformance.delete(button.dataset.performanceKey);
+        }
+
+        try {
+          await saveUnavailablePerformances(button);
+          populateAvailableShifts();
+          generateCalendar();
+        } catch (error) {
+          if (wasUnavailable) {
+            unavailablePerformanceIds.add(normalizedPerformanceId);
+            setUnavailablePerformanceDetail(true);
+          } else {
+            unavailablePerformanceIds.delete(normalizedPerformanceId);
+            setUnavailablePerformanceDetail(false);
+          }
+          Modal.error(
+            "Could not save availability",
+            error.message || "Please try again.",
+          );
+          populateAvailableShifts();
+        }
+      }
+
+      // Calendar state - initialize in Adelaide timezone
+      let currentCalendarDate = new Date();
+      function formatShiftTime(arriveTime, departTime) {
+        return DateTimeFormat.formatShiftTime(arriveTime, departTime);
+      }
+      function generateCalendar() {
+        const calendar = document.getElementById("calendar");
+        const monthSpan = document.getElementById("currentMonth");
+        const now = new Date();
+        const currentMonth = currentCalendarDate.getMonth();
+        const currentYear = currentCalendarDate.getFullYear();
+
+        // Set month header
+        if (monthSpan) {
+          monthSpan.textContent =
+            DateTimeFormat.getMonthYear(currentCalendarDate);
+        }
+
+        // Show/hide previous button based on whether we're viewing current month
+        const prevButton = document.querySelector(".calendar-nav button");
+        if (prevButton) {
+          const isCurrentMonth =
+            currentYear === now.getFullYear() &&
+            currentMonth === now.getMonth();
+          prevButton.style.display = isCurrentMonth ? "none" : "inline-block";
+        }
+        // Create calendar grid
+        const firstDay = new Date(currentYear, currentMonth, 1);
+        const lastDay = new Date(currentYear, currentMonth + 1, 0);
+        // Get first day of calendar (start from Monday of the week containing the 1st)
+        const startDate = new Date(firstDay);
+        const dayOfWeek = firstDay.getDay(); // 0 = Sunday, 1 = Monday, etc.
+        const mondayOffset = dayOfWeek === 0 ? -6 : -(dayOfWeek - 1); // If Sunday, go back 6 days, otherwise go back (dayOfWeek - 1) days
+        startDate.setDate(startDate.getDate() + mondayOffset);
+
+        // Get last day of calendar (end on Sunday of the week containing the last day)
+        const endDate = new Date(lastDay);
+        const lastDayOfWeek = lastDay.getDay();
+        const sundayOffset = lastDayOfWeek === 0 ? 0 : 7 - lastDayOfWeek; // If Sunday, no offset, otherwise add days to reach Sunday
+        endDate.setDate(endDate.getDate() + sundayOffset);
+
+        // Clear calendar
+        calendar.innerHTML = "";
+        calendar.className = "calendar";
+
+        // Create day headers (Monday to Sunday)
+        const dayHeaders = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+        dayHeaders.forEach((day) => {
+          const header = document.createElement("div");
+          header.className = "calendar-day-header";
+          header.textContent = day;
+          calendar.appendChild(header);
+        }); // Create shift lookup maps for efficient searching
+        // Map: date (YYYY-MM-DD) -> Set of assigned performance keys
+        const assignedShiftMap = new Map();
+        // Map: date (YYYY-MM-DD) -> Set of available performance keys
+        const availableShiftMap = new Map();
+        // Map: date (YYYY-MM-DD) -> Set of unavailable performance ids
+        const unavailablePerformanceMap = new Map();
+        // Helper function to safely convert date to YYYY-MM-DD format in Adelaide timezone
+        function dateToString(dateValue) {
+          // Always extract YYYY-MM-DD from any ISO string or Date
+          if (typeof dateValue === "string") {
+            // If it's already YYYY-MM-DD, return as is
+            if (/^\d{4}-\d{2}-\d{2}$/.test(dateValue)) return dateValue;
+            // If it's ISO with time, extract date part
+            if (/^\d{4}-\d{2}-\d{2}T/.test(dateValue))
+              return dateValue.split("T")[0];
+          }
+          // Fallback to DateTimeFormat
+          return DateTimeFormat.formatDateForInput(dateValue);
+        }
+        // Build assigned shift map: date -> Set of assigned performance keys
+        unavailablePerformances.forEach((performance) => {
+          if (!unavailablePerformanceMap.has(performance.date)) {
+            unavailablePerformanceMap.set(performance.date, new Set());
+          }
+          unavailablePerformanceMap
+            .get(performance.date)
+            .add(String(performance.id));
+        });
+
+        if (assignedShifts && Array.isArray(assignedShifts)) {
+          const now = new Date();
+          const currentYear = now.getFullYear();
+          const currentMonth = now.getMonth();
+          const currentMonthStart = new Date(currentYear, currentMonth, 1);
+
+          assignedShifts.forEach((show) => {
+            // Flattened structure
+            if (show.show_date && show.depart_time) {
+              const showDate = new Date(show.show_date);
+              if (showDate >= currentMonthStart) {
+                const dateOnly = dateToString(show.show_date);
+                const perfKey = show.show_date + "T" + (show.start_time || "");
+                if (dateOnly && perfKey) {
+                  if (!assignedShiftMap.has(dateOnly))
+                    assignedShiftMap.set(dateOnly, new Set());
+                  assignedShiftMap.get(dateOnly).add(perfKey);
+                }
               }
-            }
-          } else if (show.date && show.depart_time) {
-            const showDate = new Date(show.date);
-            if (showDate >= currentMonthStart) {
-              const dateOnly = dateToString(show.date);
-              const perfKey = show.date + 'T' + (show.start_time || '');
-              if (dateOnly && perfKey) {
-                if (!assignedShiftMap.has(dateOnly)) assignedShiftMap.set(dateOnly, new Set());
-                assignedShiftMap.get(dateOnly).add(perfKey);
+            } else if (show.date && show.depart_time) {
+              const showDate = new Date(show.date);
+              if (showDate >= currentMonthStart) {
+                const dateOnly = dateToString(show.date);
+                const perfKey = show.date + "T" + (show.start_time || "");
+                if (dateOnly && perfKey) {
+                  if (!assignedShiftMap.has(dateOnly))
+                    assignedShiftMap.set(dateOnly, new Set());
+                  assignedShiftMap.get(dateOnly).add(perfKey);
+                }
               }
-            }
-          } else if (show.performances && Array.isArray(show.performances)) {
-            show.performances.forEach((perf) => {
-              if (perf.shifts && Array.isArray(perf.shifts)) {
-                perf.shifts.forEach(shift => {
-                  if (shift.date) {
-                    const shiftDate = new Date(shift.date);
-                    if (shiftDate >= currentMonthStart) {
-                      const dateOnly = dateToString(shift.date);
-                      const perfKey = (shift.date || perf.date) + 'T' + (shift.start_time || perf.start_time || '');
-                      if (dateOnly && perfKey) {
-                        if (!assignedShiftMap.has(dateOnly)) assignedShiftMap.set(dateOnly, new Set());
-                        assignedShiftMap.get(dateOnly).add(perfKey);
+            } else if (show.performances && Array.isArray(show.performances)) {
+              show.performances.forEach((perf) => {
+                if (perf.shifts && Array.isArray(perf.shifts)) {
+                  perf.shifts.forEach((shift) => {
+                    if (shift.date) {
+                      const shiftDate = new Date(shift.date);
+                      if (shiftDate >= currentMonthStart) {
+                        const dateOnly = dateToString(shift.date);
+                        const perfKey =
+                          (shift.date || perf.date) +
+                          "T" +
+                          (shift.start_time || perf.start_time || "");
+                        if (dateOnly && perfKey) {
+                          if (!assignedShiftMap.has(dateOnly))
+                            assignedShiftMap.set(dateOnly, new Set());
+                          assignedShiftMap.get(dateOnly).add(perfKey);
+                        }
                       }
                     }
-                  }
-                });
-              }
-            });
-          }
-        });
-      }
-
-      // Build available shift map: date -> Set of available performance keys
-      if (availableShifts && Array.isArray(availableShifts)) {
-        const now = new Date();
-        availableShifts.forEach((show) => {
-          if (show.show_date && show.depart_time) {
-            const shiftEndTime = new Date(show.depart_time);
-            if (shiftEndTime > now) {
-              const dateOnly = dateToString(show.show_date);
-              const perfKey = show.show_date + 'T' + (show.start_time || '');
-              if (dateOnly && perfKey) {
-                if (!availableShiftMap.has(dateOnly)) availableShiftMap.set(dateOnly, new Set());
-                availableShiftMap.get(dateOnly).add(perfKey);
-              }
-            }
-          } else if (show.date && show.depart_time) {
-            const shiftEndTime = new Date(show.depart_time);
-            if (shiftEndTime > now) {
-              const dateOnly = dateToString(show.date);
-              const perfKey = show.date + 'T' + (show.start_time || '');
-              if (dateOnly && perfKey) {
-                if (!availableShiftMap.has(dateOnly)) availableShiftMap.set(dateOnly, new Set());
-                availableShiftMap.get(dateOnly).add(perfKey);
-              }
-            }
-          } else if (show.performances && Array.isArray(show.performances)) {
-            show.performances.forEach((perf) => {
-              if (perf.shifts && Array.isArray(perf.shifts)) {
-                perf.shifts.forEach(shift => {
-                  const shiftEndTime = new Date(shift.depart_time);
-                  if (shiftEndTime > now && shift.date) {
-                    const dateOnly = dateToString(shift.date);
-                    const perfKey = (shift.date || perf.date) + 'T' + (shift.start_time || perf.start_time || '');
-                    if (dateOnly && perfKey) {
-                      if (!availableShiftMap.has(dateOnly)) availableShiftMap.set(dateOnly, new Set());
-                      availableShiftMap.get(dateOnly).add(perfKey);
-                    }
-                  }
-                });
-              }
-            });
-          }
-        });
-      }
-
-  // Debug: Log the final sets of performance keys by date
-  console.log('Calendar: Assigned shift map:', Object.fromEntries(Array.from(assignedShiftMap.entries()).map(([k,v])=>[k,Array.from(v)])));
-  console.log('Calendar: Available shift map:', Object.fromEntries(Array.from(availableShiftMap.entries()).map(([k,v])=>[k,Array.from(v)])));
-
-      // Generate calendar days
-      const currentDate = new Date(startDate);
-      while (currentDate <= endDate) {
-        const dayDiv = document.createElement('div');
-        dayDiv.className = 'calendar-day';
-        const isCurrentMonth = currentDate.getMonth() === currentMonth;
-        const isToday = DateTimeFormat.isToday(currentDate);
-
-        // Create Adelaide timezone date string for comparison
-        const year = currentDate.getFullYear();
-        const month = String(currentDate.getMonth() + 1).padStart(2, '0');
-        const day = String(currentDate.getDate()).padStart(2, '0');
-        const dateStr = `${year}-${month}-${day}`;
-
-        // Apply styling classes
-        if (!isCurrentMonth) {
-          dayDiv.classList.add('other-month');
-        }
-        if (isToday) {
-          dayDiv.classList.add('today');
-        }
-
-        // Add day number (only for current month)
-        const dayNumber = document.createElement('div');
-        dayNumber.className = 'calendar-day-number';
-        if (isCurrentMonth) {
-          dayNumber.textContent = currentDate.getDate();
-        }
-        dayDiv.appendChild(dayNumber);
-
-        // Add shift indicators (only for current month days)
-        if (isCurrentMonth) {
-          const assignedPerfKeys = assignedShiftMap.get(dateStr) || new Set();
-          const availablePerfKeys = availableShiftMap.get(dateStr) || new Set();
-          const hasAssignedShift = assignedPerfKeys.size > 0;
-          // Only show available indicator if there is an available shift for a different performance than assigned
-          // (i.e., available performance keys not in assigned performance keys)
-          const availableOtherPerf = Array.from(availablePerfKeys).filter(perfKey => !assignedPerfKeys.has(perfKey));
-          const hasAvailableOtherPerf = availableOtherPerf.length > 0;
-
-          if (hasAssignedShift || hasAvailableOtherPerf) {
-            const indicatorsContainer = document.createElement('div');
-            indicatorsContainer.className = 'shift-indicators';
-            if (hasAssignedShift) {
-              const assignedIcon = document.createElement('div');
-              assignedIcon.className = 'shift-icon assigned';
-              assignedIcon.title = 'You have assigned shifts on this day';
-              indicatorsContainer.appendChild(assignedIcon);
-            }
-            if (hasAvailableOtherPerf) {
-              const availableIcon = document.createElement('div');
-              availableIcon.className = 'shift-icon available';
-              availableIcon.title = 'Available shifts on this day (different performance)';
-              indicatorsContainer.appendChild(availableIcon);
-            }
-            dayDiv.appendChild(indicatorsContainer);
-          }
-        }
-
-        calendar.appendChild(dayDiv);
-        currentDate.setDate(currentDate.getDate() + 1);
-      }
-    }
-
-    function changeMonth(delta) {
-      // Update calendar date maintaining Adelaide timezone alignment
-      const newMonth = currentCalendarDate.getMonth() + delta;
-      const newYear = currentCalendarDate.getFullYear() + Math.floor(newMonth / 12);
-      const adjustedMonth = ((newMonth % 12) + 12) % 12;
-
-      // Don't allow going to months before current month
-      const now = new Date();
-      const targetDate = new Date(newYear, adjustedMonth, 1);
-      const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-
-      if (targetDate >= currentMonthStart) {
-        currentCalendarDate = targetDate;
-        generateCalendar();
-      }
-    } function populateAssignedShifts() {
-      if (assignedShifts.length === 0) {
-        assignedContainer.innerHTML = '<div class="no-shifts">You are not currently assigned to any shifts.</div>';
-      } else {
-        const now = new Date();
-        const today = new Date(now);
-        today.setHours(0, 0, 0, 0); // Start of today for date comparison
-
-        // Flatten all shifts and filter to those whose start_time is in the future
-        const allShifts = [];
-        assignedShifts.forEach(show => {
-          // Handle flattened structure
-          if (show.show_date && show.arrive_time) {
-            const shiftStart = new Date(show.start_time);
-            if (shiftStart >= now) {
-              allShifts.push({
-                id: show.id,
-                role: show.role,
-                arrive_time: show.arrive_time,
-                depart_time: show.depart_time,
-                show_name: show.show_name,
-                date: show.show_date,
-                start_time: show.start_time,
-                end_time: show.end_time
+                  });
+                }
               });
             }
+          });
+        }
+
+        // Build available shift map: date -> Set of available performance keys
+        if (availableShifts && Array.isArray(availableShifts)) {
+          const now = new Date();
+          availableShifts.forEach((show) => {
+            if (show.show_date && show.depart_time) {
+              const shiftEndTime = new Date(show.depart_time);
+              if (
+                shiftEndTime > now &&
+                !unavailablePerformanceIds.has(String(show.show_date_id))
+              ) {
+                const dateOnly = dateToString(show.show_date);
+                const perfKey = show.show_date + "T" + (show.start_time || "");
+                if (dateOnly && perfKey) {
+                  if (!availableShiftMap.has(dateOnly))
+                    availableShiftMap.set(dateOnly, new Set());
+                  availableShiftMap.get(dateOnly).add(perfKey);
+                }
+              }
+            } else if (show.date && show.depart_time) {
+              const shiftEndTime = new Date(show.depart_time);
+              if (
+                shiftEndTime > now &&
+                !unavailablePerformanceIds.has(String(show.show_date_id))
+              ) {
+                const dateOnly = dateToString(show.date);
+                const perfKey = show.date + "T" + (show.start_time || "");
+                if (dateOnly && perfKey) {
+                  if (!availableShiftMap.has(dateOnly))
+                    availableShiftMap.set(dateOnly, new Set());
+                  availableShiftMap.get(dateOnly).add(perfKey);
+                }
+              }
+            } else if (show.performances && Array.isArray(show.performances)) {
+              show.performances.forEach((perf) => {
+                if (perf.shifts && Array.isArray(perf.shifts)) {
+                  perf.shifts.forEach((shift) => {
+                    const shiftEndTime = new Date(shift.depart_time);
+                    if (
+                      shiftEndTime > now &&
+                      shift.date &&
+                      !unavailablePerformanceIds.has(String(shift.show_date_id))
+                    ) {
+                      const dateOnly = dateToString(shift.date);
+                      const perfKey =
+                        (shift.date || perf.date) +
+                        "T" +
+                        (shift.start_time || perf.start_time || "");
+                      if (dateOnly && perfKey) {
+                        if (!availableShiftMap.has(dateOnly))
+                          availableShiftMap.set(dateOnly, new Set());
+                        availableShiftMap.get(dateOnly).add(perfKey);
+                      }
+                    }
+                  });
+                }
+              });
+            }
+          });
+        }
+
+        // Debug: Log the final sets of performance keys by date
+        console.log(
+          "Calendar: Assigned shift map:",
+          Object.fromEntries(
+            Array.from(assignedShiftMap.entries()).map(([k, v]) => [
+              k,
+              Array.from(v),
+            ]),
+          ),
+        );
+        console.log(
+          "Calendar: Available shift map:",
+          Object.fromEntries(
+            Array.from(availableShiftMap.entries()).map(([k, v]) => [
+              k,
+              Array.from(v),
+            ]),
+          ),
+        );
+        console.log(
+          "Calendar: Unavailable performance map:",
+          Object.fromEntries(
+            Array.from(unavailablePerformanceMap.entries()).map(([k, v]) => [
+              k,
+              Array.from(v),
+            ]),
+          ),
+        );
+
+        // Generate calendar days
+        const currentDate = new Date(startDate);
+        while (currentDate <= endDate) {
+          const dayDiv = document.createElement("div");
+          dayDiv.className = "calendar-day";
+          const isCurrentMonth = currentDate.getMonth() === currentMonth;
+          const isToday = DateTimeFormat.isToday(currentDate);
+
+          // Create Adelaide timezone date string for comparison
+          const year = currentDate.getFullYear();
+          const month = String(currentDate.getMonth() + 1).padStart(2, "0");
+          const day = String(currentDate.getDate()).padStart(2, "0");
+          const dateStr = `${year}-${month}-${day}`;
+
+          // Apply styling classes
+          if (!isCurrentMonth) {
+            dayDiv.classList.add("other-month");
           }
-          // Handle nested structure (performances with shifts)
-          else if (show.performances && Array.isArray(show.performances)) {
-            show.performances.forEach(performance => {
+          if (isToday) {
+            dayDiv.classList.add("today");
+          }
+
+          // Add day number (only for current month)
+          const dayNumber = document.createElement("div");
+          dayNumber.className = "calendar-day-number";
+          if (isCurrentMonth) {
+            dayNumber.textContent = currentDate.getDate();
+          }
+          dayDiv.appendChild(dayNumber);
+
+          // Add shift indicators (only for current month days)
+          if (isCurrentMonth) {
+            const assignedPerfKeys = assignedShiftMap.get(dateStr) || new Set();
+            const availablePerfKeys =
+              availableShiftMap.get(dateStr) || new Set();
+            const unavailablePerfIds =
+              unavailablePerformanceMap.get(dateStr) || new Set();
+            const hasAssignedShift = assignedPerfKeys.size > 0;
+            const hasUnavailablePerformance = unavailablePerfIds.size > 0;
+            // Only show available indicator if there is an available shift for a different performance than assigned
+            // (i.e., available performance keys not in assigned performance keys)
+            const availableOtherPerf = Array.from(availablePerfKeys).filter(
+              (perfKey) => !assignedPerfKeys.has(perfKey),
+            );
+            const hasAvailableOtherPerf = availableOtherPerf.length > 0;
+
+            if (
+              hasAssignedShift ||
+              hasAvailableOtherPerf ||
+              hasUnavailablePerformance
+            ) {
+              const indicatorsContainer = document.createElement("div");
+              indicatorsContainer.className = "shift-indicators";
+              if (hasAssignedShift) {
+                const assignedIcon = document.createElement("div");
+                assignedIcon.className = "shift-icon assigned";
+                assignedIcon.title = "You have assigned shifts on this day";
+                indicatorsContainer.appendChild(assignedIcon);
+              }
+              if (hasAvailableOtherPerf) {
+                const availableIcon = document.createElement("div");
+                availableIcon.className = "shift-icon available";
+                availableIcon.title =
+                  "Available shifts on this day (different performance)";
+                indicatorsContainer.appendChild(availableIcon);
+              }
+              if (hasUnavailablePerformance) {
+                const unavailableIcon = document.createElement("div");
+                unavailableIcon.className = "shift-icon unavailable";
+                unavailableIcon.title =
+                  "You marked a performance unavailable on this day";
+                unavailableIcon.textContent = "X";
+                indicatorsContainer.appendChild(unavailableIcon);
+              }
+              dayDiv.appendChild(indicatorsContainer);
+            }
+          }
+
+          calendar.appendChild(dayDiv);
+          currentDate.setDate(currentDate.getDate() + 1);
+        }
+      }
+
+      function changeMonth(delta) {
+        // Update calendar date maintaining Adelaide timezone alignment
+        const newMonth = currentCalendarDate.getMonth() + delta;
+        const newYear =
+          currentCalendarDate.getFullYear() + Math.floor(newMonth / 12);
+        const adjustedMonth = ((newMonth % 12) + 12) % 12;
+
+        // Don't allow going to months before current month
+        const now = new Date();
+        const targetDate = new Date(newYear, adjustedMonth, 1);
+        const currentMonthStart = new Date(
+          now.getFullYear(),
+          now.getMonth(),
+          1,
+        );
+
+        if (targetDate >= currentMonthStart) {
+          currentCalendarDate = targetDate;
+          generateCalendar();
+        }
+      }
+      function populateAssignedShifts() {
+        if (assignedShifts.length === 0) {
+          assignedContainer.innerHTML =
+            '<div class="no-shifts">You are not currently assigned to any shifts.</div>';
+        } else {
+          const now = new Date();
+          const today = new Date(now);
+          today.setHours(0, 0, 0, 0); // Start of today for date comparison
+
+          // Flatten all shifts and filter to those whose start_time is in the future
+          const allShifts = [];
+          assignedShifts.forEach((show) => {
+            // Handle flattened structure
+            if (show.show_date && show.arrive_time) {
+              const shiftStart = new Date(show.start_time);
+              if (shiftStart >= now) {
+                allShifts.push({
+                  id: show.id,
+                  role: show.role,
+                  arrive_time: show.arrive_time,
+                  depart_time: show.depart_time,
+                  show_name: show.show_name,
+                  date: show.show_date,
+                  start_time: show.start_time,
+                  end_time: show.end_time,
+                });
+              }
+            }
+            // Handle nested structure (performances with shifts)
+            else if (show.performances && Array.isArray(show.performances)) {
+              show.performances.forEach((performance) => {
+                if (performance.shifts && Array.isArray(performance.shifts)) {
+                  performance.shifts.forEach((shift) => {
+                    const shiftStart = new Date(shift.start_time);
+                    if (shiftStart >= now) {
+                      allShifts.push({
+                        ...shift,
+                        show_name: show.show_name,
+                        date: shift.date || performance.date,
+                        start_time: shift.start_time,
+                        end_time: shift.end_time,
+                      });
+                    }
+                  });
+                }
+              });
+            }
+          });
+
+          // Sort by date (closest first), then by arrive time
+          allShifts.sort((a, b) => {
+            const dateCompare = new Date(a.date) - new Date(b.date);
+            if (dateCompare !== 0) return dateCompare;
+            return new Date(a.arrive_time) - new Date(b.arrive_time);
+          });
+          if (allShifts.length === 0) {
+            assignedContainer.innerHTML =
+              '<div class="no-shifts">You are not currently assigned to any future shifts.</div>';
+          } else {
+            assignedContainer.innerHTML = allShifts
+              .map((shift) => {
+                // Check if shift is less than 48 hours away
+                const shiftDate = new Date(shift.arrive_time);
+                const now = new Date();
+                const hoursUntilShift = (shiftDate - now) / (1000 * 60 * 60); // Convert to hours
+                const canRemove = hoursUntilShift >= 48;
+
+                // Remove any '+1 day' or similar from the formatted time before appending our own (+1d) marker
+                let plusOneDay = "";
+                let shiftTimeStr = formatShiftTime(
+                  shift.arrive_time,
+                  shift.depart_time,
+                );
+                shiftTimeStr = shiftTimeStr
+                  .replace(/\s*\+1\s*day(s)?/i, "")
+                  .replace(/\s*\(\+1\s*day(s)?\)/i, "")
+                  .replace(/\s*\(\+1d\)/i, "");
+                try {
+                  const arrive = new Date(shift.arrive_time);
+                  const depart = new Date(shift.depart_time);
+                  if (
+                    arrive instanceof Date &&
+                    depart instanceof Date &&
+                    !isNaN(arrive) &&
+                    !isNaN(depart)
+                  ) {
+                    // If depart is on the next day (or later) compared to arrive
+                    if (
+                      depart.getDate() !== arrive.getDate() ||
+                      depart.getMonth() !== arrive.getMonth() ||
+                      depart.getFullYear() !== arrive.getFullYear()
+                    ) {
+                      plusOneDay = " (+1d)";
+                    }
+                  }
+                } catch (e) {}
+                return `
+            <div class="shift assigned-shift" style="padding: 0;">
+              <div class="shift-row" style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1rem; padding: 1rem;">
+                <div class="shift-details" style="flex: 1 1 250px; min-width: 200px;">
+                  <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 4px; font-weight: 600; color: #222;">
+                    ${shift.date ? DateTimeFormat.formatDate(shift.date) : shift.start_time ? DateTimeFormat.formatDate(shift.start_time) : ""} | 
+                    ${shift.show_name}
+                  </div>
+                  <div style="color: #222; margin-bottom: 2px;">
+                    Shift Times: ${shiftTimeStr}${plusOneDay} | ${shift.role}
+                  </div>
+                </div>
+                <div style="flex: 0 0 auto; display: flex; align-items: center;">
+                  ${
+                    canRemove
+                      ? `<button class="btn btn-danger" style="min-width: 90px;" onclick="removeShift(${shift.id})">Remove</button>`
+                      : `<button class="btn btn-danger" style="min-width: 90px;" disabled onclick="showCannotRemoveMessage()" title="Cannot remove shifts less than 48 hours away">Remove</button>`
+                  }
+                </div>
+              </div>
+            </div>
+          `;
+              })
+              .join("");
+          }
+        }
+      }
+      function populateAvailableShifts() {
+        const now = new Date();
+
+        // Flatten all available future shifts from all shows/performances
+        const allAvailableShifts = [];
+        availableShifts.forEach((show) => {
+          // Flattened structure (single shift per show)
+          if (show.show_date && show.arrive_time) {
+            const shiftEndTime = new Date(show.depart_time);
+            if (shiftEndTime > now) {
+              allAvailableShifts.push({
+                ...show,
+                date: show.show_date,
+                performance_date: show.show_date,
+                performance_start: show.start_time,
+                performance_end: show.end_time,
+                show_name: show.show_name,
+              });
+            }
+          } else if (show.performances && Array.isArray(show.performances)) {
+            show.performances.forEach((performance) => {
               if (performance.shifts && Array.isArray(performance.shifts)) {
-                performance.shifts.forEach(shift => {
-                  const shiftStart = new Date(shift.start_time);
-                  if (shiftStart >= now) {
-                    allShifts.push({
+                performance.shifts.forEach((shift) => {
+                  const shiftEndTime = new Date(shift.depart_time);
+                  if (shiftEndTime > now) {
+                    allAvailableShifts.push({
                       ...shift,
-                      show_name: show.show_name,
                       date: shift.date || performance.date,
-                      start_time: shift.start_time,
-                      end_time: shift.end_time
+                      performance_date: performance.date,
+                      performance_start: performance.start_time,
+                      performance_end: performance.end_time,
+                      show_name: show.show_name,
                     });
                   }
                 });
@@ -1077,192 +1477,122 @@
           }
         });
 
-        // Sort by date (closest first), then by arrive time
-        allShifts.sort((a, b) => {
-          const dateCompare = new Date(a.date) - new Date(b.date);
-          if (dateCompare !== 0) return dateCompare;
-          return new Date(a.arrive_time) - new Date(b.arrive_time);
-        });
-        if (allShifts.length === 0) {
-          assignedContainer.innerHTML = '<div class="no-shifts">You are not currently assigned to any future shifts.</div>';
+        if (allAvailableShifts.length === 0) {
+          availableContainer.innerHTML =
+            '<div class="no-shifts">No shifts are currently available for signup (all shifts have ended).</div>';
+          submitBtn.disabled = true;
         } else {
-          assignedContainer.innerHTML = allShifts.map(shift => {
-            // Check if shift is less than 48 hours away
-            const shiftDate = new Date(shift.arrive_time);
-            const now = new Date();
-            const hoursUntilShift = (shiftDate - now) / (1000 * 60 * 60); // Convert to hours
-            const canRemove = hoursUntilShift >= 48;
-
-            // Remove any '+1 day' or similar from the formatted time before appending our own (+1d) marker
-            let plusOneDay = '';
-            let shiftTimeStr = formatShiftTime(shift.arrive_time, shift.depart_time);
-            shiftTimeStr = shiftTimeStr.replace(/\s*\+1\s*day(s)?/i, '').replace(/\s*\(\+1\s*day(s)?\)/i, '').replace(/\s*\(\+1d\)/i, '');
-            try {
-              const arrive = new Date(shift.arrive_time);
-              const depart = new Date(shift.depart_time);
-              if (
-                arrive instanceof Date && depart instanceof Date &&
-                !isNaN(arrive) && !isNaN(depart)
-              ) {
-                // If depart is on the next day (or later) compared to arrive
-                if (
-                  depart.getDate() !== arrive.getDate() ||
-                  depart.getMonth() !== arrive.getMonth() ||
-                  depart.getFullYear() !== arrive.getFullYear()
-                ) {
-                  plusOneDay = ' (+1d)';
-                }
-              }
-            } catch (e) {}
-            return `
-            <div class="shift assigned-shift" style="padding: 0;">
-              <div class="shift-row" style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1rem; padding: 1rem;">
-                <div class="shift-details" style="flex: 1 1 250px; min-width: 200px;">
-                  <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 4px; font-weight: 600; color: #222;">
-                    ${shift.date ? DateTimeFormat.formatDate(shift.date) : (shift.start_time ? DateTimeFormat.formatDate(shift.start_time) : '')} | 
-                    ${shift.show_name}
-                  </div>
-                  <div style="color: #222; margin-bottom: 2px;">
-                    Shift Times: ${shiftTimeStr}${plusOneDay} | ${shift.role}
-                  </div>
-                </div>
-                <div style="flex: 0 0 auto; display: flex; align-items: center;">
-                  ${canRemove
-                    ? `<button class="btn btn-danger" style="min-width: 90px;" onclick="removeShift(${shift.id})">Remove</button>`
-                    : `<button class="btn btn-danger" style="min-width: 90px;" disabled onclick="showCannotRemoveMessage()" title="Cannot remove shifts less than 48 hours away">Remove</button>`
-                  }
-                </div>
-              </div>
-            </div>
-          `;
-          }).join('');
-        }
-      }
-    } function populateAvailableShifts() {
-      const now = new Date();
-
-      // Flatten all available future shifts from all shows/performances
-      const allAvailableShifts = [];
-      availableShifts.forEach(show => {
-        // Flattened structure (single shift per show)
-        if (show.show_date && show.arrive_time) {
-          const shiftEndTime = new Date(show.depart_time);
-          if (shiftEndTime > now) {
-            allAvailableShifts.push({
-              ...show,
-              date: show.show_date,
-              performance_date: show.show_date,
-              performance_start: show.start_time,
-              performance_end: show.end_time,
-              show_name: show.show_name
-            });
-          }
-        } else if (show.performances && Array.isArray(show.performances)) {
-          show.performances.forEach(performance => {
-            if (performance.shifts && Array.isArray(performance.shifts)) {
-              performance.shifts.forEach(shift => {
-                const shiftEndTime = new Date(shift.depart_time);
-                if (shiftEndTime > now) {
-                  allAvailableShifts.push({
-                    ...shift,
-                    date: shift.date || performance.date,
-                    performance_date: performance.date,
-                    performance_start: performance.start_time,
-                    performance_end: performance.end_time,
-                    show_name: show.show_name
-                  });
-                }
-              });
-            }
+          // Sort by date, then by arrive_time
+          allAvailableShifts.sort((a, b) => {
+            const dateCompare = new Date(a.date) - new Date(b.date);
+            if (dateCompare !== 0) return dateCompare;
+            return new Date(a.arrive_time) - new Date(b.arrive_time);
           });
-        }
-      });
+          availableContainer.innerHTML = allAvailableShifts
+            .map((shift) => {
+              // Remove any '+1 day' or similar from the formatted time before appending our own (+1d) marker
+              let plusOneDay = "";
+              let shiftTimeStr = formatShiftTime(
+                shift.arrive_time,
+                shift.depart_time,
+              );
+              shiftTimeStr = shiftTimeStr
+                .replace(/\s*\+1\s*day(s)?/i, "")
+                .replace(/\s*\(\+1\s*day(s)?\)/i, "")
+                .replace(/\s*\(\+1d\)/i, "");
+              try {
+                const arrive = new Date(shift.arrive_time);
+                const depart = new Date(shift.depart_time);
+                if (
+                  arrive instanceof Date &&
+                  depart instanceof Date &&
+                  !isNaN(arrive) &&
+                  !isNaN(depart)
+                ) {
+                  if (
+                    depart.getDate() !== arrive.getDate() ||
+                    depart.getMonth() !== arrive.getMonth() ||
+                    depart.getFullYear() !== arrive.getFullYear()
+                  ) {
+                    plusOneDay = " (+1d)";
+                  }
+                }
+              } catch (e) {}
+              const performanceId = String(shift.show_date_id);
+              const performanceKey = `${shift.performance_date}T${shift.performance_start}`;
+              const isUnavailable = unavailablePerformanceIds.has(performanceId);
+              const availabilityButtonLabel = isUnavailable
+                ? "I'm available"
+                : "I'm unavailable";
+              const availabilityButtonClass = isUnavailable
+                ? "available"
+                : "unavailable";
+              const selectControl = isUnavailable
+                ? '<span class="availability-note">Marked unavailable</span>'
+                : `<label style="display: flex; align-items: center; cursor: pointer; margin-bottom: 0;">
+                    <input type='checkbox' value='${shift.id}' data-performance-key="${performanceKey}" data-show-name="${shift.show_name}" data-performance-date="${shift.performance_date}" data-performance-start="${shift.performance_start}" data-performance-end="${shift.performance_end}" data-shift-role="${shift.role}" onchange="handleShiftSelection(this)">
+                    <span style="margin-left: 8px;">Select</span>
+                  </label>`;
 
-      if (allAvailableShifts.length === 0) {
-        availableContainer.innerHTML = '<div class="no-shifts">No shifts are currently available for signup (all shifts have ended).</div>';
-        submitBtn.disabled = true;
-      } else {
-        // Sort by date, then by arrive_time
-        allAvailableShifts.sort((a, b) => {
-          const dateCompare = new Date(a.date) - new Date(b.date);
-          if (dateCompare !== 0) return dateCompare;
-          return new Date(a.arrive_time) - new Date(b.arrive_time);
-        });
-        availableContainer.innerHTML = allAvailableShifts.map(shift => {
-          // Remove any '+1 day' or similar from the formatted time before appending our own (+1d) marker
-          let plusOneDay = '';
-          let shiftTimeStr = formatShiftTime(shift.arrive_time, shift.depart_time);
-          shiftTimeStr = shiftTimeStr.replace(/\s*\+1\s*day(s)?/i, '').replace(/\s*\(\+1\s*day(s)?\)/i, '').replace(/\s*\(\+1d\)/i, '');
-          try {
-            const arrive = new Date(shift.arrive_time);
-            const depart = new Date(shift.depart_time);
-            if (
-              arrive instanceof Date && depart instanceof Date &&
-              !isNaN(arrive) && !isNaN(depart)
-            ) {
-              if (
-                depart.getDate() !== arrive.getDate() ||
-                depart.getMonth() !== arrive.getMonth() ||
-                depart.getFullYear() !== arrive.getFullYear()
-              ) {
-                plusOneDay = ' (+1d)';
-              }
-            }
-          } catch (e) {}
-          return `
-            <div class="shift available-shift" style="padding: 0;">
+              return `
+            <div class="shift available-shift ${isUnavailable ? "unavailable-performance" : ""}" style="padding: 0;">
               <div class="shift-row" style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1rem; padding: 1rem;">
                 <div class="shift-details" style="flex: 1 1 250px; min-width: 200px;">
                   <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 4px; font-weight: 600; color: #222;">
-                    ${shift.date ? DateTimeFormat.formatDate(shift.date) : (shift.start_time ? DateTimeFormat.formatDate(shift.start_time) : '')} | 
+                    ${shift.date ? DateTimeFormat.formatDate(shift.date) : shift.start_time ? DateTimeFormat.formatDate(shift.start_time) : ""} | 
                     ${shift.show_name}
                   </div>
                   <div style="color: #222; margin-bottom: 2px;">
                     Shift Times: ${shiftTimeStr}${plusOneDay} | ${shift.role}
                   </div>
                 </div>
-                <div style="flex: 0 0 auto; display: flex; align-items: center;">
-                  <label style="display: flex; align-items: center; cursor: pointer; margin-bottom: 0;">
-                    <input type='checkbox' value='${shift.id}' data-performance-key="${shift.performance_date}T${shift.performance_start}" data-show-name="${shift.show_name}" data-performance-date="${shift.performance_date}" data-performance-start="${shift.performance_start}" data-performance-end="${shift.performance_end}" data-shift-role="${shift.role}" onchange="handleShiftSelection(this)">
-                    <span style="margin-left: 8px;">Select</span>
-                  </label>
+                <div class="shift-actions">
+                  ${selectControl}
+                  <button type="button" class="availability-toggle ${availabilityButtonClass}" data-performance-key="${performanceKey}" data-performance-date="${shift.performance_date}" onclick="togglePerformanceAvailability(this, ${performanceId})">${availabilityButtonLabel}</button>
                 </div>
               </div>
             </div>
           `;
-        }).join('');
-        submitBtn.disabled = false;
+            })
+            .join("");
+          submitBtn.disabled = !allAvailableShifts.some(
+            (shift) =>
+              !unavailablePerformanceIds.has(String(shift.show_date_id)),
+          );
+        }
       }
-    }
 
-    // Track selected shifts by performance to enforce one per performance rule
-    const selectedShiftsByPerformance = new Map();
+      // Track selected shifts by performance to enforce one per performance rule
+      const selectedShiftsByPerformance = new Map();
 
-    function handleShiftSelection(checkbox) {
-      const performanceKey = checkbox.dataset.performanceKey;
-      const shiftId = checkbox.value;
-      const shiftRole = checkbox.dataset.shiftRole;
-      const showName = checkbox.dataset.showName;
-      const performanceDate = checkbox.dataset.performanceDate;
-      const performanceStart = checkbox.dataset.performanceStart;
-      const performanceEnd = checkbox.dataset.performanceEnd;
+      function handleShiftSelection(checkbox) {
+        const performanceKey = checkbox.dataset.performanceKey;
+        const shiftId = checkbox.value;
+        const shiftRole = checkbox.dataset.shiftRole;
+        const showName = checkbox.dataset.showName;
+        const performanceDate = checkbox.dataset.performanceDate;
+        const performanceStart = checkbox.dataset.performanceStart;
+        const performanceEnd = checkbox.dataset.performanceEnd;
 
-      if (checkbox.checked) {
-        // Check if this performance already has a selected shift
-        if (selectedShiftsByPerformance.has(performanceKey)) {
-          const existingShiftId = selectedShiftsByPerformance.get(performanceKey);
-          const existingCheckbox = document.querySelector(`input[value="${existingShiftId}"]`);
+        if (checkbox.checked) {
+          // Check if this performance already has a selected shift
+          if (selectedShiftsByPerformance.has(performanceKey)) {
+            const existingShiftId =
+              selectedShiftsByPerformance.get(performanceKey);
+            const existingCheckbox = document.querySelector(
+              `input[value="${existingShiftId}"]`,
+            );
 
-          if (existingCheckbox && existingShiftId !== shiftId) {
-            // Uncheck the new selection first
-            checkbox.checked = false;
+            if (existingCheckbox && existingShiftId !== shiftId) {
+              // Uncheck the new selection first
+              checkbox.checked = false;
 
-            // Show swap confirmation modal
-            const existingShiftRole = existingCheckbox.dataset.shiftRole;
+              // Show swap confirmation modal
+              const existingShiftRole = existingCheckbox.dataset.shiftRole;
 
-            Modal.showModal('shift-swap-confirm', {
-              title: 'Swap Shifts?',
-              body: `
+              Modal.showModal("shift-swap-confirm", {
+                title: "Swap Shifts?",
+                body: `
                 <p>You're already signed up for a shift in this performance:</p>                  <div class="shift-details-modal">
                     <div class="show-info">${showName}</div>
                     <div class="shift-role">Current: ${existingShiftRole}</div>
@@ -1273,206 +1603,237 @@
                   <div class="shift-role">New: ${shiftRole}</div>
                 </div>
               `,
-              buttons: [
-                {
-                  text: 'Cancel',
-                  className: 'modal-btn-outline',
-                  action: 'cancel'
-                },
-                {
-                  text: 'Swap Shifts',
-                  className: 'modal-btn-primary',
-                  action: 'swap',
-                  handler: () => {
-                    // Uncheck the existing shift
-                    existingCheckbox.checked = false;
-                    selectedShiftsByPerformance.delete(performanceKey);
+                buttons: [
+                  {
+                    text: "Cancel",
+                    className: "modal-btn-outline",
+                    action: "cancel",
+                  },
+                  {
+                    text: "Swap Shifts",
+                    className: "modal-btn-primary",
+                    action: "swap",
+                    handler: () => {
+                      // Uncheck the existing shift
+                      existingCheckbox.checked = false;
+                      selectedShiftsByPerformance.delete(performanceKey);
 
-                    // Check the new shift
-                    checkbox.checked = true;
-                    selectedShiftsByPerformance.set(performanceKey, shiftId);
+                      // Check the new shift
+                      checkbox.checked = true;
+                      selectedShiftsByPerformance.set(performanceKey, shiftId);
 
-                    Modal.closeModal('shift-swap-confirm');
-                  }
-                }
-              ]
-            });
-            return;
+                      Modal.closeModal("shift-swap-confirm");
+                    },
+                  },
+                ],
+              });
+              return;
+            }
           }
+
+          // Add to selected shifts
+          selectedShiftsByPerformance.set(performanceKey, shiftId);
+        } else {
+          // Remove from selected shifts
+          selectedShiftsByPerformance.delete(performanceKey);
+        }
+      }
+
+      async function removeShift(shiftId) {
+        Modal.confirm(
+          "Remove Shift",
+          "Are you sure you want to remove yourself from this shift?",
+          async () => {
+            try {
+              const response = await fetch(
+                `/volunteer/signup/${volunteer.id}/shift`,
+                {
+                  method: "DELETE",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ shiftId: shiftId }),
+                },
+              );
+
+              if (response.ok) {
+                showMessage("success", "You have been removed from the shift.");
+                // Refresh the page to update the lists
+                setTimeout(() => location.reload(), 1000);
+              } else {
+                throw new Error("Failed to remove from shift");
+              }
+            } catch (error) {
+              Modal.error(
+                "Error",
+                "Failed to remove from shift. Please try again.",
+              );
+            }
+          },
+        );
+      }
+
+      function showCannotRemoveMessage() {
+        Modal.alert(
+          "Cannot Remove Shift",
+          "You cannot remove yourself from shifts that are less than 48 hours away. Please contact the FOH Manager if you need to make changes to this shift.",
+        );
+      }
+
+      function logout() {
+        // Simple redirect to the main route
+        window.location.href = "/";
+      }
+
+      function quickDownloadPDF() {
+        const pdfUrl = `/volunteer/signup/${volunteer.id}/schedule-pdf`;
+
+        // Open the PDF in a new tab
+        window.open(pdfUrl, "_blank");
+      }
+
+      async function downloadPDF() {
+        const pdfButton = document.querySelector(".pdf-button");
+        const originalText = pdfButton.innerHTML;
+        try {
+          pdfButton.disabled = true;
+          pdfButton.innerHTML = "<span>⏳ Generating...</span>";
+
+          const response = await fetch(`/volunteer/signup/${volunteer.id}/pdf`);
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+          const blob = await response.blob();
+          // Try to get filename from Content-Disposition header
+          let filename = "theatre-shifts.pdf";
+          const disposition = response.headers.get("Content-Disposition");
+          if (disposition) {
+            const match = disposition.match(/filename="?([^";]+)"?/);
+            if (match) {
+              filename = match[1];
+            }
+          }
+          // Create a link and trigger download
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = filename;
+          document.body.appendChild(a);
+          a.click();
+          setTimeout(() => {
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+          }, 100);
+          pdfButton.innerHTML = "<span>✓ Downloaded!</span>";
+          setTimeout(() => {
+            pdfButton.disabled = false;
+            pdfButton.innerHTML = originalText;
+          }, 2000);
+        } catch (error) {
+          console.error("PDF download failed:", error);
+          pdfButton.disabled = false;
+          pdfButton.innerHTML = originalText;
+          Modal.error("Error", "Failed to download PDF. Please try again.");
+        }
+      }
+
+      function showMessage(type, text) {
+        const successMsg = document.getElementById("successMessage");
+        const errorMsg = document.getElementById("errorMessage");
+
+        if (type === "success") {
+          successMsg.innerHTML = `<strong>Success!</strong> ${text}`;
+          successMsg.style.display = "block";
+          errorMsg.style.display = "none";
+        } else {
+          errorMsg.innerHTML = `<strong>Error!</strong> ${text}`;
+          errorMsg.style.display = "block";
+          successMsg.style.display = "none";
         }
 
-        // Add to selected shifts
-        selectedShiftsByPerformance.set(performanceKey, shiftId);
-      } else {
-        // Remove from selected shifts
-        selectedShiftsByPerformance.delete(performanceKey);
-      }
-    }
+        setTimeout(() => {
+          successMsg.style.display = "none";
+          errorMsg.style.display = "none";
+        }, 5000);
+      } // Initialize the page
+      window.addEventListener("load", () => {
+        console.log("Page loaded. Checking libraries...");
+        console.log("jsPDF available:", !!window.jspdf);
+        console.log("DateTimeFormat available:", !!window.DateTimeFormat);
+        console.log("Modal available:", !!window.Modal);
 
-    async function removeShift(shiftId) {
-      Modal.confirm(
-        'Remove Shift',
-        'Are you sure you want to remove yourself from this shift?',
-        async () => {
+        // Show warning if jsPDF isn't loaded
+        if (!window.jspdf) {
+          console.warn(
+            "jsPDF not loaded immediately, PDF button may need to wait for library",
+          );
+        }
+
+        generateCalendar();
+        populateAssignedShifts();
+        populateAvailableShifts();
+      });
+
+      // Handle form submission for new shifts
+      document
+        .getElementById("signupForm")
+        .addEventListener("submit", async (e) => {
+          e.preventDefault();
+
+          const selectedShifts = Array.from(
+            document.querySelectorAll(
+              "#availableShifts input[type=checkbox]:checked",
+            ),
+          );
+
+          if (selectedShifts.length === 0) {
+            Modal.alert(
+              "No Shifts Selected",
+              "Please select at least one shift to sign up for.",
+            );
+            return;
+          }
+
+          const originalText = submitBtn.textContent;
+          submitBtn.disabled = true;
+          submitBtn.textContent = "Signing up...";
+
           try {
-            const response = await fetch(`/volunteer/signup/${volunteer.id}/shift`, {
-              method: 'DELETE',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ shiftId: shiftId })
+            const shiftIds = selectedShifts.map((cb) => cb.value);
+            const response = await fetch(window.location.href, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ shiftIds: shiftIds }),
             });
 
             if (response.ok) {
-              showMessage('success', 'You have been removed from the shift.');
-              // Refresh the page to update the lists
-              setTimeout(() => location.reload(), 1000);
-            } else {
-              throw new Error('Failed to remove from shift');
-            }
-          } catch (error) {
-            Modal.error('Error', 'Failed to remove from shift. Please try again.');
-          }
-        }
-      );
-    }
+              Modal.success(
+                "Success",
+                "You have successfully signed up for the selected shifts.",
+                () => {
+                  location.reload();
+                },
+              );
+            } else if (response.status === 409) {
+              // Handle conflict - already assigned to a shift for this performance
+              const conflictData = await response.json();
 
-    function showCannotRemoveMessage() {
-      Modal.alert(
-        'Cannot Remove Shift',
-        'You cannot remove yourself from shifts that are less than 48 hours away. Please contact the FOH Manager if you need to make changes to this shift.'
-      );
-    }
+              if (conflictData.conflictType === "unavailable_performance") {
+                Modal.error(
+                  "Unavailable Performance",
+                  `You marked yourself unavailable for ${conflictData.performanceLabel}.`,
+                );
+              } else if (conflictData.conflictType === "performance_conflict") {
+                const { existingShift, performance, requestedShiftId } =
+                  conflictData;
+                const requestedCheckbox = document.querySelector(
+                  `input[value="${requestedShiftId}"]`,
+                );
+                const requestedRole = requestedCheckbox
+                  ? requestedCheckbox.dataset.shiftRole
+                  : "Unknown Role";
 
-    function logout() {
-      // Simple redirect to the main route
-      window.location.href = '/';
-    }
-
-    function quickDownloadPDF() {
-      const pdfUrl = `/volunteer/signup/${volunteer.id}/schedule-pdf`;
-
-      // Open the PDF in a new tab
-      window.open(pdfUrl, '_blank');
-    }
-
-    async function downloadPDF() {
-      const pdfButton = document.querySelector('.pdf-button');
-      const originalText = pdfButton.innerHTML;
-      try {
-        pdfButton.disabled = true;
-        pdfButton.innerHTML = '<span>⏳ Generating...</span>';
-
-        const response = await fetch(`/volunteer/signup/${volunteer.id}/pdf`);
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        const blob = await response.blob();
-        // Try to get filename from Content-Disposition header
-        let filename = 'theatre-shifts.pdf';
-        const disposition = response.headers.get('Content-Disposition');
-        if (disposition) {
-          const match = disposition.match(/filename="?([^";]+)"?/);
-          if (match) {
-            filename = match[1];
-          }
-        }
-        // Create a link and trigger download
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        setTimeout(() => {
-          window.URL.revokeObjectURL(url);
-          document.body.removeChild(a);
-        }, 100);
-        pdfButton.innerHTML = '<span>✓ Downloaded!</span>';
-        setTimeout(() => {
-          pdfButton.disabled = false;
-          pdfButton.innerHTML = originalText;
-        }, 2000);
-      } catch (error) {
-        console.error('PDF download failed:', error);
-        pdfButton.disabled = false;
-        pdfButton.innerHTML = originalText;
-        Modal.error('Error', 'Failed to download PDF. Please try again.');
-      }
-    }
-
-    function showMessage(type, text) {
-      const successMsg = document.getElementById('successMessage');
-      const errorMsg = document.getElementById('errorMessage');
-
-      if (type === 'success') {
-        successMsg.innerHTML = `<strong>Success!</strong> ${text}`;
-        successMsg.style.display = 'block';
-        errorMsg.style.display = 'none';
-      } else {
-        errorMsg.innerHTML = `<strong>Error!</strong> ${text}`;
-        errorMsg.style.display = 'block';
-        successMsg.style.display = 'none';
-      }
-
-      setTimeout(() => {
-        successMsg.style.display = 'none';
-        errorMsg.style.display = 'none';
-      }, 5000);
-    }    // Initialize the page
-    window.addEventListener('load', () => {
-      console.log('Page loaded. Checking libraries...');
-      console.log('jsPDF available:', !!window.jspdf);
-      console.log('DateTimeFormat available:', !!window.DateTimeFormat);
-      console.log('Modal available:', !!window.Modal);
-
-      // Show warning if jsPDF isn't loaded
-      if (!window.jspdf) {
-        console.warn('jsPDF not loaded immediately, PDF button may need to wait for library');
-      }
-
-      generateCalendar();
-      populateAssignedShifts();
-      populateAvailableShifts();
-    });
-
-    // Handle form submission for new shifts
-    document.getElementById('signupForm').addEventListener('submit', async (e) => {
-      e.preventDefault();
-
-      const selectedShifts = Array.from(document.querySelectorAll('#availableShifts input[type=checkbox]:checked'));
-
-      if (selectedShifts.length === 0) {
-        Modal.alert('No Shifts Selected', 'Please select at least one shift to sign up for.');
-        return;
-      }
-
-      const originalText = submitBtn.textContent;
-      submitBtn.disabled = true;
-      submitBtn.textContent = 'Signing up...';
-
-      try {
-        const shiftIds = selectedShifts.map(cb => cb.value);
-        const response = await fetch(window.location.href, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ shiftIds: shiftIds })
-        });
-
-        if (response.ok) {
-          Modal.success('Success', 'You have successfully signed up for the selected shifts.', () => {
-            location.reload();
-          });
-        } else if (response.status === 409) {
-          // Handle conflict - already assigned to a shift for this performance
-          const conflictData = await response.json();
-
-          if (conflictData.conflictType === 'performance_conflict') {
-            const { existingShift, performance, requestedShiftId } = conflictData;
-            const requestedCheckbox = document.querySelector(`input[value="${requestedShiftId}"]`);
-            const requestedRole = requestedCheckbox ? requestedCheckbox.dataset.shiftRole : 'Unknown Role';
-
-            Modal.showModal('conflict-resolution', {
-              title: 'Shift Conflict',
-              body: `
+                Modal.showModal("conflict-resolution", {
+                  title: "Shift Conflict",
+                  body: `
                 <p>You're already assigned to a shift for this performance:</p>                  <div class="shift-details-modal">
                     <div class="show-info">${performance.show_name}</div>
                     <div class="shift-role">Current: ${existingShift.role}</div>
@@ -1483,54 +1844,69 @@
                   <div class="shift-role">New: ${requestedRole}</div>
                 </div>
               `,
-              buttons: [
-                {
-                  text: 'Keep Current',
-                  className: 'modal-btn-outline',
-                  action: 'keep'
-                },
-                {
-                  text: 'Swap Shifts',
-                  className: 'modal-btn-primary',
-                  action: 'swap',
-                  handler: async () => {
-                    try {
-                      const swapResponse = await fetch(`/volunteer/signup/${volunteer.id}/swap`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                          oldShiftId: existingShift.id,
-                          newShiftId: requestedShiftId
-                        })
-                      });
+                  buttons: [
+                    {
+                      text: "Keep Current",
+                      className: "modal-btn-outline",
+                      action: "keep",
+                    },
+                    {
+                      text: "Swap Shifts",
+                      className: "modal-btn-primary",
+                      action: "swap",
+                      handler: async () => {
+                        try {
+                          const swapResponse = await fetch(
+                            `/volunteer/signup/${volunteer.id}/swap`,
+                            {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({
+                                oldShiftId: existingShift.id,
+                                newShiftId: requestedShiftId,
+                              }),
+                            },
+                          );
 
-                      if (swapResponse.ok) {
-                        Modal.success('Success', 'Shift swapped successfully!', () => {
-                          location.reload();
-                        });
-                      } else {
-                        Modal.error('Error', 'Failed to swap shifts. Please try again.');
-                      }
-                    } catch (error) {
-                      Modal.error('Error', 'Failed to swap shifts. Please try again.');
-                    }
-                    Modal.closeModal('conflict-resolution');
-                  }
-                }
-              ]
-            });
+                          if (swapResponse.ok) {
+                            Modal.success(
+                              "Success",
+                              "Shift swapped successfully!",
+                              () => {
+                                location.reload();
+                              },
+                            );
+                          } else {
+                            Modal.error(
+                              "Error",
+                              "Failed to swap shifts. Please try again.",
+                            );
+                          }
+                        } catch (error) {
+                          Modal.error(
+                            "Error",
+                            "Failed to swap shifts. Please try again.",
+                          );
+                        }
+                        Modal.closeModal("conflict-resolution");
+                      },
+                    },
+                  ],
+                });
+              }
+            } else {
+              throw new Error("Signup failed");
+            }
+          } catch (error) {
+            Modal.error(
+              "Error",
+              "Failed to sign up for shifts. Please try again.",
+            );
+          } finally {
+            submitBtn.disabled = false;
+            submitBtn.textContent = originalText;
           }
-        } else {
-          throw new Error('Signup failed');
-        }
-      } catch (error) {
-        Modal.error('Error', 'Failed to sign up for shifts. Please try again.');
-      } finally {
-        submitBtn.disabled = false;
-        submitBtn.textContent = originalText;
-      }
-    });
-  </script>
-</body>
-
+        });
+    </script>
+  </body>
 </html>
