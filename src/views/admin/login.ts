@@ -44,19 +44,6 @@ export function renderLoginTemplate(): string {
           font-weight: 500;
           color: #333;
         }
-        input[type="email"], input[type="password"] { 
-          width: 100%; 
-          padding: 0.75rem; 
-          border: 1px solid #dee2e6; 
-          border-radius: 4px; 
-          box-sizing: border-box;
-          font-size: 1rem;
-        }
-        input[type="email"]:focus, input[type="password"]:focus { 
-          outline: none; 
-          border-color: #007bff; 
-          box-shadow: 0 0 0 2px rgba(0,123,255,0.25);
-        }
         .btn { 
           width: 100%; 
           padding: 0.75rem; 
@@ -75,6 +62,33 @@ export function renderLoginTemplate(): string {
         .btn:disabled {
           background: #6c757d;
           cursor: not-allowed;
+        }
+        .microsoft-btn {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 0.65rem;
+          background: #2f2f2f;
+        }
+        .microsoft-btn:hover {
+          background: #1f1f1f;
+        }
+        .microsoft-mark {
+          display: grid;
+          grid-template-columns: repeat(2, 0.55rem);
+          grid-template-rows: repeat(2, 0.55rem);
+          gap: 0.12rem;
+          flex: 0 0 auto;
+        }
+        .microsoft-mark span:nth-child(1) { background: #f25022; }
+        .microsoft-mark span:nth-child(2) { background: #7fba00; }
+        .microsoft-mark span:nth-child(3) { background: #00a4ef; }
+        .microsoft-mark span:nth-child(4) { background: #ffb900; }
+        .login-copy {
+          color: #495057;
+          line-height: 1.5;
+          margin: 0 0 1.5rem;
+          text-align: center;
         }
         .error { 
           background: #f8d7da; 
@@ -116,23 +130,20 @@ export function renderLoginTemplate(): string {
         
         <div id="errorMessage" class="error" style="display: none;"></div>
         
+        <p class="login-copy">
+          Sign in with your Microsoft 365 account. Admin access is limited to members of the Theatre Shifts Web App Admins group.
+        </p>
+
         <form id="loginForm">
-          <div class="form-group">
-            <label for="email">Email:</label>
-            <input type="email" id="email" name="email" required autocomplete="email">
-          </div>
-          
-          <div class="form-group">
-            <label for="password">Password:</label>
-            <input type="password" id="password" name="password" required autocomplete="current-password">
-          </div>
-          
-          <button type="submit" class="btn" id="loginBtn">
-            Login
+          <button type="submit" class="btn microsoft-btn" id="loginBtn">
+            <span class="microsoft-mark" aria-hidden="true">
+              <span></span><span></span><span></span><span></span>
+            </span>
+            <span id="loginBtnText">Sign in with Microsoft</span>
           </button>
           
           <div class="loading" id="loading">
-            Signing in...
+            Redirecting to Microsoft...
           </div>
         </form>
           <div class="form-footer">
@@ -145,84 +156,63 @@ export function renderLoginTemplate(): string {
           e.preventDefault();
           
           const btn = document.getElementById('loginBtn');
+          const btnText = document.getElementById('loginBtnText');
           const loading = document.getElementById('loading');
           const errorMessage = document.getElementById('errorMessage');
           
           // Show loading state
           btn.disabled = true;
-          btn.textContent = 'Signing in...';
+          btnText.textContent = 'Redirecting...';
           loading.style.display = 'block';
           errorMessage.style.display = 'none';
-          
-          const formData = new FormData(e.target);
-          const email = formData.get('email');
-          const password = formData.get('password');
-          
+
           try {
-            // First attempt to sign in
-            const response = await fetch('/api/auth/sign-in/email', {
+            const response = await fetch('/api/auth/sign-in/social', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ email, password }),
+              body: JSON.stringify({
+                provider: 'microsoft',
+                callbackURL: '/admin/dashboard',
+                errorCallbackURL: '/admin/login'
+              }),
               credentials: 'include'
             });
-            
-            if (response.ok) {
-              // After successful login, check the session to verify admin status
-              const sessionResponse = await fetch('/api/auth/session', {
-                credentials: 'include'
-              });
-              
-              if (sessionResponse.ok) {
-                const sessionData = await sessionResponse.json();
-                
-                if (sessionData.user && sessionData.user.isAdmin) {
-                  // Redirect to admin dashboard
-                  window.location.href = '/admin/dashboard';
-                } else {
-                  errorMessage.textContent = 'Admin access required';
-                  errorMessage.style.display = 'block';
-                }
-              } else {
-                errorMessage.textContent = 'Failed to verify admin status';
-                errorMessage.style.display = 'block';
-              }
-            } else {
-              // Try to parse JSON error response first
-              let errorText = 'Invalid email or password';
+
+            let result = {};
+            const contentType = response.headers.get('content-type') || '';
+            if (contentType.includes('application/json')) {
               try {
-                const errorData = await response.json();
-                if (errorData.message) {
-                  errorText = errorData.message;
-                } else if (errorData.error) {
-                  errorText = errorData.error;
-                }
-              } catch {
-                // If JSON parsing fails, fall back to text
-                try {
-                  errorText = await response.text() || 'Invalid email or password';
-                } catch {
-                  // If all parsing fails, use default message
-                  errorText = 'Invalid email or password';
-                }
+                result = await response.json();
+              } catch (_) {
+                result = {};
               }
-              errorMessage.textContent = errorText;
-              errorMessage.style.display = 'block';
             }
+
+            if (!response.ok || !result.url) {
+              errorMessage.textContent = result.message || result.error || 'Microsoft sign-in could not be started.';
+              errorMessage.style.display = 'block';
+              return;
+            }
+
+            window.location.href = result.url;
           } catch (error) {
             console.error('Login error:', error);
-            errorMessage.textContent = 'Login failed. Please try again.';
+            errorMessage.textContent = 'Microsoft sign-in failed. Please try again.';
             errorMessage.style.display = 'block';
           } finally {
-            // Reset button state
             btn.disabled = false;
-            btn.textContent = 'Login';
+            btnText.textContent = 'Sign in with Microsoft';
             loading.style.display = 'none';
           }
         });
-        
-        // Focus on email field when page loads
-        document.getElementById('email').focus();
+
+        const query = new URLSearchParams(window.location.search);
+        const error = query.get('error') || query.get('error_description');
+        if (error) {
+          const errorMessage = document.getElementById('errorMessage');
+          errorMessage.textContent = error.replaceAll('_', ' ');
+          errorMessage.style.display = 'block';
+        }
       </script>
     </body>
     </html>

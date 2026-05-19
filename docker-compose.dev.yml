@@ -20,6 +20,7 @@ services:
       - ./service-worker.js:/app/service-worker.js:ro
     environment:
       - DENO_ENV=development
+      - DATABASE_URL=${DATABASE_URL_DOCKER:-${DATABASE_URL}}
     networks:
       - backend
     # Don't restart automatically in dev mode

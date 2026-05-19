@@ -4,6 +4,73 @@ import { requireAdminAuth } from "../middlewares/better-auth.ts";
 
 const router = new Router();
 
+const knownAdminPaths = [
+  /^\/login$/,
+  /^\/logout$/,
+  /^\/reset-password$/,
+  /^\/dashboard$/,
+  /^\/shows$/,
+  /^\/shows\/new$/,
+  /^\/shows\/[^/]+\/edit$/,
+  /^\/api\/shows$/,
+  /^\/api\/shows\/[^/]+$/,
+  /^\/api\/shows\/[^/]+\/dates$/,
+  /^\/api\/shows\/[^/]+\/run-sheet\/[^/]+$/,
+  /^\/api\/show-dates$/,
+  /^\/api\/show-dates\/[^/]+$/,
+  /^\/api\/show-dates\/[^/]+\/run-sheet$/,
+  /^\/api\/shows\/[^/]+\/intervals$/,
+  /^\/api\/intervals\/[^/]+$/,
+  /^\/volunteers$/,
+  /^\/volunteers\/new$/,
+  /^\/volunteers\/[^/]+\/edit$/,
+  /^\/volunteers\/[^/]+\/shifts$/,
+  /^\/api\/volunteers$/,
+  /^\/api\/volunteers\/[^/]+$/,
+  /^\/api\/volunteers\/[^/]+\/approval$/,
+  /^\/api\/volunteers\/[^/]+\/shifts$/,
+  /^\/api\/volunteers\/[^/]+\/shifts\/[^/]+$/,
+  /^\/api\/volunteers\/[^/]+\/shifts\/removal-pdf$/,
+  /^\/api\/volunteers\/[^/]+\/shifts\/simple$/,
+  /^\/api\/volunteers\/[^/]+\/schedule-pdf$/,
+  /^\/api\/volunteers\/[^/]+\/email-schedule-pdf$/,
+  /^\/api\/volunteers\/[^/]+\/email-show-week$/,
+  /^\/api\/volunteers\/[^/]+\/email-last-minute-shifts$/,
+  /^\/api\/volunteers\/[^/]+\/emails$/,
+  /^\/api\/volunteers\/[^/]+\/available-shifts$/,
+  /^\/api\/emails\/[^/]+\/content$/,
+  /^\/api\/emails\/attachments\/[^/]+\/download$/,
+  /^\/shifts$/,
+  /^\/shifts\/new$/,
+  /^\/shifts\/[^/]+\/edit$/,
+  /^\/api\/shifts$/,
+  /^\/api\/shifts\/calendar-data$/,
+  /^\/api\/shifts\/calendar-shows$/,
+  /^\/api\/shifts\/default-roles$/,
+  /^\/api\/shifts\/[^/]+$/,
+  /^\/api\/shifts\/[^/]+\/volunteers$/,
+  /^\/api\/shifts\/[^/]+\/available-roles$/,
+  /^\/api\/shifts\/[^/]+\/available-volunteers$/,
+  /^\/unfilled-shifts$/,
+  /^\/bulk-email$/,
+  /^\/api\/analytics\/unfilled$/,
+  /^\/api\/unfilled-shifts\/count$/,
+  /^\/api\/unfilled-shifts\/pdf$/,
+  /^\/api\/performances-without-shifts\/count$/,
+  /^\/api\/bulk-email\/shows$/,
+  /^\/api\/bulk-email\/shows\/[^/]+\/volunteers$/,
+  /^\/api\/bulk-email\/volunteers\/unfilled-shifts$/,
+  /^\/api\/bulk-email\/send-show-week$/,
+  /^\/api\/bulk-email\/send-unfilled-shifts$/,
+  /^\/api\/server-time$/,
+  /^\/api\/volunteer-shifts$/,
+];
+
+function isKnownAdminPath(pathname: string): boolean {
+  const adminPath = pathname.replace(/^\/admin/, "") || "/";
+  return knownAdminPaths.some((pattern) => pattern.test(adminPath));
+}
+
 // Public routes
 router.get("/login", adminController.showLoginForm);
 router.get("/logout", adminController.logout);
@@ -13,6 +80,15 @@ router.get("/reset-password", async (ctx) => {
     root: `${Deno.cwd()}/src/views/admin`,
     path: "reset-password.html",
   });
+});
+
+router.use(async (ctx, next) => {
+  if (!isKnownAdminPath(new URL(ctx.request.url).pathname)) {
+    ctx.response.status = 404;
+    return;
+  }
+
+  await next();
 });
 
 // Protected admin routes - apply middleware first
@@ -32,8 +108,14 @@ router.delete("/api/shows/:id", adminController.deleteShow);
 
 router.get("/api/shows/:showId/dates", adminController.listShowDates);
 // Running sheet PDF endpoints
-router.get("/api/shows/:showId/run-sheet/:date", adminController.downloadRunSheetPDF); // Legacy endpoint
-router.get("/api/show-dates/:showDateId/run-sheet", adminController.downloadRunSheetPDFByShowDate); // New specific endpoint
+router.get(
+  "/api/shows/:showId/run-sheet/:date",
+  adminController.downloadRunSheetPDF,
+); // Legacy endpoint
+router.get(
+  "/api/show-dates/:showDateId/run-sheet",
+  adminController.downloadRunSheetPDFByShowDate,
+); // New specific endpoint
 
 // Show dates API endpoints
 router.post("/api/show-dates", adminController.createShowDate);
@@ -57,15 +139,39 @@ router.get("/api/volunteers", adminController.listVolunteers);
 router.post("/api/volunteers", adminController.createVolunteer);
 router.get("/api/volunteers/:id", adminController.getVolunteer);
 router.put("/api/volunteers/:id", adminController.updateVolunteer);
-router.put("/api/volunteers/:id/approval", adminController.toggleVolunteerApproval);
-router.post("/api/volunteers/:id/shifts/removal-pdf", adminController.generateShiftRemovalPDF);
-router.get("/api/volunteers/:id/schedule-pdf", adminController.downloadVolunteerSchedulePDF);
-router.post("/api/volunteers/:id/email-schedule-pdf", adminController.emailVolunteerSchedulePDF);
-router.post("/api/volunteers/:id/email-show-week", adminController.emailShowWeekPDF);
-router.post("/api/volunteers/:id/email-last-minute-shifts", adminController.emailLastMinuteShifts);
-router.get("/api/volunteers/:id/emails", adminController.getParticipantEmailHistory);
+router.put(
+  "/api/volunteers/:id/approval",
+  adminController.toggleVolunteerApproval,
+);
+router.post(
+  "/api/volunteers/:id/shifts/removal-pdf",
+  adminController.generateShiftRemovalPDF,
+);
+router.get(
+  "/api/volunteers/:id/schedule-pdf",
+  adminController.downloadVolunteerSchedulePDF,
+);
+router.post(
+  "/api/volunteers/:id/email-schedule-pdf",
+  adminController.emailVolunteerSchedulePDF,
+);
+router.post(
+  "/api/volunteers/:id/email-show-week",
+  adminController.emailShowWeekPDF,
+);
+router.post(
+  "/api/volunteers/:id/email-last-minute-shifts",
+  adminController.emailLastMinuteShifts,
+);
+router.get(
+  "/api/volunteers/:id/emails",
+  adminController.getParticipantEmailHistory,
+);
 router.get("/api/emails/:emailId/content", adminController.getEmailContent);
-router.get("/api/emails/attachments/:attachmentId/download", adminController.downloadEmailAttachment);
+router.get(
+  "/api/emails/attachments/:attachmentId/download",
+  adminController.downloadEmailAttachment,
+);
 router.delete("/api/volunteers/:id", adminController.deleteVolunteer);
 
 // Shifts management pages
@@ -90,28 +196,70 @@ router.get("/bulk-email", adminController.showBulkEmailPage);
 
 // Analytics API endpoints
 router.get("/api/analytics/unfilled", adminController.unfilledShifts);
-router.get("/api/unfilled-shifts/count", adminController.getUnfilledShiftsCount);
-router.get("/api/unfilled-shifts/pdf", adminController.downloadUnfilledShiftsPDF);
-router.get("/api/performances-without-shifts/count", adminController.getPerformancesWithoutShiftsCount);
+router.get(
+  "/api/unfilled-shifts/count",
+  adminController.getUnfilledShiftsCount,
+);
+router.get(
+  "/api/unfilled-shifts/pdf",
+  adminController.downloadUnfilledShiftsPDF,
+);
+router.get(
+  "/api/performances-without-shifts/count",
+  adminController.getPerformancesWithoutShiftsCount,
+);
 
 // Bulk email API endpoints
 router.get("/api/bulk-email/shows", adminController.getShowsForBulkEmail);
-router.get("/api/bulk-email/shows/:showId/volunteers", adminController.getVolunteersForShow);
-router.get("/api/bulk-email/volunteers/unfilled-shifts", adminController.getVolunteersForUnfilledShifts);
-router.post("/api/bulk-email/send-show-week", adminController.sendBulkShowWeekEmails);
-router.post("/api/bulk-email/send-unfilled-shifts", adminController.sendBulkUnfilledShiftsEmails);
+router.get(
+  "/api/bulk-email/shows/:showId/volunteers",
+  adminController.getVolunteersForShow,
+);
+router.get(
+  "/api/bulk-email/volunteers/unfilled-shifts",
+  adminController.getVolunteersForUnfilledShifts,
+);
+router.post(
+  "/api/bulk-email/send-show-week",
+  adminController.sendBulkShowWeekEmails,
+);
+router.post(
+  "/api/bulk-email/send-unfilled-shifts",
+  adminController.sendBulkUnfilledShiftsEmails,
+);
 
 // Server time API endpoint
 router.get("/api/server-time", adminController.getServerTime);
 
 // Volunteer-Shift Assignment API endpoints
-router.get("/api/shifts/:shiftId/volunteers", adminController.getShiftVolunteers);
-router.get("/api/shifts/:shiftId/available-roles", adminController.getAvailableRolesForShift);
-router.get("/api/volunteers/:volunteerId/shifts", adminController.getVolunteerShifts);
-router.get("/api/volunteers/:volunteerId/shifts/simple", adminController.getVolunteerShiftsSimple);
-router.get("/api/shifts/:shiftId/available-volunteers", adminController.getAvailableVolunteersForShift);
-router.get("/api/volunteers/:volunteerId/available-shifts", adminController.getAvailableShiftsForVolunteer);
+router.get(
+  "/api/shifts/:shiftId/volunteers",
+  adminController.getShiftVolunteers,
+);
+router.get(
+  "/api/shifts/:shiftId/available-roles",
+  adminController.getAvailableRolesForShift,
+);
+router.get(
+  "/api/volunteers/:volunteerId/shifts",
+  adminController.getVolunteerShifts,
+);
+router.get(
+  "/api/volunteers/:volunteerId/shifts/simple",
+  adminController.getVolunteerShiftsSimple,
+);
+router.get(
+  "/api/shifts/:shiftId/available-volunteers",
+  adminController.getAvailableVolunteersForShift,
+);
+router.get(
+  "/api/volunteers/:volunteerId/available-shifts",
+  adminController.getAvailableShiftsForVolunteer,
+);
 router.post("/api/volunteer-shifts", adminController.assignVolunteerToShift);
-router.delete("/api/volunteers/:volunteerId/shifts/:shiftId", adminController.removeVolunteerFromShift);
+router.delete(
+  "/api/volunteers/:volunteerId/shifts/:shiftId",
+  adminController.removeVolunteerFromShift,
+);
 
 export default router;
