@@ -339,7 +339,7 @@ document.addEventListener("DOMContentLoaded", function () {
         .map((input) => input.value);
 
       if (selectedDates.length === 0) {
-        showError("Please select at least one show date");
+        showError("Please select at least one performance");
         return;
       }
       // Get selected roles - use more specific selectors to avoid the '8' issue
@@ -377,7 +377,7 @@ document.addEventListener("DOMContentLoaded", function () {
           const totalRoles = selectedRoles.length;
 
           showSuccess(
-            `Successfully created ${successCount} shifts across ${totalDates} performance date${
+            `Created ${successCount} shifts across ${totalDates} performance${
               totalDates > 1 ? "s" : ""
             } and ${totalRoles} role${totalRoles > 1 ? "s" : ""}`,
           );

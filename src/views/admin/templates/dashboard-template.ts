@@ -1,7 +1,10 @@
-import { getAdminNavigation, getAdminStyles, getAdminScripts } from "../components/navigation.ts";
+import {
+  getAdminNavigation,
+  getAdminScripts,
+  getAdminStyles,
+} from "../components/navigation.ts";
 
 export function renderDashboardTemplate(): string {
-  
   return `
     <!DOCTYPE html>
     <html>
@@ -296,7 +299,7 @@ export function renderDashboardTemplate(): string {
       </style>
     </head>
     <body>
-      ${getAdminNavigation('dashboard')}      <!-- Main Content -->
+      ${getAdminNavigation("dashboard")}      <!-- Main Content -->
       <div class="main-content">
         <div class="page-header">
           <div class="dashboard-header">
@@ -332,7 +335,7 @@ export function renderDashboardTemplate(): string {
             </div>
             
             <div class="show-filter">
-              <h4>Filter by Shows:</h4>
+              <h4>Filter by Productions:</h4>
               <div class="show-checkboxes" id="showCheckboxes">
                 <!-- Show checkboxes will be populated by JavaScript -->
               </div>

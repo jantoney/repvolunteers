@@ -1,5 +1,13 @@
-import { getAdminNavigation, getAdminStyles, getAdminScripts } from "../components/navigation.ts";
-import { formatDate, formatTime, isDifferentDay } from "../../../utils/timezone.ts";
+import {
+  getAdminNavigation,
+  getAdminScripts,
+  getAdminStyles,
+} from "../components/navigation.ts";
+import {
+  formatDate,
+  formatTime,
+  isDifferentDay,
+} from "../../../utils/timezone.ts";
 
 export interface UnfilledShift {
   id: number;
@@ -17,9 +25,11 @@ export interface UnfilledShiftsPageData {
   shifts: UnfilledShift[];
 }
 
-export function renderUnfilledShiftsTemplate(data: UnfilledShiftsPageData): string {
+export function renderUnfilledShiftsTemplate(
+  data: UnfilledShiftsPageData,
+): string {
   const { shifts } = data;
-  
+
   // Group shifts by show and date
   const grouped = new Map<string, UnfilledShift[]>();
   for (const shift of shifts) {
@@ -29,7 +39,7 @@ export function renderUnfilledShiftsTemplate(data: UnfilledShiftsPageData): stri
     }
     grouped.get(key)!.push(shift);
   }
-  
+
   return `
     <!DOCTYPE html>
     <html>
@@ -80,7 +90,7 @@ export function renderUnfilledShiftsTemplate(data: UnfilledShiftsPageData): stri
       </style>
     </head>
     <body>
-      ${getAdminNavigation('unfilled')}
+      ${getAdminNavigation("unfilled")}
 
       <!-- Main Content -->
       <div class="main-content">
@@ -90,11 +100,19 @@ export function renderUnfilledShiftsTemplate(data: UnfilledShiftsPageData): stri
             <button id="pdfButton" class="btn btn-primary" onclick="downloadPDF()">📄 PDF</button>
             <a href="/admin/shifts" class="btn btn-secondary">All Shifts</a>
           </div>
-        </div>        ${shifts.length > 0 ? `
+        </div>        ${
+    shifts.length > 0
+      ? `
           <div class="alert">
-            <strong>Attention Required!</strong> There ${shifts.length === 1 ? 'is' : 'are'} ${shifts.length} unfilled shift${shifts.length !== 1 ? 's' : ''} that need${shifts.length === 1 ? 's' : ''} participants assigned.
+            <strong>Attention Required!</strong> There ${
+        shifts.length === 1 ? "is" : "are"
+      } ${shifts.length} unfilled shift${
+        shifts.length !== 1 ? "s" : ""
+      } that need${shifts.length === 1 ? "s" : ""} participants assigned.
           </div>
-        ` : ''}
+        `
+      : ""
+  }
 
         <!-- Stats -->
         <div class="stats">
@@ -103,50 +121,64 @@ export function renderUnfilledShiftsTemplate(data: UnfilledShiftsPageData): stri
             <div class="stat-label">Unfilled Shifts</div>
           </div>
           <div class="stat-card">
-            <div class="stat-number">${new Set(shifts.map(s => s.show_name)).size}</div>
-            <div class="stat-label">Shows Affected</div>
+            <div class="stat-number">${
+    new Set(shifts.map((s) => s.show_name)).size
+  }</div>
+            <div class="stat-label">Productions Affected</div>
           </div>
           <div class="stat-card">
-            <div class="stat-number">${new Set(shifts.map(s => s.date)).size}</div>
-            <div class="stat-label">Performance Dates</div>
+            <div class="stat-number">${
+    new Set(shifts.map((s) => s.date)).size
+  }</div>
+            <div class="stat-label">Performances</div>
           </div>
         </div>
 
-        ${shifts.length === 0 ? `          <div class="form-container">
+        ${
+    shifts.length === 0
+      ? `          <div class="form-container">
             <div style="text-align: center; padding: 2rem; color: #28a745;">
               <h4>🎉 All Shifts Filled!</h4>
               <p>Excellent! All shifts currently have participants assigned. Great job on the coordination!</p>
               <a href="/admin/shifts" class="btn btn-primary">View All Shifts</a>
             </div>
           </div>
-        ` : `
+        `
+      : `
           <!-- Unfilled Shifts -->
-          ${Array.from(grouped.entries()).map(([_key, shiftsGroup]) => {
-            const firstShift = shiftsGroup[0];
-            return `
+          ${
+        Array.from(grouped.entries()).map(([_key, shiftsGroup]) => {
+          const firstShift = shiftsGroup[0];
+          return `
               <div class="performance-group">
                 <div class="performance-header">
                   <h3 class="performance-title">${firstShift.show_name}</h3>
                   <p class="performance-details">
                     ${formatDate(new Date(firstShift.date))} | 
-                    Show: ${firstShift.show_start} - ${firstShift.show_end}
+                    Performance: ${firstShift.show_start} - ${firstShift.show_end}
                   </p>
                 </div>
                 
                 <div class="shifts-grid">
-                  ${shiftsGroup.map(shift => {
-                    const arriveTime = formatTime(shift.arrive_time);
-                    const departTime = formatTime(shift.depart_time);
-                    const isNextDay = isDifferentDay(shift.arrive_time, shift.depart_time);
-                    
-                    return `
+                  ${
+            shiftsGroup.map((shift) => {
+              const arriveTime = formatTime(shift.arrive_time);
+              const departTime = formatTime(shift.depart_time);
+              const isNextDay = isDifferentDay(
+                shift.arrive_time,
+                shift.depart_time,
+              );
+
+              return `
                       <div class="shift-card">
                         <div class="shift-role">${shift.role}</div>
                         
                         <div class="shift-times">
                           <span class="time-range">
                             ${arriveTime} - ${departTime}
-                            ${isNextDay ? '<span class="next-day">+1 day</span>' : ''}
+                            ${
+                isNextDay ? '<span class="next-day">+1 day</span>' : ""
+              }
                           </span>
                         </div>
                           <div class="table-actions">
@@ -155,11 +187,14 @@ export function renderUnfilledShiftsTemplate(data: UnfilledShiftsPageData): stri
                         </div>
                       </div>
                     `;
-                  }).join('')}
+            }).join("")
+          }
                 </div>
               </div>
             `;
-          }).join('')}        `}
+        }).join("")
+      }        `
+  }
       </div>
 
       <!-- Assignment Modal -->

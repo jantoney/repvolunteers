@@ -1,28 +1,31 @@
 import type { RouterContext } from "oak";
 import { getPool } from "../models/db.ts";
-import {
-  getAdelaideTimeParameterSQL
-} from "../utils/timezone.ts";
+import { getAdelaideTimeParameterSQL } from "../utils/timezone.ts";
 import { getAuth } from "../auth.ts";
-import { generateShiftRemovalPDF as generatePDF, getMimeType, getFileExtension, type ShiftData, type VolunteerData } from "../utils/pdf-generator.ts";
-
+import {
+  generateShiftRemovalPDF as generatePDF,
+  getFileExtension,
+  getMimeType,
+  type ShiftData,
+  type VolunteerData,
+} from "../utils/pdf-generator.ts";
 
 // Import view functions from separated files
 export {
-  showLoginForm,
-  showDashboard,
-  showShowsPage,
-  showNewShowForm,
-  showEditShowForm,
-  showVolunteersPage,
-  showVolunteerShiftsPage,
-  showNewVolunteerForm,
-  showEditVolunteerForm,
-  showShiftsPage,
-  showNewShiftForm,
-  showEditShiftForm,
-  showUnfilledShiftsPage,
   showBulkEmailPage,
+  showDashboard,
+  showEditShiftForm,
+  showEditShowForm,
+  showEditVolunteerForm,
+  showLoginForm,
+  showNewShiftForm,
+  showNewShowForm,
+  showNewVolunteerForm,
+  showShiftsPage,
+  showShowsPage,
+  showUnfilledShiftsPage,
+  showVolunteerShiftsPage,
+  showVolunteersPage,
 } from "../views/admin/index.ts";
 
 // Logout function
@@ -38,7 +41,7 @@ export async function logout(ctx: RouterContext<string>) {
 
     // Call Better Auth's sign out API
     await auth.api.signOut({
-      headers: request.headers
+      headers: request.headers,
     });
 
     // Clear the session cookie manually as well
@@ -47,7 +50,7 @@ export async function logout(ctx: RouterContext<string>) {
       httpOnly: true,
       secure: false, // Set to false for development
       sameSite: "lax",
-      path: "/"
+      path: "/",
     });
 
     // Redirect to login page
@@ -60,7 +63,7 @@ export async function logout(ctx: RouterContext<string>) {
       httpOnly: true,
       secure: false,
       sameSite: "lax",
-      path: "/"
+      path: "/",
     });
     ctx.response.redirect("/admin/login");
   }
@@ -74,16 +77,19 @@ export async function downloadRunSheetPDF(ctx: RouterContext<string>) {
   const client = await pool.connect();
   try {
     // Get show and performance info
-    const showRes = await client.queryObject<{ name: string }>("SELECT name FROM shows WHERE id = $1", [showId]);
+    const showRes = await client.queryObject<{ name: string }>(
+      "SELECT name FROM shows WHERE id = $1",
+      [showId],
+    );
     if (showRes.rows.length === 0) {
-      ctx.throw(404, "Show not found");
+      ctx.throw(404, "Production not found");
     }
     const showName = showRes.rows[0].name;
 
     // Get show date info (with Adelaide timezone conversion)
-    const perfRes = await client.queryObject<{ 
-      id: number; 
-      start_time: string; 
+    const perfRes = await client.queryObject<{
+      id: number;
+      start_time: string;
       end_time: string;
       performance_start: string;
       performance_end: string;
@@ -93,13 +99,14 @@ export async function downloadRunSheetPDF(ctx: RouterContext<string>) {
               TO_CHAR(end_time AT TIME ZONE 'Australia/Adelaide', 'HH24:MI') as performance_end
        FROM show_dates 
        WHERE show_id = $1 AND TO_CHAR(start_time AT TIME ZONE 'Australia/Adelaide', 'YYYY-MM-DD') = $2`,
-      [showId, date]
+      [showId, date],
     );
     if (perfRes.rows.length === 0) {
-      ctx.throw(404, "Performance date not found");
+      ctx.throw(404, "Performance not found");
     }
     const perf = perfRes.rows[0];
-    const performanceTime = `${perf.performance_start} - ${perf.performance_end}`;
+    const performanceTime =
+      `${perf.performance_start} - ${perf.performance_end}`;
 
     // Get all shifts for this performance (with Adelaide timezone conversion)
     const shiftsRes = await client.queryObject<{
@@ -114,7 +121,7 @@ export async function downloadRunSheetPDF(ctx: RouterContext<string>) {
        FROM shifts 
        WHERE show_date_id = $1 
        ORDER BY arrive_time, role`,
-      [perf.id]
+      [perf.id],
     );
 
     // Get all participants assigned to shifts for this performance (with Adelaide timezone conversion)
@@ -132,25 +139,25 @@ export async function downloadRunSheetPDF(ctx: RouterContext<string>) {
        JOIN shifts s ON s.id = vs.shift_id
        WHERE s.show_date_id = $1
        ORDER BY p.name, s.arrive_time, s.role`,
-      [perf.id]
+      [perf.id],
     );
 
     // Find unfilled shifts for current performance (not used anymore, but kept for potential future use)
-    const _unfilledShifts = shiftsRes.rows.filter(shift => {
+    const _unfilledShifts = shiftsRes.rows.filter((shift) => {
       // If no participant assigned to this role/arrive/depart combination
-      return !participantsRes.rows.some(p => 
-        p.role === shift.role && 
-        p.arrive_time === shift.arrive_time && 
+      return !participantsRes.rows.some((p) =>
+        p.role === shift.role &&
+        p.arrive_time === shift.arrive_time &&
         p.depart_time === shift.depart_time
       );
     });
 
     // Format participants (times are already in Adelaide timezone from SQL)
-    const participants = participantsRes.rows.map(p => ({
+    const participants = participantsRes.rows.map((p) => ({
       name: p.name,
       role: p.role,
       arriveTime: p.arrive_time,
-      departTime: p.depart_time
+      departTime: p.depart_time,
     }));
 
     // Get unfilled shifts for the next 3 weeks for this show (including current performance)
@@ -173,15 +180,15 @@ export async function downloadRunSheetPDF(ctx: RouterContext<string>) {
        GROUP BY sd.start_time, s.role, s.arrive_time, s.depart_time
        HAVING COUNT(ps.participant_id) = 0
        ORDER BY sd.start_time, s.arrive_time`,
-      [showId, date]
+      [showId, date],
     );
 
     // Format unfilled shifts (times are already in Adelaide timezone from SQL)
-    const unfilled = unfilledShiftsRes.rows.map(s => ({
+    const unfilled = unfilledShiftsRes.rows.map((s) => ({
       date: s.date,
       role: s.role,
       arriveTime: s.arrive_time,
-      departTime: s.depart_time
+      departTime: s.depart_time,
     }));
 
     // Get intervals for this show
@@ -190,27 +197,32 @@ export async function downloadRunSheetPDF(ctx: RouterContext<string>) {
       duration_minutes: number;
     }>(
       `SELECT start_minutes, duration_minutes FROM show_intervals WHERE show_id = $1 ORDER BY start_minutes`,
-      [showId]
+      [showId],
     );
 
     const intervals = intervalsRes.rows;
 
     // Generate PDF using the updated PDF generator
-    const { generateRunSheetPDF } = await import("../utils/run-sheet-pdf-generator.ts");
+    const { generateRunSheetPDF } = await import(
+      "../utils/run-sheet-pdf-generator.ts"
+    );
     const pdfBuffer = generateRunSheetPDF({
       showName,
       date,
       performanceTime,
       participants,
       unfilledShifts: unfilled,
-      intervals
+      intervals,
     });
 
     const filename = `run-sheet-${showId}-${date}.pdf`;
 
     ctx.response.status = 200;
     ctx.response.headers.set("Content-Type", "application/pdf");
-    ctx.response.headers.set("Content-Disposition", `inline; filename="${filename}"`);
+    ctx.response.headers.set(
+      "Content-Disposition",
+      `inline; filename="${filename}"`,
+    );
     ctx.response.body = pdfBuffer;
   } finally {
     client.release();
@@ -218,13 +230,15 @@ export async function downloadRunSheetPDF(ctx: RouterContext<string>) {
 }
 
 // Generate and download running sheet PDF for a specific show date (performance)
-export async function downloadRunSheetPDFByShowDate(ctx: RouterContext<string>) {
+export async function downloadRunSheetPDFByShowDate(
+  ctx: RouterContext<string>,
+) {
   const showDateId = ctx.params.showDateId;
   const pool = getPool();
   const client = await pool.connect();
   try {
     // Get show date and show info in one query
-    const showDateRes = await client.queryObject<{ 
+    const showDateRes = await client.queryObject<{
       show_id: number;
       show_name: string;
       date: string;
@@ -238,15 +252,16 @@ export async function downloadRunSheetPDFByShowDate(ctx: RouterContext<string>) 
        FROM show_dates sd
        JOIN shows s ON s.id = sd.show_id
        WHERE sd.id = $1`,
-      [showDateId]
+      [showDateId],
     );
-    
+
     if (showDateRes.rows.length === 0) {
       ctx.throw(404, "Performance not found");
     }
-    
+
     const showDate = showDateRes.rows[0];
-    const performanceTime = `${showDate.performance_start} - ${showDate.performance_end}`;
+    const performanceTime =
+      `${showDate.performance_start} - ${showDate.performance_end}`;
 
     // Get all shifts for this specific performance (for reference, but not directly used)
     const _shiftsRes = await client.queryObject<{
@@ -261,7 +276,7 @@ export async function downloadRunSheetPDFByShowDate(ctx: RouterContext<string>) 
        FROM shifts 
        WHERE show_date_id = $1 
        ORDER BY arrive_time, role`,
-      [showDateId]
+      [showDateId],
     );
 
     // Get all participants assigned to shifts for this specific performance
@@ -279,15 +294,15 @@ export async function downloadRunSheetPDFByShowDate(ctx: RouterContext<string>) 
        JOIN shifts s ON s.id = vs.shift_id
        WHERE s.show_date_id = $1
        ORDER BY p.name, s.arrive_time, s.role`,
-      [showDateId]
+      [showDateId],
     );
 
     // Format participants (times are already in Adelaide timezone from SQL)
-    const participants = participantsRes.rows.map(p => ({
+    const participants = participantsRes.rows.map((p) => ({
       name: p.name,
       role: p.role,
       arriveTime: p.arrive_time,
-      departTime: p.depart_time
+      departTime: p.depart_time,
     }));
 
     // Get unfilled shifts for the next 3 weeks from this performance date onwards
@@ -310,15 +325,15 @@ export async function downloadRunSheetPDFByShowDate(ctx: RouterContext<string>) 
        GROUP BY sd.start_time, s.role, s.arrive_time, s.depart_time
        HAVING COUNT(ps.participant_id) = 0
        ORDER BY sd.start_time, s.arrive_time`,
-      [showDate.show_id, showDate.date]
+      [showDate.show_id, showDate.date],
     );
 
     // Format unfilled shifts (times are already in Adelaide timezone from SQL)
-    const unfilled = unfilledShiftsRes.rows.map(s => ({
+    const unfilled = unfilledShiftsRes.rows.map((s) => ({
       date: s.date,
       role: s.role,
       arriveTime: s.arrive_time,
-      departTime: s.depart_time
+      departTime: s.depart_time,
     }));
 
     // Get intervals for this show
@@ -327,27 +342,33 @@ export async function downloadRunSheetPDFByShowDate(ctx: RouterContext<string>) 
       duration_minutes: number;
     }>(
       `SELECT start_minutes, duration_minutes FROM show_intervals WHERE show_id = $1 ORDER BY start_minutes`,
-      [showDate.show_id]
+      [showDate.show_id],
     );
 
     const intervals = intervalsRes.rows;
 
     // Generate PDF using the updated PDF generator
-    const { generateRunSheetPDF } = await import("../utils/run-sheet-pdf-generator.ts");
+    const { generateRunSheetPDF } = await import(
+      "../utils/run-sheet-pdf-generator.ts"
+    );
     const pdfBuffer = generateRunSheetPDF({
       showName: showDate.show_name,
       date: showDate.date,
       performanceTime,
       participants,
       unfilledShifts: unfilled,
-      intervals
+      intervals,
     });
 
-    const filename = `run-sheet-${showDate.show_id}-${showDateId}-${showDate.date}.pdf`;
+    const filename =
+      `run-sheet-${showDate.show_id}-${showDateId}-${showDate.date}.pdf`;
 
     ctx.response.status = 200;
     ctx.response.headers.set("Content-Type", "application/pdf");
-    ctx.response.headers.set("Content-Disposition", `inline; filename="${filename}"`);
+    ctx.response.headers.set(
+      "Content-Disposition",
+      `inline; filename="${filename}"`,
+    );
     ctx.response.body = pdfBuffer;
   } finally {
     client.release();
@@ -356,7 +377,6 @@ export async function downloadRunSheetPDFByShowDate(ctx: RouterContext<string>) 
 
 // API Functions for Shows
 export async function listShows(ctx: RouterContext<string>) {
-
   const pool = getPool();
   const client = await pool.connect();
   try {
@@ -381,9 +401,9 @@ export async function listShows(ctx: RouterContext<string>) {
     `);
 
     // Convert BigInt count values to numbers for JSON serialization
-    const shows = result.rows.map(show => ({
+    const shows = result.rows.map((show) => ({
       ...show,
-      show_date_count: Number(show.show_date_count)
+      show_date_count: Number(show.show_date_count),
     }));
 
     ctx.response.body = shows;
@@ -407,7 +427,8 @@ export async function listShowDates(ctx: RouterContext<string>) {
       filled_shifts: bigint;
     }
 
-    const result = await client.queryObject<ShowDateRow>(`
+    const result = await client.queryObject<ShowDateRow>(
+      `
       SELECT sd.id, sd.show_id, 
              TO_CHAR(sd.start_time AT TIME ZONE 'Australia/Adelaide', 'YYYY-MM-DD"T"HH24:MI:SS') as start_time, 
              TO_CHAR(sd.end_time AT TIME ZONE 'Australia/Adelaide', 'YYYY-MM-DD"T"HH24:MI:SS') as end_time, 
@@ -421,15 +442,17 @@ export async function listShowDates(ctx: RouterContext<string>) {
       WHERE sd.show_id = $1
       GROUP BY sd.id, s.name, sd.start_time, sd.end_time
       ORDER BY sd.start_time
-    `, [showId]);
+    `,
+      [showId],
+    );
 
     // Convert BigInt count values to numbers for JSON serialization and add formatted date field
-    const showDates = result.rows.map(date => ({
+    const showDates = result.rows.map((date) => ({
       ...date,
       total_shifts: Number(date.total_shifts),
       filled_shifts: Number(date.filled_shifts),
-      date: date.start_time // Add the date field that the frontend expects
-    }));  
+      date: date.start_time, // Add the date field that the frontend expects
+    }));
 
     ctx.response.body = showDates;
   } finally {
@@ -466,7 +489,7 @@ export async function createShow(ctx: RouterContext<string>) {
       console.log("🔍 Checking if show exists:", name);
       const existingShow = await client.queryObject(
         "SELECT id FROM shows WHERE name = $1",
-        [name]
+        [name],
       );
 
       if (existingShow.rows.length > 0) {
@@ -477,7 +500,7 @@ export async function createShow(ctx: RouterContext<string>) {
         console.log("➕ Creating new show:", name);
         const result = await client.queryObject<{ id: number }>(
           "INSERT INTO shows (name) VALUES ($1) RETURNING id",
-          [name]
+          [name],
         );
         showId = result.rows[0].id;
         console.log("✅ Created new show with ID:", showId);
@@ -486,7 +509,12 @@ export async function createShow(ctx: RouterContext<string>) {
 
     const results = [];
 
-    console.log("🎯 Processing", performances.length, "performances for show ID:", showId);
+    console.log(
+      "🎯 Processing",
+      performances.length,
+      "performances for show ID:",
+      showId,
+    );
 
     for (const performance of performances) {
       const { start_time, end_time } = performance;
@@ -500,7 +528,7 @@ export async function createShow(ctx: RouterContext<string>) {
         console.log("🔍 Checking for existing performance...");
         const existingDate = await client.queryObject(
           "SELECT id FROM show_dates WHERE show_id = $1 AND start_time = ($2::timestamp AT TIME ZONE 'Australia/Adelaide')",
-          [showId, start_time]
+          [showId, start_time],
         );
 
         if (existingDate.rows.length > 0) {
@@ -508,7 +536,7 @@ export async function createShow(ctx: RouterContext<string>) {
           results.push({
             start_time,
             success: false,
-            reason: "Performance already exists"
+            reason: "Performance already exists",
           });
           continue;
         }
@@ -516,26 +544,29 @@ export async function createShow(ctx: RouterContext<string>) {
         console.log("💾 Inserting new show date...");
         const result = await client.queryObject<{ id: number }>(
           "INSERT INTO show_dates (show_id, start_time, end_time) VALUES ($1, $2::timestamp AT TIME ZONE 'Australia/Adelaide', $3::timestamp AT TIME ZONE 'Australia/Adelaide') RETURNING id",
-          [showId, start_time, end_time]
+          [showId, start_time, end_time],
         );
 
-        console.log("✅ Successfully created show date with ID:", result.rows[0].id);
+        console.log(
+          "✅ Successfully created show date with ID:",
+          result.rows[0].id,
+        );
         results.push({
           start_time,
           id: result.rows[0].id,
-          success: true
+          success: true,
         });
       } catch (error) {
         console.error("❌ Error processing performance:", error);
         console.error("  Error details:", {
           message: error instanceof Error ? error.message : String(error),
           stack: error instanceof Error ? error.stack : undefined,
-          name: error instanceof Error ? error.name : 'Unknown'
+          name: error instanceof Error ? error.name : "Unknown",
         });
         results.push({
           start_time,
           success: false,
-          reason: "Database error"
+          reason: "Database error",
         });
       }
     }
@@ -569,7 +600,7 @@ export async function updateShow(ctx: RouterContext<string>) {
   try {
     await client.queryObject(
       "UPDATE shows SET name = $1 WHERE id = $2",
-      [name, id]
+      [name, id],
     );
     ctx.response.status = 200;
   } finally {
@@ -597,17 +628,19 @@ export async function createShowDate(ctx: RouterContext<string>) {
   const client = await pool.connect();
   try {
     // Parse the incoming datetime strings
-    const startDate = start_time.split('T')[0];
-    const startTimeOnly = start_time.split('T')[1];
-    const endDate = end_time.split('T')[0];
-    const endTimeOnly = end_time.split('T')[1];
+    const startDate = start_time.split("T")[0];
+    const startTimeOnly = start_time.split("T")[1];
+    const endDate = end_time.split("T")[0];
+    const endTimeOnly = end_time.split("T")[1];
 
     // Use SQL AT TIME ZONE to ensure dates are treated as Adelaide time
     const result = await client.queryObject<{ id: number }>(
       `INSERT INTO show_dates (show_id, start_time, end_time) 
-       VALUES ($1, ${getAdelaideTimeParameterSQL('$2')}, ${getAdelaideTimeParameterSQL('$3')}) 
+       VALUES ($1, ${getAdelaideTimeParameterSQL("$2")}, ${
+        getAdelaideTimeParameterSQL("$3")
+      }) 
        RETURNING id`,
-      [show_id, `${startDate} ${startTimeOnly}`, `${endDate} ${endTimeOnly}`]
+      [show_id, `${startDate} ${startTimeOnly}`, `${endDate} ${endTimeOnly}`],
     );
 
     ctx.response.status = 201;
@@ -625,18 +658,18 @@ export async function updateShowDate(ctx: RouterContext<string>) {
   const client = await pool.connect();
   try {
     // Parse the incoming datetime strings
-    const startDate = start_time.split('T')[0];
-    const startTimeOnly = start_time.split('T')[1];
-    const endDate = end_time.split('T')[0];
-    const endTimeOnly = end_time.split('T')[1];
+    const startDate = start_time.split("T")[0];
+    const startTimeOnly = start_time.split("T")[1];
+    const endDate = end_time.split("T")[0];
+    const endTimeOnly = end_time.split("T")[1];
 
     // Use SQL AT TIME ZONE to ensure dates are treated as Adelaide time
     await client.queryObject(
       `UPDATE show_dates 
-       SET start_time = ${getAdelaideTimeParameterSQL('$1')}, 
-           end_time = ${getAdelaideTimeParameterSQL('$2')} 
+       SET start_time = ${getAdelaideTimeParameterSQL("$1")}, 
+           end_time = ${getAdelaideTimeParameterSQL("$2")} 
        WHERE id = $3`,
-      [`${startDate} ${startTimeOnly}`, `${endDate} ${endTimeOnly}`, id]
+      [`${startDate} ${startTimeOnly}`, `${endDate} ${endTimeOnly}`, id],
     );
 
     ctx.response.status = 200;
@@ -665,7 +698,7 @@ export async function listShowIntervals(ctx: RouterContext<string>) {
   try {
     const result = await client.queryObject(
       "SELECT id, start_minutes, duration_minutes FROM show_intervals WHERE show_id = $1 ORDER BY start_minutes",
-      [showId]
+      [showId],
     );
     ctx.response.body = result.rows;
   } finally {
@@ -682,7 +715,7 @@ export async function createShowInterval(ctx: RouterContext<string>) {
   try {
     const result = await client.queryObject<{ id: number }>(
       "INSERT INTO show_intervals (show_id, start_minutes, duration_minutes) VALUES ($1, $2, $3) RETURNING id",
-      [showId, start_minutes, duration_minutes]
+      [showId, start_minutes, duration_minutes],
     );
     ctx.response.status = 201;
     ctx.response.body = { id: result.rows[0].id };
@@ -700,7 +733,7 @@ export async function updateShowInterval(ctx: RouterContext<string>) {
   try {
     await client.queryObject(
       "UPDATE show_intervals SET start_minutes = $1, duration_minutes = $2 WHERE id = $3",
-      [start_minutes, duration_minutes, id]
+      [start_minutes, duration_minutes, id],
     );
     ctx.response.status = 200;
   } finally {
@@ -725,7 +758,9 @@ export async function listVolunteers(ctx: RouterContext<string>) {
   const pool = getPool();
   const client = await pool.connect();
   try {
-    const result = await client.queryObject("SELECT id, name, email, phone FROM participants ORDER BY name");
+    const result = await client.queryObject(
+      "SELECT id, name, email, phone FROM participants ORDER BY name",
+    );
     ctx.response.body = result.rows;
   } finally {
     client.release();
@@ -736,16 +771,17 @@ export async function createVolunteer(ctx: RouterContext<string>) {
   const value = await ctx.request.body.json();
   const { name, email, phone } = value;
   const pool = getPool();
-  const client = await pool.connect(); try {
+  const client = await pool.connect();
+  try {
     const result = await client.queryObject<{ id: string }>(
       "INSERT INTO participants (name, email, phone) VALUES ($1, $2, $3) RETURNING id",
-      [name, email, phone]
+      [name, email, phone],
     );
     const volunteerId = result.rows[0].id;
     ctx.response.status = 201;
     ctx.response.body = {
       id: volunteerId,
-      signupLink: `/volunteer/signup/${volunteerId}`
+      signupLink: `/volunteer/signup/${volunteerId}`,
     };
   } finally {
     client.release();
@@ -755,8 +791,11 @@ export async function createVolunteer(ctx: RouterContext<string>) {
 export async function getVolunteer(ctx: RouterContext<string>) {
   const id = ctx.params.id;
   const pool = getPool();
-  const client = await pool.connect(); try {
-    const result = await client.queryObject<{ id: string; name: string; email: string; phone: string }>("SELECT id, name, email, phone FROM participants WHERE id=$1", [id]);
+  const client = await pool.connect();
+  try {
+    const result = await client.queryObject<
+      { id: string; name: string; email: string; phone: string }
+    >("SELECT id, name, email, phone FROM participants WHERE id=$1", [id]);
     if (result.rows.length === 0) {
       ctx.throw(404, "Volunteer not found");
     }
@@ -775,7 +814,7 @@ export async function updateVolunteer(ctx: RouterContext<string>) {
   try {
     await client.queryObject(
       "UPDATE participants SET name=$1, email=$2, phone=$3 WHERE id=$4",
-      [name, email, phone, id]
+      [name, email, phone, id],
     );
     ctx.response.status = 200;
   } finally {
@@ -801,14 +840,18 @@ export async function getShiftCalendarData(ctx: RouterContext<string>) {
   const client = await pool.connect();
   try {
     // Get selected show IDs from query parameters
-    const showIds = ctx.request.url.searchParams.get('shows');
-    const showIdArray = showIds ? showIds.split(',').map(id => parseInt(id)).filter(id => !isNaN(id)) : [];
+    const showIds = ctx.request.url.searchParams.get("shows");
+    const showIdArray = showIds
+      ? showIds.split(",").map((id) => parseInt(id)).filter((id) => !isNaN(id))
+      : [];
 
     // Build the WHERE clause for show filtering
-    let showFilter = '';
+    let showFilter = "";
     const queryParams = [];
     if (showIdArray.length > 0) {
-      const placeholders = showIdArray.map((_, index) => `$${index + 1}`).join(',');
+      const placeholders = showIdArray.map((_, index) => `$${index + 1}`).join(
+        ",",
+      );
       showFilter = `AND sh.id IN (${placeholders})`;
       queryParams.push(...showIdArray);
     }
@@ -819,7 +862,8 @@ export async function getShiftCalendarData(ctx: RouterContext<string>) {
       total_shifts: number;
       filled_shifts: number;
       show_names: string;
-    }>(`
+    }>(
+      `
       SELECT 
         DATE(sd.start_time)::text as date,
         COALESCE(COUNT(s.id), 0)::int as total_shifts,
@@ -839,7 +883,9 @@ export async function getShiftCalendarData(ctx: RouterContext<string>) {
       GROUP BY DATE(sd.start_time)
       HAVING COUNT(s.id) > 0
       ORDER BY DATE(sd.start_time)
-    `, queryParams);
+    `,
+      queryParams,
+    );
 
     ctx.response.body = result.rows;
   } finally {
@@ -894,7 +940,8 @@ export async function listShifts(ctx: RouterContext<string>) {
        FROM shifts s
        JOIN show_dates sd ON sd.id = s.show_date_id
        JOIN shows sh ON sh.id = sd.show_id
-       ORDER BY sh.name, DATE(sd.start_time), sd.start_time, s.arrive_time`
+       WHERE s.depart_time >= NOW() - INTERVAL '3 hours'
+       ORDER BY sh.name, DATE(sd.start_time), sd.start_time, s.arrive_time`,
     );
     // Group by show, then by performance (date/start_time)
     const grouped: {
@@ -907,9 +954,9 @@ export async function listShifts(ctx: RouterContext<string>) {
             start_time: string;
             end_time: string;
             shifts: ShiftRow[];
-          }
-        }
-      }
+          };
+        };
+      };
     } = {};
     for (const row of result.rows) {
       const showKey = `${row.show_id}`;
@@ -917,7 +964,7 @@ export async function listShifts(ctx: RouterContext<string>) {
         grouped[showKey] = {
           show_id: row.show_id,
           show_name: row.show_name,
-          performances: {}
+          performances: {},
         };
       }
       const perfKey = `${row.date}T${row.show_start}`;
@@ -926,16 +973,16 @@ export async function listShifts(ctx: RouterContext<string>) {
           date: row.date,
           start_time: row.show_start,
           end_time: row.show_end,
-          shifts: []
+          shifts: [],
         };
       }
       grouped[showKey].performances[perfKey].shifts.push(row);
     }
     // Convert to array structure
-    const resultArr = Object.values(grouped).map(show => ({
+    const resultArr = Object.values(grouped).map((show) => ({
       show_id: show.show_id,
       show_name: show.show_name,
-      performances: Object.values(show.performances)
+      performances: Object.values(show.performances),
     }));
     ctx.response.body = resultArr;
   } finally {
@@ -953,7 +1000,7 @@ const DEFAULT_ROLES = [
   "Tea and Coffee 1 (Can see show)",
   "Tea and Coffee 2 (Can see show)",
   "Raffle Ticket Selling",
-  "Box Office"
+  "Box Office",
 ];
 
 export function getDefaultRoles(ctx: RouterContext<string>) {
@@ -977,7 +1024,7 @@ export async function createShift(ctx: RouterContext<string>) {
           // Get the show date (extract date from start_time)
           const showDateResult = await client.queryObject<{ date: string }>(
             "SELECT DATE(start_time)::text as date FROM show_dates WHERE id = $1",
-            [dateId]
+            [dateId],
           );
 
           if (showDateResult.rows.length === 0) {
@@ -985,7 +1032,7 @@ export async function createShift(ctx: RouterContext<string>) {
               dateId,
               role,
               success: false,
-              reason: "Show date not found"
+              reason: "Performance not found",
             });
             continue;
           }
@@ -999,7 +1046,7 @@ export async function createShift(ctx: RouterContext<string>) {
           console.log("  Arrive Time:", arriveTime);
           console.log("  Depart Time:", departTime);
 
-          // Create arrive and depart timestamps 
+          // Create arrive and depart timestamps
           const arriveTimestamp = `${showDate}T${arriveTime}:00`;
           let departTimestamp = `${showDate}T${departTime}:00`;
 
@@ -1007,23 +1054,28 @@ export async function createShift(ctx: RouterContext<string>) {
           console.log("  Initial Depart Timestamp:", departTimestamp);
 
           // Handle next day if depart time is before arrive time
-          const arriveTime24 = parseInt(arriveTime.split(':')[0]) * 60 + parseInt(arriveTime.split(':')[1]);
-          const departTime24 = parseInt(departTime.split(':')[0]) * 60 + parseInt(departTime.split(':')[1]);
-          
+          const arriveTime24 = parseInt(arriveTime.split(":")[0]) * 60 +
+            parseInt(arriveTime.split(":")[1]);
+          const departTime24 = parseInt(departTime.split(":")[0]) * 60 +
+            parseInt(departTime.split(":")[1]);
+
           let isNextDay = false;
           if (departTime24 <= arriveTime24) {
             // Add one day to depart timestamp for next day
-            const nextDay = new Date(showDate + 'T00:00:00');
+            const nextDay = new Date(showDate + "T00:00:00");
             nextDay.setDate(nextDay.getDate() + 1);
-            const nextDayStr = nextDay.toISOString().split('T')[0];
+            const nextDayStr = nextDay.toISOString().split("T")[0];
             departTimestamp = `${nextDayStr}T${departTime}:00`;
             isNextDay = true;
-            console.log("  Adjusted Depart Timestamp (next day):", departTimestamp);
+            console.log(
+              "  Adjusted Depart Timestamp (next day):",
+              departTimestamp,
+            );
           }
 
           const result = await client.queryObject<{ id: number }>(
             "INSERT INTO shifts (show_date_id, role, arrive_time, depart_time) VALUES ($1, $2, $3::timestamp AT TIME ZONE 'Australia/Adelaide', $4::timestamp AT TIME ZONE 'Australia/Adelaide') RETURNING id",
-            [dateId, role, arriveTimestamp, departTimestamp]
+            [dateId, role, arriveTimestamp, departTimestamp],
           );
 
           results.push({
@@ -1031,7 +1083,7 @@ export async function createShift(ctx: RouterContext<string>) {
             role,
             id: result.rows[0].id,
             success: true,
-            nextDay: isNextDay
+            nextDay: isNextDay,
           });
         } catch (error) {
           console.error("❌ Error creating shift:", error);
@@ -1041,13 +1093,13 @@ export async function createShift(ctx: RouterContext<string>) {
             dateId,
             role,
             arriveTime,
-            departTime
+            departTime,
           });
           results.push({
             dateId,
             role,
             success: false,
-            reason: "Database error"
+            reason: "Database error",
           });
         }
       }
@@ -1076,7 +1128,7 @@ export async function updateShift(ctx: RouterContext<string>) {
 
     await client.queryObject(
       "UPDATE shifts SET role=$1, arrive_time=$2::timestamp AT TIME ZONE 'Australia/Adelaide', depart_time=$3::timestamp AT TIME ZONE 'Australia/Adelaide' WHERE id=$4",
-      [role, arrive_time, depart_time, id]
+      [role, arrive_time, depart_time, id],
     );
     ctx.response.status = 200;
   } finally {
@@ -1122,10 +1174,11 @@ export async function unfilledShifts(ctx: RouterContext<string>) {
        JOIN show_dates sd ON sd.id = s.show_date_id
        JOIN shows sh ON sh.id = sd.show_id
        LEFT JOIN participant_shifts vs ON vs.shift_id = s.id
+       WHERE s.depart_time >= NOW() - INTERVAL '3 hours'
        GROUP BY s.id, s.show_date_id, s.role, s.arrive_time, s.depart_time, 
                 DATE(sd.start_time), sd.start_time, sd.end_time, sh.name, sh.id
        HAVING COUNT(vs.participant_id) = 0
-       ORDER BY sh.name, DATE(sd.start_time), sd.start_time, s.arrive_time`
+       ORDER BY sh.name, DATE(sd.start_time), sd.start_time, s.arrive_time`,
     );
     // Group by show, then by performance (date/start_time)
     const grouped: {
@@ -1138,9 +1191,9 @@ export async function unfilledShifts(ctx: RouterContext<string>) {
             start_time: string;
             end_time: string;
             shifts: ShiftRow[];
-          }
-        }
-      }
+          };
+        };
+      };
     } = {};
     for (const row of result.rows) {
       const showKey = `${row.show_id}`;
@@ -1148,7 +1201,7 @@ export async function unfilledShifts(ctx: RouterContext<string>) {
         grouped[showKey] = {
           show_id: row.show_id,
           show_name: row.show_name,
-          performances: {}
+          performances: {},
         };
       }
       const perfKey = `${row.date}T${row.show_start}`;
@@ -1157,16 +1210,16 @@ export async function unfilledShifts(ctx: RouterContext<string>) {
           date: row.date,
           start_time: row.show_start,
           end_time: row.show_end,
-          shifts: []
+          shifts: [],
         };
       }
       grouped[showKey].performances[perfKey].shifts.push(row);
     }
     // Convert to array structure
-    const resultArr = Object.values(grouped).map(show => ({
+    const resultArr = Object.values(grouped).map((show) => ({
       show_id: show.show_id,
       show_name: show.show_name,
-      performances: Object.values(show.performances)
+      performances: Object.values(show.performances),
     }));
     ctx.response.body = resultArr;
   } finally {
@@ -1186,7 +1239,7 @@ export async function getShiftVolunteers(ctx: RouterContext<string>) {
        JOIN participant_shifts vs ON vs.participant_id = v.id
        WHERE vs.shift_id = $1
        ORDER BY v.name`,
-      [shiftId]
+      [shiftId],
     );
     ctx.response.body = result.rows;
   } finally {
@@ -1224,7 +1277,7 @@ export async function getVolunteerShifts(ctx: RouterContext<string>) {
        JOIN shows sh ON sh.id = sd.show_id
        WHERE vs.participant_id = $1
        ORDER BY sh.name, DATE(sd.start_time AT TIME ZONE 'Australia/Adelaide'), sd.start_time, s.arrive_time`,
-      [volunteerId]
+      [volunteerId],
     );
     // Group by show, then by performance (date/start_time)
     const grouped: {
@@ -1237,9 +1290,9 @@ export async function getVolunteerShifts(ctx: RouterContext<string>) {
             start_time: string;
             end_time: string;
             shifts: ShiftRow[];
-          }
-        }
-      }
+          };
+        };
+      };
     } = {};
     for (const row of result.rows) {
       const showKey = `${row.show_id}`;
@@ -1247,7 +1300,7 @@ export async function getVolunteerShifts(ctx: RouterContext<string>) {
         grouped[showKey] = {
           show_id: row.show_id,
           show_name: row.show_name,
-          performances: {}
+          performances: {},
         };
       }
       const perfKey = `${row.date}T${row.show_start}`;
@@ -1256,16 +1309,16 @@ export async function getVolunteerShifts(ctx: RouterContext<string>) {
           date: row.date,
           start_time: row.show_start,
           end_time: row.show_end,
-          shifts: []
+          shifts: [],
         };
       }
       grouped[showKey].performances[perfKey].shifts.push(row);
     }
     // Convert to array structure
-    const resultArr = Object.values(grouped).map(show => ({
+    const resultArr = Object.values(grouped).map((show) => ({
       show_id: show.show_id,
       show_name: show.show_name,
-      performances: Object.values(show.performances)
+      performances: Object.values(show.performances),
     }));
     ctx.response.body = resultArr;
   } finally {
@@ -1302,26 +1355,26 @@ export async function getVolunteerShiftsSimple(ctx: RouterContext<string>) {
        WHERE vs.participant_id = $1 
          AND s.depart_time > NOW()
        ORDER BY DATE(sd.start_time), s.arrive_time`,
-      [volunteerId]
+      [volunteerId],
     );
 
     // Format the data for easy display in modal
-    const shifts = result.rows.map(row => {
+    const shifts = result.rows.map((row) => {
       const arriveTime = row.arrive_time;
       const departTime = row.depart_time;
 
       // Check if depart time is next day (arrive time > depart time)
       const isNextDay = arriveTime > departTime;
-      const timeDisplay = isNextDay ?
-        `${arriveTime} - ${departTime} (+1 day)` :
-        `${arriveTime} - ${departTime}`;
+      const timeDisplay = isNextDay
+        ? `${arriveTime} - ${departTime} (+1 day)`
+        : `${arriveTime} - ${departTime}`;
 
       return {
         id: row.id,
         show_name: row.show_name,
         role: row.role,
         date: row.date,
-        time: timeDisplay
+        time: timeDisplay,
       };
     });
 
@@ -1340,18 +1393,20 @@ export async function assignVolunteerToShift(ctx: RouterContext<string>) {
     // Check if assignment already exists
     const existing = await client.queryObject(
       "SELECT 1 FROM participant_shifts WHERE participant_id = $1 AND shift_id = $2",
-      [volunteerId, shiftId]
+      [volunteerId, shiftId],
     );
 
     if (existing.rows.length > 0) {
       ctx.response.status = 400;
-      ctx.response.body = { error: "Volunteer is already assigned to this shift" };
+      ctx.response.body = {
+        error: "Volunteer is already assigned to this shift",
+      };
       return;
     }
 
     await client.queryObject(
       "INSERT INTO participant_shifts (participant_id, shift_id) VALUES ($1, $2)",
-      [volunteerId, shiftId]
+      [volunteerId, shiftId],
     );
     ctx.response.body = { success: true };
   } finally {
@@ -1367,7 +1422,7 @@ export async function removeVolunteerFromShift(ctx: RouterContext<string>) {
   try {
     await client.queryObject(
       "DELETE FROM participant_shifts WHERE participant_id = $1 AND shift_id = $2",
-      [volunteerId, shiftId]
+      [volunteerId, shiftId],
     );
     ctx.response.body = { success: true };
   } finally {
@@ -1375,11 +1430,13 @@ export async function removeVolunteerFromShift(ctx: RouterContext<string>) {
   }
 }
 
-export async function getAvailableVolunteersForShift(ctx: RouterContext<string>) {
+export async function getAvailableVolunteersForShift(
+  ctx: RouterContext<string>,
+) {
   const shiftId = ctx.params.shiftId;
   const pool = getPool();
   const client = await pool.connect();
-  try {    // Get volunteers not already assigned to this shift
+  try { // Get volunteers not already assigned to this shift
     const result = await client.queryObject(
       `SELECT v.id, v.name, v.email, v.phone
        FROM participants v
@@ -1389,7 +1446,7 @@ export async function getAvailableVolunteersForShift(ctx: RouterContext<string>)
          WHERE vs.shift_id = $1
        )
        ORDER BY v.name`,
-      [shiftId]
+      [shiftId],
     );
     ctx.response.body = result.rows;
   } finally {
@@ -1397,7 +1454,9 @@ export async function getAvailableVolunteersForShift(ctx: RouterContext<string>)
   }
 }
 
-export async function getAvailableShiftsForVolunteer(ctx: RouterContext<string>) {
+export async function getAvailableShiftsForVolunteer(
+  ctx: RouterContext<string>,
+) {
   const volunteerId = ctx.params.volunteerId;
   const pool = getPool();
   const client = await pool.connect();
@@ -1431,7 +1490,7 @@ export async function getAvailableShiftsForVolunteer(ctx: RouterContext<string>)
          WHERE vs.participant_id = $1
        )
        ORDER BY sh.name, DATE(sd.start_time AT TIME ZONE 'Australia/Adelaide'), sd.start_time, s.arrive_time`,
-      [volunteerId]
+      [volunteerId],
     );
     // Group by show, then by performance (date/start_time)
     const grouped: {
@@ -1444,9 +1503,9 @@ export async function getAvailableShiftsForVolunteer(ctx: RouterContext<string>)
             start_time: string;
             end_time: string;
             shifts: ShiftRow[];
-          }
-        }
-      }
+          };
+        };
+      };
     } = {};
     for (const row of result.rows) {
       const showKey = `${row.show_id}`;
@@ -1454,7 +1513,7 @@ export async function getAvailableShiftsForVolunteer(ctx: RouterContext<string>)
         grouped[showKey] = {
           show_id: row.show_id,
           show_name: row.show_name,
-          performances: {}
+          performances: {},
         };
       }
       const perfKey = `${row.date}T${row.show_start}`;
@@ -1463,16 +1522,16 @@ export async function getAvailableShiftsForVolunteer(ctx: RouterContext<string>)
           date: row.date,
           start_time: row.show_start,
           end_time: row.show_end,
-          shifts: []
+          shifts: [],
         };
       }
       grouped[showKey].performances[perfKey].shifts.push(row);
     }
     // Convert to array structure
-    const resultArr = Object.values(grouped).map(show => ({
+    const resultArr = Object.values(grouped).map((show) => ({
       show_id: show.show_id,
       show_name: show.show_name,
-      performances: Object.values(show.performances)
+      performances: Object.values(show.performances),
     }));
     ctx.response.body = resultArr;
   } finally {
@@ -1487,18 +1546,22 @@ export async function getUnfilledShiftsCount(ctx: RouterContext<string>) {
     const result = await client.queryObject<{ count: string }>(
       `SELECT COUNT(DISTINCT s.id) as count
        FROM shifts s
+       JOIN show_dates sd ON sd.id = s.show_date_id
        LEFT JOIN participant_shifts vs ON vs.shift_id = s.id
-       WHERE vs.participant_id IS NULL`
+       WHERE vs.participant_id IS NULL
+         AND s.depart_time >= NOW() - INTERVAL '3 hours'`,
     );
 
-    const count = parseInt(result.rows[0]?.count || '0');
+    const count = parseInt(result.rows[0]?.count || "0");
     ctx.response.body = { count };
   } finally {
     client.release();
   }
 }
 
-export async function getPerformancesWithoutShiftsCount(ctx: RouterContext<string>) {
+export async function getPerformancesWithoutShiftsCount(
+  ctx: RouterContext<string>,
+) {
   const pool = getPool();
   const client = await pool.connect();
   try {
@@ -1506,10 +1569,10 @@ export async function getPerformancesWithoutShiftsCount(ctx: RouterContext<strin
       `SELECT COUNT(*) as count
        FROM show_dates sd
        LEFT JOIN shifts s ON s.show_date_id = sd.id
-       WHERE s.id IS NULL`
+       WHERE s.id IS NULL`,
     );
 
-    const count = parseInt(result.rows[0]?.count || '0');
+    const count = parseInt(result.rows[0]?.count || "0");
     ctx.response.body = { count };
   } finally {
     client.release();
@@ -1521,15 +1584,15 @@ export async function getServerTime(ctx: RouterContext<string>) {
   const client = await pool.connect();
   try {
     // Get current time in Adelaide timezone from the database
-    const result = await client.queryObject<{ 
-      current_time: string, 
-      current_date: string 
+    const result = await client.queryObject<{
+      current_time: string;
+      current_date: string;
     }>(
       `SELECT 
         TO_CHAR(NOW() AT TIME ZONE 'Australia/Adelaide', 'HH24:MI') as current_time,
-        TO_CHAR(NOW() AT TIME ZONE 'Australia/Adelaide', 'DD/MM/YYYY') as current_date`
+        TO_CHAR(NOW() AT TIME ZONE 'Australia/Adelaide', 'DD/MM/YYYY') as current_date`,
     );
-    
+
     ctx.response.body = result.rows[0];
   } finally {
     client.release();
@@ -1549,14 +1612,14 @@ export async function toggleVolunteerApproval(ctx: RouterContext<string>) {
     // Update approval status
     await client.queryObject(
       "UPDATE participants SET approved = $1 WHERE id = $2",
-      [approved, id]
+      [approved, id],
     );
 
     // If disabling and removeShifts is true, remove from all shifts
     if (!approved && removeShifts) {
       await client.queryObject(
         "DELETE FROM participant_shifts WHERE participant_id = $1",
-        [id]
+        [id],
       );
     }
 
@@ -1581,7 +1644,7 @@ export async function generateShiftRemovalPDF(ctx: RouterContext<string>) {
   try {
     const volunteerResult = await client.queryObject(
       "SELECT name, email FROM participants WHERE id = $1",
-      [id]
+      [id],
     );
 
     if (volunteerResult.rows.length === 0) {
@@ -1595,10 +1658,15 @@ export async function generateShiftRemovalPDF(ctx: RouterContext<string>) {
     const pdfBuffer = generatePDF(volunteer, shiftData);
 
     // Set response headers for download
-    const filename = `shift-removal-${volunteer.name.replace(/[^a-zA-Z0-9]/g, '-')}-${new Date().toISOString().split('T')[0]}.${getFileExtension()}`;
+    const filename = `shift-removal-${
+      volunteer.name.replace(/[^a-zA-Z0-9]/g, "-")
+    }-${new Date().toISOString().split("T")[0]}.${getFileExtension()}`;
 
     ctx.response.headers.set("Content-Type", getMimeType());
-    ctx.response.headers.set("Content-Disposition", `attachment; filename="${filename}"`);
+    ctx.response.headers.set(
+      "Content-Disposition",
+      `attachment; filename="${filename}"`,
+    );
     ctx.response.body = pdfBuffer;
   } finally {
     client.release();
@@ -1614,17 +1682,19 @@ export async function getAvailableRolesForShift(ctx: RouterContext<string>) {
     // Get the show_date_id for this shift
     const shiftResult = await client.queryObject(
       "SELECT show_date_id FROM shifts WHERE id = $1",
-      [shiftId]
+      [shiftId],
     );
 
     if (shiftResult.rows.length === 0) {
       ctx.throw(404, "Shift not found");
     }
 
-    const showDateId = (shiftResult.rows[0] as { show_date_id: number }).show_date_id;
+    const showDateId =
+      (shiftResult.rows[0] as { show_date_id: number }).show_date_id;
 
     // Get all available roles for the same performance (show_date_id) that are not assigned
-    const availableRolesResult = await client.queryObject(`
+    const availableRolesResult = await client.queryObject(
+      `
       SELECT 
         s.id,
         s.role
@@ -1634,7 +1704,9 @@ export async function getAvailableRolesForShift(ctx: RouterContext<string>) {
         AND ps.participant_id IS NULL
         AND s.id != $2
       ORDER BY s.role
-    `, [showDateId, shiftId]);
+    `,
+      [showDateId, shiftId],
+    );
 
     ctx.response.body = availableRolesResult.rows;
   } finally {
@@ -1649,15 +1721,27 @@ export async function downloadVolunteerSchedulePDF(ctx: RouterContext<string>) {
   const volunteerId = ctx.params.id;
 
   try {
-    const { generateVolunteerPDFData, generateVolunteerSchedulePDF, getVolunteerScheduleMimeType, getVolunteerScheduleFileExtension } = await import("../utils/pdf-generator.ts");
+    const {
+      generateVolunteerPDFData,
+      generateVolunteerSchedulePDF,
+      getVolunteerScheduleMimeType,
+      getVolunteerScheduleFileExtension,
+    } = await import("../utils/pdf-generator.ts");
 
     const pdfData = await generateVolunteerPDFData(volunteerId);
     const pdfBuffer = generateVolunteerSchedulePDF(pdfData);
 
-    const filename = `theatre-shifts-${pdfData.volunteer.name.replace(/[^a-zA-Z0-9]/g, '-')}-${new Date().toISOString().split('T')[0]}.${getVolunteerScheduleFileExtension()}`;
+    const filename = `theatre-shifts-${
+      pdfData.volunteer.name.replace(/[^a-zA-Z0-9]/g, "-")
+    }-${
+      new Date().toISOString().split("T")[0]
+    }.${getVolunteerScheduleFileExtension()}`;
 
     ctx.response.headers.set("Content-Type", getVolunteerScheduleMimeType());
-    ctx.response.headers.set("Content-Disposition", `attachment; filename="${filename}"`);
+    ctx.response.headers.set(
+      "Content-Disposition",
+      `attachment; filename="${filename}"`,
+    );
     ctx.response.body = pdfBuffer;
   } catch (error) {
     console.error("Error generating volunteer schedule PDF:", error);
@@ -1673,9 +1757,13 @@ export async function emailVolunteerSchedulePDF(ctx: RouterContext<string>) {
   const volunteerId = ctx.params.id;
 
   try {
-    const { generateVolunteerPDFData, filterCurrentAndFutureShifts } = await import("../utils/pdf-generator.ts");
-    const { generateServerSidePDF } = await import("../utils/server-pdf-generator.ts");
-    const { sendVolunteerScheduleEmail, createVolunteerLoginUrl } = await import("../utils/email.ts");
+    const { generateVolunteerPDFData, filterCurrentAndFutureShifts } =
+      await import("../utils/pdf-generator.ts");
+    const { generateServerSidePDF } = await import(
+      "../utils/server-pdf-generator.ts"
+    );
+    const { sendVolunteerScheduleEmail, createVolunteerLoginUrl } =
+      await import("../utils/email.ts");
 
     // Generate PDF data (pass volunteerId as string, not Number)
     const pdfData = await generateVolunteerPDFData(volunteerId);
@@ -1689,24 +1777,37 @@ export async function emailVolunteerSchedulePDF(ctx: RouterContext<string>) {
 
     // Generate PDF buffer (real PDF)
     const pdfBuffer = await generateServerSidePDF(pdfData);
-    const filename = `theatre-shifts-${pdfData.volunteer.name.replace(/[^a-zA-Z0-9]/g, '-')}-${new Date().toISOString().split('T')[0]}.pdf`;
+    const filename = `theatre-shifts-${
+      pdfData.volunteer.name.replace(/[^a-zA-Z0-9]/g, "-")
+    }-${new Date().toISOString().split("T")[0]}.pdf`;
 
     // Prepare email data
-    const currentAndFutureShifts = filterCurrentAndFutureShifts(pdfData.assignedShifts);
+    const currentAndFutureShifts = filterCurrentAndFutureShifts(
+      pdfData.assignedShifts,
+    );
     const hasShifts = currentAndFutureShifts.length > 0;
     // Improved shift preview formatting: date/time on first line, show/role on second, indented
-    const shifts = currentAndFutureShifts.slice(0, 5).map(shift => {
-      const date = new Date(shift.show_date).toLocaleDateString('en-AU', {
-        weekday: 'short', day: '2-digit', month: 'short', year: 'numeric'
+    const shifts = currentAndFutureShifts.slice(0, 5).map((shift) => {
+      const date = new Date(shift.show_date).toLocaleDateString("en-AU", {
+        weekday: "short",
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
       });
-      const arriveTime = new Date(shift.arrive_time).toLocaleTimeString('en-AU', {
-        hour: '2-digit', minute: '2-digit', hour12: true
-      });
+      const arriveTime = new Date(shift.arrive_time).toLocaleTimeString(
+        "en-AU",
+        {
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: true,
+        },
+      );
       // Second line indented
       return `${date} ${arriveTime}<br><span style="margin-left:1.5em;display:inline-block;">${shift.show_name} (${shift.role})</span>`;
     });
 
-    const baseUrl = Deno.env.get('BASE_URL') || `${ctx.request.url.protocol}//${ctx.request.url.host}`;
+    const baseUrl = Deno.env.get("BASE_URL") ||
+      `${ctx.request.url.protocol}//${ctx.request.url.host}`;
     const loginUrl = createVolunteerLoginUrl(baseUrl, pdfData.volunteer.id);
 
     const emailData = {
@@ -1714,16 +1815,22 @@ export async function emailVolunteerSchedulePDF(ctx: RouterContext<string>) {
       volunteerEmail: pdfData.volunteer.email,
       loginUrl,
       hasShifts,
-      shifts
+      shifts,
     };
 
     // Send email with PDF attachment
     const currentUserId = ctx.state?.user?.id;
-    const forceProduction = ctx.request.url.searchParams.get('force') === 'true';
-    const emailSent = await sendVolunteerScheduleEmail(emailData, {
-      content: pdfBuffer,
-      filename
-    }, currentUserId, forceProduction);
+    const forceProduction =
+      ctx.request.url.searchParams.get("force") === "true";
+    const emailSent = await sendVolunteerScheduleEmail(
+      emailData,
+      {
+        content: pdfBuffer,
+        filename,
+      },
+      currentUserId,
+      forceProduction,
+    );
 
     if (emailSent) {
       ctx.response.status = 200;
@@ -1731,7 +1838,7 @@ export async function emailVolunteerSchedulePDF(ctx: RouterContext<string>) {
         success: true,
         message: `Schedule PDF sent to ${pdfData.volunteer.email}`,
         hasShifts,
-        shiftsCount: currentAndFutureShifts.length
+        shiftsCount: currentAndFutureShifts.length,
       };
     } else {
       ctx.response.status = 500;
@@ -1751,9 +1858,14 @@ export async function emailShowWeekPDF(ctx: RouterContext<string>) {
   const volunteerId = ctx.params.id;
 
   try {
-    const { generateVolunteerPDFData, filterCurrentAndFutureShifts } = await import("../utils/pdf-generator.ts");
-    const { generateServerSidePDF } = await import("../utils/server-pdf-generator.ts");
-    const { sendShowWeekEmail, createVolunteerLoginUrl } = await import("../utils/email.ts");
+    const { generateVolunteerPDFData, filterCurrentAndFutureShifts } =
+      await import("../utils/pdf-generator.ts");
+    const { generateServerSidePDF } = await import(
+      "../utils/server-pdf-generator.ts"
+    );
+    const { sendShowWeekEmail, createVolunteerLoginUrl } = await import(
+      "../utils/email.ts"
+    );
 
     // Generate PDF data (pass volunteerId as string, not Number)
     const pdfData = await generateVolunteerPDFData(volunteerId);
@@ -1767,24 +1879,37 @@ export async function emailShowWeekPDF(ctx: RouterContext<string>) {
 
     // Generate PDF buffer (real PDF)
     const pdfBuffer = await generateServerSidePDF(pdfData);
-    const filename = `show-week-shifts-${pdfData.volunteer.name.replace(/[^a-zA-Z0-9]/g, '-')}-${new Date().toISOString().split('T')[0]}.pdf`;
+    const filename = `show-week-shifts-${
+      pdfData.volunteer.name.replace(/[^a-zA-Z0-9]/g, "-")
+    }-${new Date().toISOString().split("T")[0]}.pdf`;
 
     // Prepare email data
-    const currentAndFutureShifts = filterCurrentAndFutureShifts(pdfData.assignedShifts);
+    const currentAndFutureShifts = filterCurrentAndFutureShifts(
+      pdfData.assignedShifts,
+    );
     const hasShifts = currentAndFutureShifts.length > 0;
     // Improved shift preview formatting: date/time on first line, show/role on second, indented
-    const shifts = currentAndFutureShifts.slice(0, 5).map(shift => {
-      const date = new Date(shift.show_date).toLocaleDateString('en-AU', {
-        weekday: 'short', day: '2-digit', month: 'short', year: 'numeric'
+    const shifts = currentAndFutureShifts.slice(0, 5).map((shift) => {
+      const date = new Date(shift.show_date).toLocaleDateString("en-AU", {
+        weekday: "short",
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
       });
-      const arriveTime = new Date(shift.arrive_time).toLocaleTimeString('en-AU', {
-        hour: '2-digit', minute: '2-digit', hour12: true
-      });
+      const arriveTime = new Date(shift.arrive_time).toLocaleTimeString(
+        "en-AU",
+        {
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: true,
+        },
+      );
       // Second line indented
       return `${date} ${arriveTime}<br><span style="margin-left:1.5em;display:inline-block;">${shift.show_name} (${shift.role})</span>`;
     });
 
-    const baseUrl = Deno.env.get('BASE_URL') || `${ctx.request.url.protocol}//${ctx.request.url.host}`;
+    const baseUrl = Deno.env.get("BASE_URL") ||
+      `${ctx.request.url.protocol}//${ctx.request.url.host}`;
     const loginUrl = createVolunteerLoginUrl(baseUrl, pdfData.volunteer.id);
 
     const emailData = {
@@ -1792,16 +1917,22 @@ export async function emailShowWeekPDF(ctx: RouterContext<string>) {
       volunteerEmail: pdfData.volunteer.email,
       loginUrl,
       hasShifts,
-      shifts
+      shifts,
     };
 
     // Send email with PDF attachment
     const currentUserId = ctx.state?.user?.id;
-    const forceProduction = ctx.request.url.searchParams.get('force') === 'true';
-    const emailSent = await sendShowWeekEmail(emailData, {
-      content: pdfBuffer,
-      filename
-    }, currentUserId, forceProduction);
+    const forceProduction =
+      ctx.request.url.searchParams.get("force") === "true";
+    const emailSent = await sendShowWeekEmail(
+      emailData,
+      {
+        content: pdfBuffer,
+        filename,
+      },
+      currentUserId,
+      forceProduction,
+    );
 
     if (emailSent) {
       ctx.response.status = 200;
@@ -1809,7 +1940,7 @@ export async function emailShowWeekPDF(ctx: RouterContext<string>) {
         success: true,
         message: `Show Week email sent to ${pdfData.volunteer.email}`,
         hasShifts,
-        shiftsCount: currentAndFutureShifts.length
+        shiftsCount: currentAndFutureShifts.length,
       };
     } else {
       ctx.response.status = 500;
@@ -1829,26 +1960,30 @@ export async function emailLastMinuteShifts(ctx: RouterContext<string>) {
   const volunteerId = ctx.params.id;
 
   try {
-    const { generateOutstandingShiftsPDF } = await import("../utils/unfilled-shifts-pdf-generator.ts");
+    const { generateOutstandingShiftsPDF } = await import(
+      "../utils/unfilled-shifts-pdf-generator.ts"
+    );
     const { sendLastMinuteShiftsEmail } = await import("../utils/email.ts");
 
     // Get volunteer data
     const pool = getPool();
     const client = await pool.connect();
     let volunteer;
-    
+
     try {
-      const volunteerResult = await client.queryObject<{ id: number; name: string; email: string }>(
+      const volunteerResult = await client.queryObject<
+        { id: number; name: string; email: string }
+      >(
         "SELECT id, name, email FROM participants WHERE id = $1",
-        [volunteerId]
+        [volunteerId],
       );
-      
+
       if (volunteerResult.rows.length === 0) {
         ctx.response.status = 404;
         ctx.response.body = { error: "Volunteer not found" };
         return;
       }
-      
+
       volunteer = volunteerResult.rows[0];
     } finally {
       client.release();
@@ -1863,20 +1998,30 @@ export async function emailLastMinuteShifts(ctx: RouterContext<string>) {
 
     // Generate PDF of next 10 outstanding shifts
     const pdfBuffer = await generateOutstandingShiftsPDF(10);
-    const filename = `last-minute-shifts-${new Date().toISOString().split('T')[0]}.pdf`;
+    const filename = `last-minute-shifts-${
+      new Date().toISOString().split("T")[0]
+    }.pdf`;
 
     // Get the next 10 unfilled shifts for email preview
     const unfilledShifts = await getNext10UnfilledShifts();
     const hasShifts = unfilledShifts.length > 0;
-    
+
     // Format shifts for email preview (similar to existing email formats)
-    const shifts = unfilledShifts.map(shift => {
-      const date = new Date(shift.show_start).toLocaleDateString('en-AU', {
-        weekday: 'short', day: '2-digit', month: 'short', year: 'numeric'
+    const shifts = unfilledShifts.map((shift) => {
+      const date = new Date(shift.show_start).toLocaleDateString("en-AU", {
+        weekday: "short",
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
       });
-      const arriveTime = new Date(shift.arrive_time).toLocaleTimeString('en-AU', {
-        hour: '2-digit', minute: '2-digit', hour12: true
-      });
+      const arriveTime = new Date(shift.arrive_time).toLocaleTimeString(
+        "en-AU",
+        {
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: true,
+        },
+      );
       return `${date} ${arriveTime}<br><span style="margin-left:1.5em;display:inline-block;">${shift.show_name} (${shift.role})</span>`;
     });
 
@@ -1885,16 +2030,22 @@ export async function emailLastMinuteShifts(ctx: RouterContext<string>) {
       volunteerEmail: volunteer.email,
       volunteerId: volunteerId, // Add the volunteer ID for tracking
       hasShifts,
-      shifts
+      shifts,
     };
 
     // Send email with PDF attachment
     const currentUserId = ctx.state?.user?.id;
-    const forceProduction = ctx.request.url.searchParams.get('force') === 'true';
-    const emailSent = await sendLastMinuteShiftsEmail(emailData, {
-      content: pdfBuffer,
-      filename
-    }, currentUserId, forceProduction);
+    const forceProduction =
+      ctx.request.url.searchParams.get("force") === "true";
+    const emailSent = await sendLastMinuteShiftsEmail(
+      emailData,
+      {
+        content: pdfBuffer,
+        filename,
+      },
+      currentUserId,
+      forceProduction,
+    );
 
     if (emailSent) {
       ctx.response.status = 200;
@@ -1902,7 +2053,7 @@ export async function emailLastMinuteShifts(ctx: RouterContext<string>) {
         success: true,
         message: `Last Minute Shifts email sent to ${volunteer.email}`,
         hasShifts,
-        shiftsCount: unfilledShifts.length
+        shiftsCount: unfilledShifts.length,
       };
     } else {
       ctx.response.status = 500;
@@ -1928,7 +2079,7 @@ async function getNext10UnfilledShifts() {
       role: string;
       arrive_time: string;
     };
-    
+
     const result = await client.queryObject<ShiftRow>(
       `SELECT s.id, sh.name as show_name, 
               DATE(sd.start_time) as date, 
@@ -1939,13 +2090,13 @@ async function getNext10UnfilledShifts() {
        JOIN show_dates sd ON sd.id = s.show_date_id
        JOIN shows sh ON sh.id = sd.show_id
        LEFT JOIN participant_shifts vs ON vs.shift_id = s.id
-       WHERE sd.start_time >= NOW()
+       WHERE s.depart_time >= NOW() - INTERVAL '3 hours'
        GROUP BY s.id, sh.name, DATE(sd.start_time), sd.start_time, s.role, s.arrive_time
        HAVING COUNT(vs.participant_id) = 0
        ORDER BY sd.start_time, s.arrive_time
-       LIMIT 10`
+       LIMIT 10`,
     );
-    
+
     return result.rows;
   } finally {
     client.release();
@@ -1968,7 +2119,7 @@ async function getUnfilledShiftsForVolunteer(volunteerId: string, limit = 10) {
       arrive_time: string;
       depart_time: string;
     };
-    
+
     const result = await client.queryObject<ShiftRow>(
       `SELECT s.id, sh.name as show_name, 
               DATE(sd.start_time) as date, 
@@ -1980,7 +2131,7 @@ async function getUnfilledShiftsForVolunteer(volunteerId: string, limit = 10) {
        JOIN show_dates sd ON sd.id = s.show_date_id
        JOIN shows sh ON sh.id = sd.show_id
        LEFT JOIN participant_shifts vs ON vs.shift_id = s.id
-       WHERE sd.start_time >= NOW()
+       WHERE s.depart_time >= NOW() - INTERVAL '3 hours'
          AND s.id NOT IN (
            -- Exclude shifts that overlap with volunteer's existing shifts
            SELECT DISTINCT unfilled.id
@@ -1992,7 +2143,7 @@ async function getUnfilledShiftsForVolunteer(volunteerId: string, limit = 10) {
              WHERE ps.participant_id = $1
            )
            JOIN show_dates existing_sd ON existing_sd.id = existing.show_date_id
-           WHERE unfilled_sd.start_time >= NOW()
+           WHERE unfilled.depart_time >= NOW() - INTERVAL '3 hours'
              AND (
                -- Check for time overlap: shifts overlap if one starts before the other ends
                (unfilled.arrive_time < existing.depart_time AND unfilled.depart_time > existing.arrive_time)
@@ -2005,9 +2156,9 @@ async function getUnfilledShiftsForVolunteer(volunteerId: string, limit = 10) {
        HAVING COUNT(vs.participant_id) = 0
        ORDER BY sd.start_time, s.arrive_time
        LIMIT $2`,
-      [volunteerId, limit]
+      [volunteerId, limit],
     );
-    
+
     return result.rows;
   } finally {
     client.release();
@@ -2019,15 +2170,22 @@ async function getUnfilledShiftsForVolunteer(volunteerId: string, limit = 10) {
  */
 export async function downloadUnfilledShiftsPDF(ctx: RouterContext<string>) {
   try {
-    const { generateUnfilledShiftsPDF } = await import("../utils/unfilled-shifts-pdf-generator.ts");
+    const { generateUnfilledShiftsPDF } = await import(
+      "../utils/unfilled-shifts-pdf-generator.ts"
+    );
 
     // Generate PDF buffer
     const pdfBuffer = await generateUnfilledShiftsPDF();
 
-    const filename = `unfilled-shifts-${new Date().toISOString().split('T')[0]}.pdf`;
+    const filename = `unfilled-shifts-${
+      new Date().toISOString().split("T")[0]
+    }.pdf`;
 
     ctx.response.headers.set("Content-Type", "application/pdf");
-    ctx.response.headers.set("Content-Disposition", `inline; filename="${filename}"`);
+    ctx.response.headers.set(
+      "Content-Disposition",
+      `inline; filename="${filename}"`,
+    );
     ctx.response.body = pdfBuffer;
   } catch (error) {
     console.error("Error generating unfilled shifts PDF:", error);
@@ -2043,11 +2201,13 @@ export async function getParticipantEmailHistory(ctx: RouterContext<string>) {
   const participantId = ctx.params.id;
 
   try {
-    const { getEmailsForParticipant } = await import("../utils/email-tracking.ts");
+    const { getEmailsForParticipant } = await import(
+      "../utils/email-tracking.ts"
+    );
     const emails = await getEmailsForParticipant(participantId);
 
     // Format the response with safe data (don't expose full HTML content in list)
-    const formattedEmails = emails.map(email => ({
+    const formattedEmails = emails.map((email) => ({
       id: email.id,
       to_email: email.to_email,
       from_email: email.from_email,
@@ -2056,12 +2216,12 @@ export async function getParticipantEmailHistory(ctx: RouterContext<string>) {
       sent_at: email.sent_at,
       delivery_status: email.delivery_status,
       attachment_count: email.attachments?.length || 0,
-      attachments: email.attachments?.map(att => ({
+      attachments: email.attachments?.map((att) => ({
         id: att.id,
         filename: att.filename,
         content_type: att.content_type,
-        file_size: att.file_size
-      }))
+        file_size: att.file_size,
+      })),
     }));
 
     ctx.response.body = { emails: formattedEmails };
@@ -2081,7 +2241,7 @@ export async function getEmailContent(ctx: RouterContext<string>) {
   try {
     const pool = getPool();
     const client = await pool.connect();
-    
+
     try {
       // Get email details with sender/recipient information
       const emailResult = await client.queryObject<{
@@ -2098,7 +2258,7 @@ export async function getEmailContent(ctx: RouterContext<string>) {
         `SELECT id, html_content, subject, email_type, sent_at, to_email, from_email, 
                 to_participant_id, delivery_status
         FROM sent_emails WHERE id = $1`,
-        [emailId]
+        [emailId],
       );
 
       if (emailResult.rows.length === 0) {
@@ -2110,11 +2270,11 @@ export async function getEmailContent(ctx: RouterContext<string>) {
       const email = emailResult.rows[0];
 
       // Get participant name if available
-      let recipientName = 'Unknown';
+      let recipientName = "Unknown";
       if (email.to_participant_id) {
         const participantResult = await client.queryObject<{ name: string }>(
           `SELECT name FROM participants WHERE id = $1`,
-          [email.to_participant_id]
+          [email.to_participant_id],
         );
         if (participantResult.rows.length > 0) {
           recipientName = participantResult.rows[0].name;
@@ -2130,7 +2290,7 @@ export async function getEmailContent(ctx: RouterContext<string>) {
       }>(
         `SELECT id, filename, content_type, file_size
         FROM email_attachments WHERE sent_email_id = $1`,
-        [emailId]
+        [emailId],
       );
 
       // Build response with all necessary information
@@ -2140,12 +2300,12 @@ export async function getEmailContent(ctx: RouterContext<string>) {
         subject: email.subject,
         email_type: email.email_type,
         sent_at: email.sent_at,
-        sender_name: 'Theatre Shifts Admin',
+        sender_name: "Theatre Shifts Admin",
         sender_email: email.from_email,
         recipient_name: recipientName,
         recipient_email: email.to_email,
         delivery_status: email.delivery_status,
-        attachments: attachmentResult.rows
+        attachments: attachmentResult.rows,
       };
     } finally {
       client.release();
@@ -2174,14 +2334,20 @@ export async function downloadEmailAttachment(ctx: RouterContext<string>) {
     }
 
     ctx.response.headers.set("Content-Type", attachment.content_type);
-    
+
     // For PDFs, use inline to open in browser; for other files, force download
-    if (attachment.content_type === 'application/pdf') {
-      ctx.response.headers.set("Content-Disposition", `inline; filename="${attachment.filename}"`);
+    if (attachment.content_type === "application/pdf") {
+      ctx.response.headers.set(
+        "Content-Disposition",
+        `inline; filename="${attachment.filename}"`,
+      );
     } else {
-      ctx.response.headers.set("Content-Disposition", `attachment; filename="${attachment.filename}"`);
+      ctx.response.headers.set(
+        "Content-Disposition",
+        `attachment; filename="${attachment.filename}"`,
+      );
     }
-    
+
     ctx.response.body = attachment.file_data;
   } catch (error) {
     console.error("Error downloading email attachment:", error);
@@ -2214,13 +2380,13 @@ export async function getShowsForBulkEmail(ctx: RouterContext<string>) {
        WHERE sd.start_time >= NOW() - INTERVAL '1 week'
        GROUP BY s.id, s.name
        HAVING COUNT(DISTINCT sd.id) > 0
-       ORDER BY MIN(sd.start_time), s.name`
+       ORDER BY MIN(sd.start_time), s.name`,
     );
 
-    ctx.response.body = result.rows.map(show => ({
+    ctx.response.body = result.rows.map((show) => ({
       ...show,
       upcoming_performances: Number(show.upcoming_performances),
-      volunteers_with_shifts: Number(show.volunteers_with_shifts)
+      volunteers_with_shifts: Number(show.volunteers_with_shifts),
     }));
   } finally {
     client.release();
@@ -2255,12 +2421,12 @@ export async function getVolunteersForShow(ctx: RouterContext<string>) {
          AND p.email != ''
        GROUP BY p.id, p.name, p.email
        ORDER BY p.name`,
-      [showId]
+      [showId],
     );
 
-    ctx.response.body = result.rows.map(volunteer => ({
+    ctx.response.body = result.rows.map((volunteer) => ({
       ...volunteer,
-      shift_count: Number(volunteer.shift_count)
+      shift_count: Number(volunteer.shift_count),
     }));
   } finally {
     client.release();
@@ -2270,7 +2436,9 @@ export async function getVolunteersForShow(ctx: RouterContext<string>) {
 /**
  * Gets all volunteers who are available for unfilled shifts - admin only
  */
-export async function getVolunteersForUnfilledShifts(ctx: RouterContext<string>) {
+export async function getVolunteersForUnfilledShifts(
+  ctx: RouterContext<string>,
+) {
   const pool = getPool();
   const client = await pool.connect();
   try {
@@ -2293,13 +2461,13 @@ export async function getVolunteersForUnfilledShifts(ctx: RouterContext<string>)
          AND p.email IS NOT NULL
          AND p.email != ''
        GROUP BY p.id, p.name, p.email
-       ORDER BY p.name`
+       ORDER BY p.name`,
     );
 
-    ctx.response.body = result.rows.map(volunteer => ({
+    ctx.response.body = result.rows.map((volunteer) => ({
       ...volunteer,
       total_shifts: Number(volunteer.total_shifts),
-      upcoming_shifts: Number(volunteer.upcoming_shifts)
+      upcoming_shifts: Number(volunteer.upcoming_shifts),
     }));
   } finally {
     client.release();
@@ -2311,28 +2479,34 @@ export async function getVolunteersForUnfilledShifts(ctx: RouterContext<string>)
  */
 export async function sendBulkShowWeekEmails(ctx: RouterContext<string>) {
   const { showId, volunteerIds } = await ctx.request.body.json();
-  
+
   if (!showId || !volunteerIds || !Array.isArray(volunteerIds)) {
     ctx.response.status = 400;
-    ctx.response.body = { error: "Show ID and volunteer IDs are required" };
+    ctx.response.body = { error: "Production and volunteer IDs are required" };
     return;
   }
 
   const pool = getPool();
   const client = await pool.connect();
   const currentUserId = ctx.state?.user?.id;
-  const forceProduction = ctx.request.url.searchParams.get('force') === 'true';
-  
+  const forceProduction = ctx.request.url.searchParams.get("force") === "true";
+
   const results = [];
   let successCount = 0;
   let errorCount = 0;
 
   try {
-    const { generateVolunteerPDFData, filterCurrentAndFutureShifts } = await import("../utils/pdf-generator.ts");
-    const { generateServerSidePDF } = await import("../utils/server-pdf-generator.ts");
-    const { sendShowWeekEmail, createVolunteerLoginUrl } = await import("../utils/email.ts");
+    const { generateVolunteerPDFData, filterCurrentAndFutureShifts } =
+      await import("../utils/pdf-generator.ts");
+    const { generateServerSidePDF } = await import(
+      "../utils/server-pdf-generator.ts"
+    );
+    const { sendShowWeekEmail, createVolunteerLoginUrl } = await import(
+      "../utils/email.ts"
+    );
 
-    const baseUrl = Deno.env.get('BASE_URL') || `${ctx.request.url.protocol}//${ctx.request.url.host}`;
+    const baseUrl = Deno.env.get("BASE_URL") ||
+      `${ctx.request.url.protocol}//${ctx.request.url.host}`;
 
     for (const volunteerId of volunteerIds) {
       try {
@@ -2345,7 +2519,7 @@ export async function sendBulkShowWeekEmails(ctx: RouterContext<string>) {
             volunteerId,
             volunteerName: pdfData.volunteer.name,
             success: false,
-            error: "No email address"
+            error: "No email address",
           });
           errorCount++;
           continue;
@@ -2353,20 +2527,32 @@ export async function sendBulkShowWeekEmails(ctx: RouterContext<string>) {
 
         // Generate PDF buffer
         const pdfBuffer = await generateServerSidePDF(pdfData);
-        const filename = `show-week-shifts-${pdfData.volunteer.name.replace(/[^a-zA-Z0-9]/g, '-')}-${new Date().toISOString().split('T')[0]}.pdf`;
+        const filename = `show-week-shifts-${
+          pdfData.volunteer.name.replace(/[^a-zA-Z0-9]/g, "-")
+        }-${new Date().toISOString().split("T")[0]}.pdf`;
 
         // Prepare email data
-        const currentAndFutureShifts = filterCurrentAndFutureShifts(pdfData.assignedShifts);
+        const currentAndFutureShifts = filterCurrentAndFutureShifts(
+          pdfData.assignedShifts,
+        );
         const hasShifts = currentAndFutureShifts.length > 0;
-        
+
         // Format shifts for email preview
-        const shifts = currentAndFutureShifts.slice(0, 5).map(shift => {
-          const date = new Date(shift.show_date).toLocaleDateString('en-AU', {
-            weekday: 'short', day: '2-digit', month: 'short', year: 'numeric'
+        const shifts = currentAndFutureShifts.slice(0, 5).map((shift) => {
+          const date = new Date(shift.show_date).toLocaleDateString("en-AU", {
+            weekday: "short",
+            day: "2-digit",
+            month: "short",
+            year: "numeric",
           });
-          const arriveTime = new Date(shift.arrive_time).toLocaleTimeString('en-AU', {
-            hour: '2-digit', minute: '2-digit', hour12: true
-          });
+          const arriveTime = new Date(shift.arrive_time).toLocaleTimeString(
+            "en-AU",
+            {
+              hour: "2-digit",
+              minute: "2-digit",
+              hour12: true,
+            },
+          );
           return `${date} ${arriveTime}<br><span style="margin-left:1.5em;display:inline-block;">${shift.show_name} (${shift.role})</span>`;
         });
 
@@ -2377,14 +2563,19 @@ export async function sendBulkShowWeekEmails(ctx: RouterContext<string>) {
           volunteerEmail: pdfData.volunteer.email,
           loginUrl,
           hasShifts,
-          shifts
+          shifts,
         };
 
         // Send email
-        const emailSent = await sendShowWeekEmail(emailData, {
-          content: pdfBuffer,
-          filename
-        }, currentUserId, forceProduction);
+        const emailSent = await sendShowWeekEmail(
+          emailData,
+          {
+            content: pdfBuffer,
+            filename,
+          },
+          currentUserId,
+          forceProduction,
+        );
 
         if (emailSent) {
           results.push({
@@ -2392,7 +2583,7 @@ export async function sendBulkShowWeekEmails(ctx: RouterContext<string>) {
             volunteerName: pdfData.volunteer.name,
             volunteerEmail: pdfData.volunteer.email,
             success: true,
-            shiftsCount: currentAndFutureShifts.length
+            shiftsCount: currentAndFutureShifts.length,
           });
           successCount++;
         } else {
@@ -2401,20 +2592,22 @@ export async function sendBulkShowWeekEmails(ctx: RouterContext<string>) {
             volunteerName: pdfData.volunteer.name,
             volunteerEmail: pdfData.volunteer.email,
             success: false,
-            error: "Failed to send email"
+            error: "Failed to send email",
           });
           errorCount++;
         }
 
         // Add a small delay between emails to avoid overwhelming the email service
-        await new Promise(resolve => setTimeout(resolve, 100));
-
+        await new Promise((resolve) => setTimeout(resolve, 100));
       } catch (error) {
-        console.error(`Error sending show week email to volunteer ${volunteerId}:`, error);
+        console.error(
+          `Error sending show week email to volunteer ${volunteerId}:`,
+          error,
+        );
         results.push({
           volunteerId,
           success: false,
-          error: error instanceof Error ? error.message : "Unknown error"
+          error: error instanceof Error ? error.message : "Unknown error",
         });
         errorCount++;
       }
@@ -2423,12 +2616,12 @@ export async function sendBulkShowWeekEmails(ctx: RouterContext<string>) {
     ctx.response.status = 200;
     ctx.response.body = {
       success: true,
-      message: `Bulk show week emails completed: ${successCount} sent, ${errorCount} failed`,
+      message:
+        `Bulk show week emails completed: ${successCount} sent, ${errorCount} failed`,
       successCount,
       errorCount,
-      results
+      results,
     };
-
   } catch (error) {
     console.error("Error in bulk show week email operation:", error);
     ctx.response.status = 500;
@@ -2443,7 +2636,7 @@ export async function sendBulkShowWeekEmails(ctx: RouterContext<string>) {
  */
 export async function sendBulkUnfilledShiftsEmails(ctx: RouterContext<string>) {
   const { volunteerIds } = await ctx.request.body.json();
-  
+
   if (!volunteerIds || !Array.isArray(volunteerIds)) {
     ctx.response.status = 400;
     ctx.response.body = { error: "Volunteer IDs are required" };
@@ -2453,34 +2646,38 @@ export async function sendBulkUnfilledShiftsEmails(ctx: RouterContext<string>) {
   const pool = getPool();
   const client = await pool.connect();
   const currentUserId = ctx.state?.user?.id;
-  const forceProduction = ctx.request.url.searchParams.get('force') === 'true';
-  
+  const forceProduction = ctx.request.url.searchParams.get("force") === "true";
+
   const results = [];
   let successCount = 0;
   let errorCount = 0;
 
   try {
-    const { generateOutstandingShiftsPDFForVolunteer } = await import("../utils/unfilled-shifts-pdf-generator.ts");
+    const { generateOutstandingShiftsPDFForVolunteer } = await import(
+      "../utils/unfilled-shifts-pdf-generator.ts"
+    );
     const { sendLastMinuteShiftsEmail } = await import("../utils/email.ts");
 
     for (const volunteerId of volunteerIds) {
       try {
         // Get volunteer data
-        const volunteerResult = await client.queryObject<{ id: string; name: string; email: string }>(
+        const volunteerResult = await client.queryObject<
+          { id: string; name: string; email: string }
+        >(
           "SELECT id, name, email FROM participants WHERE id = $1",
-          [volunteerId]
+          [volunteerId],
         );
-        
+
         if (volunteerResult.rows.length === 0) {
           results.push({
             volunteerId,
             success: false,
-            error: "Volunteer not found"
+            error: "Volunteer not found",
           });
           errorCount++;
           continue;
         }
-        
+
         const volunteer = volunteerResult.rows[0];
 
         // Check if volunteer has email
@@ -2489,55 +2686,75 @@ export async function sendBulkUnfilledShiftsEmails(ctx: RouterContext<string>) {
             volunteerId,
             volunteerName: volunteer.name,
             success: false,
-            error: "No email address"
+            error: "No email address",
           });
           errorCount++;
           continue;
         }
 
-
         // Get unfilled shifts that don't overlap with this volunteer's existing shifts
-        const unfilledShifts = await getUnfilledShiftsForVolunteer(volunteerId, 10);
+        const unfilledShifts = await getUnfilledShiftsForVolunteer(
+          volunteerId,
+          10,
+        );
         if (unfilledShifts.length === 0) {
           results.push({
             volunteerId,
             volunteerName: volunteer.name,
             volunteerEmail: volunteer.email,
             success: true,
-            info: "No available shifts for this volunteer, email not sent"
+            info: "No available shifts for this volunteer, email not sent",
           });
           // Do not increment errorCount, this is an expected case
           continue;
         }
 
         // Format shifts for email preview
-        const shifts = unfilledShifts.map(shift => {
-          const date = new Date(shift.show_start).toLocaleDateString('en-AU', {
-            weekday: 'short', day: '2-digit', month: 'short', year: 'numeric'
+        const shifts = unfilledShifts.map((shift) => {
+          const date = new Date(shift.show_start).toLocaleDateString("en-AU", {
+            weekday: "short",
+            day: "2-digit",
+            month: "short",
+            year: "numeric",
           });
-          const arriveTime = new Date(shift.arrive_time).toLocaleTimeString('en-AU', {
-            hour: '2-digit', minute: '2-digit', hour12: true
-          });
+          const arriveTime = new Date(shift.arrive_time).toLocaleTimeString(
+            "en-AU",
+            {
+              hour: "2-digit",
+              minute: "2-digit",
+              hour12: true,
+            },
+          );
           return `${date} ${arriveTime}<br><span style="margin-left:1.5em;display:inline-block;">${shift.show_name} (${shift.role})</span>`;
         });
 
         // Generate volunteer-specific PDF with non-overlapping shifts
-        const pdfBuffer = await generateOutstandingShiftsPDFForVolunteer(volunteerId, 10);
-        const filename = `last-minute-shifts-${volunteer.name.replace(/\s+/g, '-').toLowerCase()}-${new Date().toISOString().split('T')[0]}.pdf`;
+        const pdfBuffer = await generateOutstandingShiftsPDFForVolunteer(
+          volunteerId,
+          10,
+        );
+        const filename = `last-minute-shifts-${
+          volunteer.name.replace(/\s+/g, "-").toLowerCase()
+        }-${new Date().toISOString().split("T")[0]}.pdf`;
 
         const emailData = {
           volunteerName: volunteer.name,
           volunteerEmail: volunteer.email,
           volunteerId: volunteerId,
           hasShifts: true,
-          shifts
+          shifts,
         };
 
         // Send email
-        const emailSent = await sendLastMinuteShiftsEmail(emailData, {
-          content: pdfBuffer,
-          filename
-        }, currentUserId, forceProduction);
+        const emailSent = await sendLastMinuteShiftsEmail(
+          emailData,
+          {
+            content: pdfBuffer,
+            filename,
+          },
+          currentUserId,
+          forceProduction,
+        );
 
         if (emailSent) {
           results.push({
@@ -2545,7 +2762,7 @@ export async function sendBulkUnfilledShiftsEmails(ctx: RouterContext<string>) {
             volunteerName: volunteer.name,
             volunteerEmail: volunteer.email,
             success: true,
-            shiftsCount: unfilledShifts.length
+            shiftsCount: unfilledShifts.length,
           });
           successCount++;
         } else {
@@ -2554,20 +2771,22 @@ export async function sendBulkUnfilledShiftsEmails(ctx: RouterContext<string>) {
             volunteerName: volunteer.name,
             volunteerEmail: volunteer.email,
             success: false,
-            error: "Failed to send email"
+            error: "Failed to send email",
           });
           errorCount++;
         }
 
         // Add a small delay between emails to avoid overwhelming the email service
-        await new Promise(resolve => setTimeout(resolve, 100));
-
+        await new Promise((resolve) => setTimeout(resolve, 100));
       } catch (error) {
-        console.error(`Error sending unfilled shifts email to volunteer ${volunteerId}:`, error);
+        console.error(
+          `Error sending unfilled shifts email to volunteer ${volunteerId}:`,
+          error,
+        );
         results.push({
           volunteerId,
           success: false,
-          error: error instanceof Error ? error.message : "Unknown error"
+          error: error instanceof Error ? error.message : "Unknown error",
         });
         errorCount++;
       }
@@ -2576,12 +2795,12 @@ export async function sendBulkUnfilledShiftsEmails(ctx: RouterContext<string>) {
     ctx.response.status = 200;
     ctx.response.body = {
       success: true,
-      message: `Bulk unfilled shifts emails completed: ${successCount} sent, ${errorCount} failed`,
+      message:
+        `Bulk unfilled shifts emails completed: ${successCount} sent, ${errorCount} failed`,
       successCount,
       errorCount,
-      results
+      results,
     };
-
   } catch (error) {
     console.error("Error in bulk unfilled shifts email operation:", error);
     ctx.response.status = 500;

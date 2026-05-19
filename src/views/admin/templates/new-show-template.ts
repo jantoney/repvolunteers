@@ -1,4 +1,8 @@
-import { getAdminNavigation, getAdminStyles, getAdminScripts } from "../components/navigation.ts";
+import {
+  getAdminNavigation,
+  getAdminScripts,
+  getAdminStyles,
+} from "../components/navigation.ts";
 
 export interface NewShowPageData {
   existingShows: Array<{
@@ -16,7 +20,7 @@ export function renderNewShowTemplate(data: NewShowPageData): string {
     <head>
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width, initial-scale=1">
-      <title>Add New Show - Theatre Shifts</title>
+      <title>Add Production Performances - Theatre Shifts</title>
       <!-- PWA Manifest -->
       <link rel="manifest" href="/manifest.webmanifest">
       <meta name="apple-mobile-web-app-capable" content="yes">
@@ -28,14 +32,14 @@ export function renderNewShowTemplate(data: NewShowPageData): string {
       <link rel="stylesheet" href="/src/views/admin/new-show.css">
     </head>
     <body>
-      ${getAdminNavigation('shows')}
+      ${getAdminNavigation("shows")}
       
       <!-- Main Content -->
       <div class="main-content">
         <div class="page-header">
-          <h1 class="page-title">Add New Show</h1>
+          <h1 class="page-title">Add Production Performances</h1>
           <div class="page-actions">
-            <a href="/admin/shows" class="btn btn-secondary">Back to Shows</a>
+            <a href="/admin/shows" class="btn btn-secondary">Back to Productions</a>
           </div>
         </div>
 
@@ -48,42 +52,46 @@ export function renderNewShowTemplate(data: NewShowPageData): string {
               <div class="radio-group">
                 <label>
                   <input type="radio" name="showType" value="new" checked>
-                  Create New Show
+                  Create New Production
                 </label>
                 <label>
                   <input type="radio" name="showType" value="existing">
-                  Add to Existing Show
+                  Add Performances to Existing Production
                 </label>
               </div>
               
               <div class="form-group" id="newShowName">
-                <label for="name">Show Name:</label>
+                <label for="name">Production Name:</label>
                 <input type="text" id="name" name="name" required>
               </div>
               
               <div class="form-group hidden" id="existingShowSelect">
-                <label for="existingShow">Select Show:</label>
+                <label for="existingShow">Select Production:</label>
                 <select id="existingShow" name="existingShow">
-                  <option value="">-- Select a Show --</option>
-                  ${existingShows.map(show => `<option value="${show.id}">${show.name}</option>`).join('')}
+                  <option value="">-- Select a Production --</option>
+                  ${
+    existingShows.map((show) =>
+      `<option value="${show.id}">${show.name}</option>`
+    ).join("")
+  }
                 </select>
               </div>
             </div>
             
             <div class="time-group">
               <div class="form-group">
-                <label for="startTime">Start Time:</label>
-                <input type="time" id="startTime" name="startTime" required>
+                <label for="startTime">Performance Start Time:</label>
+                <input type="hidden" id="startTime" name="startTime" value="12:00" required>
               </div>
               
               <div class="form-group">
-                <label for="endTime">End Time:</label>
-                <input type="time" id="endTime" name="endTime" required>
+                <label for="endTime">Performance End Time:</label>
+                <input type="hidden" id="endTime" name="endTime" value="13:00" required>
               </div>
             </div>
             
             <div class="form-group">
-              <label>Select Show Dates:</label>
+              <label>Select Performances:</label>
               <div class="calendar">
                 <div class="calendar-header">
                   <button type="button" class="calendar-nav" id="prevMonth">‹ Previous</button>
@@ -94,13 +102,13 @@ export function renderNewShowTemplate(data: NewShowPageData): string {
               </div>
               
               <div class="selected-dates">
-                <strong>Selected Dates:</strong>
+                <strong>Selected Performances:</strong>
                 <div id="selectedDatesDisplay"></div>
               </div>
             </div>
             
             <div class="show-intervals">
-              <h3>Show Intervals (Optional)</h3>
+              <h3>Performance Intervals (Optional)</h3>
               <p class="form-text">Add intervals that occur during each performance. These will appear on run sheets.</p>
               
               <div id="intervalsList">
@@ -109,7 +117,7 @@ export function renderNewShowTemplate(data: NewShowPageData): string {
               
               <div class="interval-form">
                 <div class="form-group">
-                  <label for="newIntervalStart">Start (minutes from show start):</label>
+                  <label for="newIntervalStart">Start (minutes from performance start):</label>
                   <input type="number" id="newIntervalStart" min="0" max="300" placeholder="e.g. 60">
                   <small class="form-text">When the interval begins</small>
                 </div>
@@ -125,7 +133,7 @@ export function renderNewShowTemplate(data: NewShowPageData): string {
             </div>
             
             <div class="form-group">
-              <button type="submit" class="btn btn-primary">Add Show</button>
+              <button type="submit" class="btn btn-primary">Save Production and Performances</button>
               <button type="button" id="clearForm" class="btn btn-secondary">Clear Form</button>
               <a href="/admin/shows" class="btn btn-outline">Cancel</a>
             </div>

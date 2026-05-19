@@ -43,7 +43,7 @@ async function loadShows() {
 
     AdminDOM.setChildren(
       select,
-      AdminDOM.el("option", { value: "" }, "-- Select a show --"),
+      AdminDOM.el("option", { value: "" }, "-- Select a production --"),
     );
     shows.forEach((show) => {
       select.appendChild(AdminDOM.el(
@@ -56,7 +56,7 @@ async function loadShows() {
     });
   } catch (error) {
     console.error("Error loading shows:", error);
-    showStatus("Error loading shows", "error");
+    showStatus("Error loading productions", "error");
   }
 }
 
@@ -219,7 +219,7 @@ async function sendShowWeekEmails() {
 
   const showId = document.getElementById("showSelect").value;
   if (!showId) {
-    showStatus("Please select a show", "error");
+    showStatus("Please select a production", "error");
     return;
   }
 

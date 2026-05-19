@@ -20,6 +20,23 @@ const monthNames = [
 ];
 
 const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const defaultShowTimes = {
+  startTime: { hour: "12", minute: "00", ampm: "PM", value: "12:00" },
+  endTime: { hour: "01", minute: "00", ampm: "PM", value: "13:00" },
+};
+
+function resetTimeInput(inputId) {
+  const defaults = defaultShowTimes[inputId];
+  document.getElementById(inputId + "-hour").value = defaults.hour;
+  document.getElementById(inputId + "-minute").value = defaults.minute;
+  document.getElementById(inputId + "-ampm").value = defaults.ampm;
+  document.getElementById(inputId).value = defaults.value;
+}
+
+function resetShowTimes() {
+  resetTimeInput("startTime");
+  resetTimeInput("endTime");
+}
 
 // Function to create time dropdowns with 15-minute increments
 function setupTimeInputs() {
@@ -47,7 +64,7 @@ function setupTimeInputs() {
     // Add hours (12-hour format)
     for (let i = 1; i <= 12; i++) {
       const option = document.createElement("option");
-      option.value = i === 12 ? "0" : String(i).padStart(2, "0");
+      option.value = String(i).padStart(2, "0");
       option.textContent = String(i);
       hourSelect.appendChild(option);
     }
@@ -75,15 +92,7 @@ function setupTimeInputs() {
     timeSelectContainer.style.gap = "0.5rem";
     timeSelectContainer.style.alignItems = "center";
 
-    // Create hidden input to store the actual time value
-    const hiddenInput = document.createElement("input");
-    hiddenInput.type = "hidden";
-    hiddenInput.name = inputId;
-    hiddenInput.id = originalInput.id;
-
-    // Hide the original input
-    originalInput.style.display = "none";
-    originalInput.id = inputId + "-original";
+    originalInput.type = "hidden";
 
     // Function to update the hidden input value
     function updateTimeValue() {
@@ -98,7 +107,6 @@ function setupTimeInputs() {
 
       // Format as HH:MM
       const timeValue = String(hour24).padStart(2, "0") + ":" + minute;
-      hiddenInput.value = timeValue;
       originalInput.value = timeValue;
     }
 
@@ -115,18 +123,11 @@ function setupTimeInputs() {
 
     // Replace the original input with our custom selector
     originalContainer.insertBefore(timeSelectContainer, originalInput);
-    originalContainer.insertBefore(hiddenInput, originalInput);
 
-    // Set default values (12:00 PM for start, 1:00 PM for end)
-    if (inputId === "startTime") {
-      hourSelect.value = "12";
-      minuteSelect.value = "00";
-      ampmSelect.value = "PM";
-    } else {
-      hourSelect.value = "01";
-      minuteSelect.value = "00";
-      ampmSelect.value = "PM";
-    }
+    const defaults = defaultShowTimes[inputId];
+    hourSelect.value = defaults.hour;
+    minuteSelect.value = defaults.minute;
+    ampmSelect.value = defaults.ampm;
 
     // Initialize the hidden input
     updateTimeValue();
@@ -242,7 +243,10 @@ function updateSelectedDatesDisplay() {
   }
 
   if (selectedDates.length === 0) {
-    AdminDOM.setChildren(display, AdminDOM.el("em", {}, "No dates selected"));
+    AdminDOM.setChildren(
+      display,
+      AdminDOM.el("em", {}, "No performances selected"),
+    );
   } else {
     AdminDOM.setChildren(
       display,
@@ -265,7 +269,11 @@ function renderIntervals() {
   if (showIntervals.length === 0) {
     AdminDOM.setChildren(
       container,
-      AdminDOM.el("p", {}, AdminDOM.el("em", {}, "No intervals added yet.")),
+      AdminDOM.el(
+        "p",
+        {},
+        AdminDOM.el("em", {}, "No performance intervals added."),
+      ),
     );
     return;
   }
@@ -306,12 +314,12 @@ globalThis.addInterval = function () {
   const duration = document.getElementById("newIntervalDuration").value;
 
   if (!startMinutes || !duration) {
-    showError("Both start time and duration are required");
+    showError("Enter both interval start and duration.");
     return;
   }
 
   if (parseInt(startMinutes) < 0 || parseInt(duration) < 1) {
-    showError("Please enter valid positive numbers");
+    showError("Use positive numbers for interval start and duration.");
     return;
   }
 
@@ -328,7 +336,7 @@ globalThis.addInterval = function () {
       (newEnd > existingStart && newEnd <= existingEnd) ||
       (newStart <= existingStart && newEnd >= existingEnd)
     ) {
-      showError("This interval overlaps with an existing interval");
+      showError("This interval overlaps another interval.");
       return;
     }
   }
@@ -343,13 +351,13 @@ globalThis.addInterval = function () {
   document.getElementById("newIntervalDuration").value = "";
 
   renderIntervals();
-  showSuccess("Interval added successfully");
+  showSuccess("Performance interval added.");
 };
 
 globalThis.removeInterval = function (index) {
   showIntervals.splice(index, 1);
   renderIntervals();
-  showSuccess("Interval removed successfully");
+  showSuccess("Performance interval removed.");
 };
 
 async function addIntervalsToShow(showId) {
@@ -369,21 +377,12 @@ async function addIntervalsToShow(showId) {
 
 function clearForm() {
   document.getElementById("name").value = "";
-  // Reset custom time selects to default values
-  document.getElementById("startTime-hour").value = "12";
-  document.getElementById("startTime-minute").value = "00";
-  document.getElementById("startTime-ampm").value = "PM";
-  document.getElementById("endTime-hour").value = "01";
-  document.getElementById("endTime-minute").value = "00";
-  document.getElementById("endTime-ampm").value = "PM";
-  // Update hidden inputs
-  document.getElementById("startTime").value = "12:00";
-  document.getElementById("endTime").value = "13:00";
+  resetShowTimes();
   document.getElementById("existingShow").value = "";
   selectedDates = [];
   showIntervals = []; // Clear intervals
 
-  // Reset to "Create New Show" option unless we just created a show
+  // Reset to "Create New Production" option unless we just created a production
   if (lastCreatedShowId === null) {
     document.querySelector('input[name="showType"][value="new"]').checked =
       true;
@@ -443,12 +442,12 @@ function initializeEventListeners() {
     const endTime = document.getElementById("endTime").value;
 
     if (selectedDates.length === 0) {
-      showError("Please select at least one date.");
+      showError("Select at least one performance.");
       return;
     }
 
     if (!startTime || !endTime) {
-      showError("Please fill in all fields.");
+      showError("Enter the performance start and end times.");
       return;
     }
 
@@ -457,16 +456,16 @@ function initializeEventListeners() {
     if (showType === "new") {
       showName = document.getElementById("name").value;
       if (!showName) {
-        showError("Please enter a show name.");
+        showError("Enter a production name.");
         return;
       }
     } else {
       showId = document.getElementById("existingShow").value;
       if (!showId) {
-        showError("Please select a show.");
+        showError("Select a production.");
         return;
       }
-      // Find the show name from the dropdown
+      // Find the production name from the dropdown
       const selectElement = document.getElementById("existingShow");
       showName = selectElement.options[selectElement.selectedIndex].text;
     }
@@ -496,11 +495,11 @@ function initializeEventListeners() {
         const successful = result.results.filter((r) => r.success);
         const failed = result.results.filter((r) => !r.success);
 
-        let message = "Successfully added " + successful.length +
-          " date(s) to '" + showName + "'.";
+        let message = "Added " + successful.length +
+          " performance(s) to '" + showName + "'.";
         if (failed.length > 0) {
           message += " " + failed.length +
-            " date(s) were skipped (duplicates).";
+            " duplicate performance(s) skipped.";
         }
 
         // Store the created/updated show ID
@@ -509,12 +508,13 @@ function initializeEventListeners() {
         // Add intervals if any were defined
         if (showIntervals.length > 0) {
           await addIntervalsToShow(lastCreatedShowId);
-          message += " " + showIntervals.length + " interval(s) added.";
+          message += " " + showIntervals.length +
+            " performance interval(s) added.";
         }
 
         showSuccess(message);
 
-        // Switch to "Add to Existing Show" and select the show we just worked with
+        // Switch to "Add Performances to Existing Production" and select the production we just worked with
         document.querySelector('input[name="showType"][value="existing"]')
           .checked = true;
         document.getElementById("newShowName").classList.add("hidden");
@@ -525,24 +525,17 @@ function initializeEventListeners() {
         document.getElementById("existingShow").required = true;
         document.getElementById("existingShow").value = lastCreatedShowId;
 
-        // Clear only the dates and times, keep the show selected
-        document.getElementById("startTime-hour").value = "12";
-        document.getElementById("startTime-minute").value = "00";
-        document.getElementById("startTime-ampm").value = "PM";
-        document.getElementById("endTime-hour").value = "01";
-        document.getElementById("endTime-minute").value = "00";
-        document.getElementById("endTime-ampm").value = "PM";
-        document.getElementById("startTime").value = "12:00";
-        document.getElementById("endTime").value = "13:00";
+        // Clear only the dates and times, keep the production selected
+        resetShowTimes();
         selectedDates = [];
-        // Don't clear intervals in case user wants to add more performances with same intervals
+        // Don't clear intervals in case user wants to add more performances with the same intervals
         renderCalendar();
         updateSelectedDatesDisplay();
       } else {
-        showError("Failed to create show. Please try again.");
+        showError("We could not save these performances. Please try again.");
       }
     } catch (_error) {
-      showError("Error creating show. Please try again.");
+      showError("We could not save these performances. Please try again.");
     }
   });
 }

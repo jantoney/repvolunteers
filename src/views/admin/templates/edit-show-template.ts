@@ -1,4 +1,8 @@
-import { getAdminNavigation, getAdminStyles, getAdminScripts } from "../components/navigation.ts";
+import {
+  getAdminNavigation,
+  getAdminScripts,
+  getAdminStyles,
+} from "../components/navigation.ts";
 import { formatDate, formatDateTimeForInput } from "../../../utils/timezone.ts";
 
 export interface Show {
@@ -19,14 +23,14 @@ export interface EditShowPageData {
 
 export function renderEditShowTemplate(data: EditShowPageData): string {
   const { show, showDates } = data;
-  
+
   return `
     <!DOCTYPE html>
     <html>
     <head>
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width, initial-scale=1">
-      <title>Edit Show - Rep Volunteers</title>
+      <title>Edit Production - Rep Volunteers</title>
       <!-- PWA Manifest -->
       <link rel="manifest" href="/manifest.webmanifest">
       <meta name="apple-mobile-web-app-capable" content="yes">
@@ -81,12 +85,12 @@ export function renderEditShowTemplate(data: EditShowPageData): string {
       </style>
     </head>
     <body>
-      ${getAdminNavigation('shows')}
+      ${getAdminNavigation("shows")}
       
       <!-- Main Content -->
       <div class="main-content">
         <div class="page-header">
-          <h1 class="page-title">Edit Show: ${show.name}</h1>
+          <h1 class="page-title">Edit Production: ${show.name}</h1>
         </div>
 
         <div class="form-container">
@@ -95,21 +99,23 @@ export function renderEditShowTemplate(data: EditShowPageData): string {
 
           <form id="showForm">
             <div class="form-group">
-              <label for="name">Show Name:</label>
+              <label for="name">Production Name:</label>
               <input type="text" id="name" name="name" value="${show.name}" required>
             </div>
             
             <div class="form-actions">
-              <button type="submit" class="btn btn-primary">Update Show Name</button>
-              <a href="/admin/shows" class="btn btn-secondary">Back to Shows</a>
+              <button type="submit" class="btn btn-primary">Update Production Name</button>
+              <a href="/admin/shows" class="btn btn-secondary">Back to Productions</a>
             </div>
           </form>
 
           <div class="show-dates">
-            <h2>Show Dates & Times</h2>
+            <h2>Performances</h2>
             
-            ${showDates.length === 0 ? '<p>No dates scheduled for this show.</p>' : 
-              showDates.map(date => `
+            ${
+    showDates.length === 0
+      ? "<p>No performances scheduled for this production.</p>"
+      : showDates.map((date) => `
                 <div class="show-date-item" data-date-id="${date.id}">
                   <div class="show-date-header">
                     <strong>${formatDate(date.start_time)}</strong>
@@ -118,16 +124,20 @@ export function renderEditShowTemplate(data: EditShowPageData): string {
                   <div class="time-group">
                     <div class="form-group">
                       <label>Start Date & Time:</label>
-                      <input type="datetime-local" id="start_${date.id}" value="${formatDateTimeForInput(date.start_time)}" onchange="updateShowDate(${date.id})">
+                      <input type="datetime-local" id="start_${date.id}" value="${
+        formatDateTimeForInput(date.start_time)
+      }" onchange="updateShowDate(${date.id})">
                     </div>
                     <div class="form-group">
                       <label>End Date & Time:</label>
-                      <input type="datetime-local" id="end_${date.id}" value="${formatDateTimeForInput(date.end_time)}" onchange="updateShowDate(${date.id})">
+                      <input type="datetime-local" id="end_${date.id}" value="${
+        formatDateTimeForInput(date.end_time)
+      }" onchange="updateShowDate(${date.id})">
                     </div>
                   </div>
                 </div>
-              `).join('')
-            }
+              `).join("")
+  }
 
             <div class="form-section">
               <h3>Add New Performance</h3>
@@ -146,7 +156,7 @@ export function renderEditShowTemplate(data: EditShowPageData): string {
           </div>
 
           <div class="show-intervals">
-            <h2>Show Intervals</h2>
+            <h2>Performance Intervals</h2>
             <p class="help-text">Intervals are recorded as time offsets from the start of each performance, and will appear on run sheets.</p>
             
             <div id="intervalsList">
@@ -158,7 +168,7 @@ export function renderEditShowTemplate(data: EditShowPageData): string {
               <div class="interval-form">
                 <div class="form-group">
                   <label for="intervalStart">Start Time (minutes from performance start):</label>
-                  <input type="number" id="intervalStart" min="0" max="300" placeholder="e.g. 60 for 1 hour into show">
+                  <input type="number" id="intervalStart" min="0" max="300" placeholder="e.g. 60 for 1 hour into the performance">
                   <small class="form-text text-muted">Enter the number of minutes from the start of the performance when the interval begins</small>
                 </div>
                 <div class="form-group">

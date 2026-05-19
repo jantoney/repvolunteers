@@ -1,6 +1,9 @@
 import type { RouterContext } from "oak";
 import { getPool } from "../../models/db.ts";
-import { renderUnfilledShiftsTemplate, type UnfilledShiftsPageData } from "./templates/unfilled-shifts-template.ts";
+import {
+  renderUnfilledShiftsTemplate,
+  type UnfilledShiftsPageData,
+} from "./templates/unfilled-shifts-template.ts";
 
 export async function showUnfilledShiftsPage(ctx: RouterContext<string>) {
   const pool = getPool();
@@ -25,15 +28,16 @@ export async function showUnfilledShiftsPage(ctx: RouterContext<string>) {
        JOIN show_dates sd ON sd.id = s.show_date_id
        JOIN shows sh ON sh.id = sd.show_id
        LEFT JOIN participant_shifts vs ON vs.shift_id = s.id
+       WHERE s.depart_time >= NOW() - INTERVAL '3 hours'
        GROUP BY s.id, sh.name, DATE(sd.start_time), sd.start_time, sd.end_time, s.role, s.arrive_time, s.depart_time
        HAVING COUNT(vs.participant_id) = 0
-       ORDER BY DATE(sd.start_time), s.arrive_time`
+       ORDER BY DATE(sd.start_time), s.arrive_time`,
     );
-    
+
     const data: UnfilledShiftsPageData = {
-      shifts: result.rows
+      shifts: result.rows,
     };
-    
+
     ctx.response.type = "text/html";
     ctx.response.body = renderUnfilledShiftsTemplate(data);
   } finally {

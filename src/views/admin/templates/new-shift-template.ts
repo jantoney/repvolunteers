@@ -1,4 +1,8 @@
-import { getAdminNavigation, getAdminStyles, getAdminScripts } from "../components/navigation.ts";
+import {
+  getAdminNavigation,
+  getAdminScripts,
+  getAdminStyles,
+} from "../components/navigation.ts";
 
 export interface Show {
   id: number;
@@ -130,7 +134,7 @@ export function renderNewShiftTemplate(data: NewShiftPageData): string {
       </style>
     </head>
     <body>
-      ${getAdminNavigation('shifts')}
+      ${getAdminNavigation("shifts")}
       
       <!-- Main Content -->
       <div class="main-content">
@@ -144,17 +148,19 @@ export function renderNewShiftTemplate(data: NewShiftPageData): string {
 
           <form id="shiftForm">
             <div class="form-group">
-              <label for="show_id">Show:</label>
+              <label for="show_id">Production:</label>
               <select id="show_id" name="show_id" required>
-                <option value="">Select a show</option>
-                ${shows.map(show => `
+                <option value="">Select a production</option>
+                ${
+    shows.map((show) => `
                   <option value="${show.id}">${show.name}</option>
-                `).join('')}
+                `).join("")
+  }
               </select>
             </div>
               <div class="show-dates-section" id="showDatesSection" style="display: none;">
-              <label>Show Dates:</label>
-              <p class="help-text">Select the performance dates for this shift. Each selected date will get its own shift with the times specified below.</p>
+              <label>Performances:</label>
+              <p class="help-text">Select the performances for this shift. Each selected performance will get its own shift with the times specified below.</p>
               
               <div class="filter-actions" id="dateFilterActions" style="margin-bottom: 1rem; display: none;">
                 <button type="button" class="filter-btn" onclick="selectAllDates()">Select All</button>
@@ -171,17 +177,17 @@ export function renderNewShiftTemplate(data: NewShiftPageData): string {
               <div class="form-group">
                 <label for="arrive_time">Arrive Time:</label>
                 <input type="time" id="arrive_time" name="arrive_time" required>
-                <small class="form-text">Time to arrive on each selected performance date (15-minute increments)</small>
+                <small class="form-text">Time to arrive for each selected performance (15-minute increments)</small>
               </div>
               
               <div class="form-group">
                 <label for="depart_time">Depart Time:</label>
                 <input type="time" id="depart_time" name="depart_time" required>
-                <small class="form-text">Time to depart on each selected performance date (15-minute increments)</small>
+                <small class="form-text">Time to depart for each selected performance (15-minute increments)</small>
               </div>
             </div>
               <div id="nextDayWarning" class="warning-message">
-              ⚠️ <strong>Following Day:</strong> Depart time is before arrive time, so the depart time will be saved as the next day for each selected performance date.
+              ⚠️ <strong>Following Day:</strong> Depart time is before arrive time, so the depart time will be saved as the next day for each selected performance.
             </div>
             
             <div class="roles-section">

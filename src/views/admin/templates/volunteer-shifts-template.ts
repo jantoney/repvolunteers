@@ -1,7 +1,7 @@
 import {
   getAdminNavigation,
-  getAdminStyles,
   getAdminScripts,
+  getAdminStyles,
 } from "../components/navigation.ts";
 
 export interface VolunteerShift {
@@ -27,7 +27,7 @@ export interface VolunteerShiftsPageData {
 }
 
 export function renderVolunteerShiftsTemplate(
-  data: VolunteerShiftsPageData
+  data: VolunteerShiftsPageData,
 ): string {
   const { volunteer, assignedShifts, pastShifts } = data;
 
@@ -278,11 +278,11 @@ export function renderVolunteerShiftsTemplate(
           
           <div class="shifts-grid">
             ${
-              assignedShifts.length === 0
-                ? '<div class="no-shifts">No upcoming shifts currently assigned</div>'
-                : assignedShifts
-                    .map(
-                      (shift) => `
+    assignedShifts.length === 0
+      ? '<div class="no-shifts">No upcoming shifts currently assigned</div>'
+      : assignedShifts
+        .map(
+          (shift) => `
                 <div class="shift-card assigned">
                   <div class="shift-header">
                     <div>
@@ -317,10 +317,10 @@ export function renderVolunteerShiftsTemplate(
                     </button>
                   </div>
                 </div>
-              `
-                    )
-                    .join("")
-            }
+              `,
+        )
+        .join("")
+  }
           </div>
         </section>
 
@@ -330,39 +330,41 @@ export function renderVolunteerShiftsTemplate(
             <h3>Past Shifts</h3>
           </div>
           ${
-            pastShifts.length === 0
-              ? `
+    pastShifts.length === 0
+      ? `
             <div class="no-shifts">No past shifts recorded</div>
           `
-              : `
+      : `
             <div class="table-wrapper">
               <table class="shifts-table">
                 <thead>
                   <tr>
-                    <th>Show</th>
+                    <th>Production</th>
                     <th>Role</th>
                     <th>Start</th>
                     <th>End</th>
                   </tr>
                 </thead>
                 <tbody>
-                  ${pastShifts
-                    .map(
-                      (shift) => `
+                  ${
+        pastShifts
+          .map(
+            (shift) => `
                     <tr>
                       <td>${shift.show_name}</td>
                       <td>${shift.role}</td>
                       <td>${shift.start_time}</td>
                       <td>${shift.end_time}</td>
                     </tr>
-                  `
-                    )
-                    .join("")}
+                  `,
+          )
+          .join("")
+      }
                 </tbody>
               </table>
             </div>
           `
-          }
+  }
         </section>
       </div>
 
@@ -373,9 +375,11 @@ export function renderVolunteerShiftsTemplate(
       <script>
         // Initialize the volunteer shifts functionality with data
         if (typeof initVolunteerShifts === 'function') {
-          initVolunteerShifts(${volunteer.id}, ${JSON.stringify(
-    volunteer.name
-  )}, ${JSON.stringify(assignedShifts)});
+          initVolunteerShifts(${volunteer.id}, ${
+    JSON.stringify(
+      volunteer.name,
+    )
+  }, ${JSON.stringify(assignedShifts)});
         }
       </script>
     </body>

@@ -2,8 +2,8 @@ import type { RouterContext } from "oak";
 import { getPool } from "../../models/db.ts";
 import {
   renderShiftsTemplate,
-  type ShiftsPageData,
   type Shift,
+  type ShiftsPageData,
 } from "./templates/shifts-template.ts";
 
 export async function showShiftsPage(ctx: RouterContext<string>) {
@@ -23,11 +23,21 @@ export async function showShiftsPage(ctx: RouterContext<string>) {
       showIdArray = [selectedShowId];
     }
 
-    // Get all shows for the dropdown
+    // Get all shows for the filter, excluding shows whose performances ended more than 3 hours ago.
     const showsResult = await client.queryObject<{
       id: number;
       name: string;
-    }>("SELECT id, name FROM shows ORDER BY name");
+    }>(`
+      SELECT id, name
+      FROM shows sh
+      WHERE EXISTS (
+        SELECT 1
+        FROM show_dates sd
+        WHERE sd.show_id = sh.id
+          AND sd.end_time >= NOW() - INTERVAL '3 hours'
+      )
+      ORDER BY name
+    `);
 
     // Build the shifts query with optional show filter
     let shiftsQuery = `
@@ -51,7 +61,7 @@ export async function showShiftsPage(ctx: RouterContext<string>) {
     `;
 
     const queryParams = [];
-    const whereConditions = [];
+    const whereConditions = ["s.depart_time >= NOW() - INTERVAL '3 hours'"];
 
     if (showIdArray.length > 0) {
       const placeholders = showIdArray
@@ -65,7 +75,7 @@ export async function showShiftsPage(ctx: RouterContext<string>) {
       whereConditions.push(
         `DATE(sd.start_time AT TIME ZONE 'Australia/Adelaide') = $${
           queryParams.length + 1
-        }`
+        }`,
       );
       queryParams.push(selectedDate);
     }

@@ -76,7 +76,7 @@ function renderShowCheckboxes() {
       container,
       AdminDOM.el("p", {
         style: { color: "#666", margin: "0" },
-      }, "No shows with shifts found."),
+      }, "No productions with shifts found."),
     );
     return;
   }

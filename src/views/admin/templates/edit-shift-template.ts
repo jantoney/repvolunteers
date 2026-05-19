@@ -1,5 +1,13 @@
-import { getAdminNavigation, getAdminStyles, getAdminScripts } from "../components/navigation.ts";
-import { formatDateTimeForInput, formatDate, formatTime } from "../../../utils/timezone.ts";
+import {
+  getAdminNavigation,
+  getAdminScripts,
+  getAdminStyles,
+} from "../components/navigation.ts";
+import {
+  formatDate,
+  formatDateTimeForInput,
+  formatTime,
+} from "../../../utils/timezone.ts";
 
 export interface ShowDate {
   id: number;
@@ -24,7 +32,7 @@ export interface EditShiftPageData {
 
 export function renderEditShiftTemplate(data: EditShiftPageData): string {
   const { shift, showDates } = data;
-  
+
   return `
     <!DOCTYPE html>
     <html>
@@ -42,7 +50,7 @@ export function renderEditShiftTemplate(data: EditShiftPageData): string {
       ${getAdminStyles()}
     </head>
     <body>
-      ${getAdminNavigation('shifts')}
+      ${getAdminNavigation("shifts")}
       
       <!-- Main Content -->
       <div class="main-content">
@@ -53,13 +61,19 @@ export function renderEditShiftTemplate(data: EditShiftPageData): string {
         <div class="form-container">
           <form id="shiftForm">
             <div class="form-group">
-              <label for="show_date_id">Show & Date:</label>
+              <label for="show_date_id">Performance:</label>
               <select id="show_date_id" name="show_date_id" required>
-                ${showDates.map(showDate => 
-                  `<option value="${showDate.id}" ${showDate.id === shift.show_date_id ? 'selected' : ''}>
-                    ${showDate.show_name} - ${formatDate(showDate.date)} (${formatTime(showDate.start_time)} - ${formatTime(showDate.end_time)})
+                ${
+    showDates.map((showDate) =>
+      `<option value="${showDate.id}" ${
+        showDate.id === shift.show_date_id ? "selected" : ""
+      }>
+                    ${showDate.show_name} - ${formatDate(showDate.date)} (${
+        formatTime(showDate.start_time)
+      } - ${formatTime(showDate.end_time)})
                   </option>`
-                ).join('')}
+    ).join("")
+  }
               </select>
             </div>
             
@@ -70,13 +84,17 @@ export function renderEditShiftTemplate(data: EditShiftPageData): string {
               <div class="form-group">
               <label for="arrive_time">Arrive Time:</label>
               <input type="datetime-local" id="arrive_time" name="arrive_time" 
-                     value="${formatDateTimeForInput(shift.arrive_time)}" required>
+                     value="${
+    formatDateTimeForInput(shift.arrive_time)
+  }" required>
             </div>
             
             <div class="form-group">
               <label for="depart_time">Depart Time:</label>
               <input type="datetime-local" id="depart_time" name="depart_time" 
-                     value="${formatDateTimeForInput(shift.depart_time)}" required>
+                     value="${
+    formatDateTimeForInput(shift.depart_time)
+  }" required>
             </div>
             
             <div class="form-actions">

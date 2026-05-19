@@ -1,7 +1,11 @@
 import type { RouterContext } from "oak";
 import { getPool } from "../../models/db.ts";
 import { formatDate } from "../../utils/timezone.ts";
-import { getAdminNavigation, getAdminStyles, getAdminScripts } from "./components/navigation.ts";
+import {
+  getAdminNavigation,
+  getAdminScripts,
+  getAdminStyles,
+} from "./components/navigation.ts";
 
 export interface Show {
   id: number;
@@ -12,6 +16,7 @@ export interface Show {
   last_date: Date | null;
   total_shifts: number;
   filled_shifts: number;
+  is_past: boolean;
 }
 
 export interface ShowsPageData {
@@ -20,6 +25,7 @@ export interface ShowsPageData {
 
 export function renderShowsTemplate(data: ShowsPageData): string {
   const { shows } = data;
+  const pastShowsCount = shows.filter((show) => show.is_past).length;
 
   return `
     <!DOCTYPE html>
@@ -27,7 +33,7 @@ export function renderShowsTemplate(data: ShowsPageData): string {
     <head>
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width, initial-scale=1">
-      <title>Manage Shows - Theatre Shifts</title>
+      <title>Manage Productions - Theatre Shifts</title>
       <!-- PWA Manifest -->
       <link rel="manifest" href="/manifest.webmanifest">
       <meta name="apple-mobile-web-app-capable" content="yes">
@@ -76,17 +82,19 @@ export function renderShowsTemplate(data: ShowsPageData): string {
         .performance-link:hover {
           text-decoration: underline;
         }
+        .past-shows-hidden .past-show-row { display: none !important; }
+        .show-past-footer { text-align: center; padding: 1rem; }
       </style>
     </head>
     <body>
-      ${getAdminNavigation('shows')}
+      ${getAdminNavigation("shows")}
 
       <!-- Main Content -->
       <div class="main-content">
         <div class="page-header">
-          <h1 class="page-title">Manage Shows</h1>
+          <h1 class="page-title">Manage Productions</h1>
           <div class="page-actions">
-            <a href="/admin/shows/new" class="btn btn-primary">Add New Show</a>
+            <a href="/admin/shows/new" class="btn btn-primary">Add Production</a>
           </div>
         </div>
 
@@ -102,41 +110,53 @@ export function renderShowsTemplate(data: ShowsPageData): string {
           <div class="table-container">
             <table class="table">              <thead>
                 <tr>
-                  <th>Show Name</th>
-                  <th>Performance Dates</th>
+                  <th>Production</th>
+                  <th>Performances</th>
                   <th>Date Range</th>
                   <th>Shift Status</th>
                   <th>Actions</th>
                 </tr>
-              </thead>              <tbody>                ${shows.map(show => {                  // Calculate traffic light color based on filled vs total shifts
-    let trafficColor = 'grey';
-    let statusText = 'No shifts';
+              </thead>              <tbody id="showsTableBody" class="${
+    pastShowsCount > 0 ? "past-shows-hidden" : ""
+  }">                ${
+    shows.map((show) => { // Calculate traffic light color based on filled vs total shifts
+      let trafficColor = "grey";
+      let statusText = "No shifts";
 
-    if (show.total_shifts > 0) {
-      const fillPercentage = (show.filled_shifts / show.total_shifts) * 100;
-      if (fillPercentage >= 80) {
-        trafficColor = 'green';
-        statusText = `${show.filled_shifts}/${show.total_shifts} filled`;
-      } else if (fillPercentage >= 50) {
-        trafficColor = 'yellow';
-        statusText = `${show.filled_shifts}/${show.total_shifts} filled`;
-      } else {
-        trafficColor = 'red';
-        statusText = `${show.filled_shifts}/${show.total_shifts} filled`;
+      if (show.total_shifts > 0) {
+        const fillPercentage = (show.filled_shifts / show.total_shifts) * 100;
+        if (fillPercentage >= 80) {
+          trafficColor = "green";
+          statusText = `${show.filled_shifts}/${show.total_shifts} filled`;
+        } else if (fillPercentage >= 50) {
+          trafficColor = "yellow";
+          statusText = `${show.filled_shifts}/${show.total_shifts} filled`;
+        } else {
+          trafficColor = "red";
+          statusText = `${show.filled_shifts}/${show.total_shifts} filled`;
+        }
       }
-    }
 
-    return `                    <tr>                      <td>
+      const rowClass = show.is_past ? ' class="past-show-row"' : "";
+
+      return `                    <tr${rowClass}>                      <td>
                         <strong>${show.name}</strong>
-                        ${show.show_date_count > 0 ? `<br><button class="expand-btn" onclick="toggleDates(${show.id})">View ${show.show_date_count} performance date(s)</button>` : ''}
+                        ${
+        show.show_date_count > 0
+          ? `<br><button class="expand-btn" onclick="toggleDates(${show.id})">View ${show.show_date_count} performance(s)</button>`
+          : ""
+      }
                       </td>
-                      <td>${show.show_date_count} performance${show.show_date_count !== 1 ? 's' : ''}</td>
+                      <td>${show.show_date_count} performance${
+        show.show_date_count !== 1 ? "s" : ""
+      }</td>
                       <td>
-                        ${show.first_date && show.last_date ?
-        (show.first_date.getTime() === show.last_date.getTime() ?
-          formatDate(show.first_date) :
-          `${formatDate(show.first_date)} - ${formatDate(show.last_date)}`
-        ) : 'No dates set'
+                        ${
+        show.first_date && show.last_date
+          ? (show.first_date.getTime() === show.last_date.getTime()
+            ? formatDate(show.first_date)
+            : `${formatDate(show.first_date)} - ${formatDate(show.last_date)}`)
+          : "No dates set"
       }
                       </td>
                       <td>
@@ -146,18 +166,40 @@ export function renderShowsTemplate(data: ShowsPageData): string {
                       <td>
                         <div class="table-actions">
                           <a href="/admin/shows/${show.id}/edit" class="btn btn-sm btn-secondary">Edit</a>
-                          <button onclick="deleteShow(${show.id}, '${show.name.replace(/'/g, "\\'")}')" class="btn btn-sm btn-danger">Delete</button>
+                          <button onclick="deleteShow(${show.id}, '${
+        show.name.replace(/'/g, "\\'")
+      }')" class="btn btn-sm btn-danger">Delete</button>
                         </div>
                       </td>
                     </tr>
-                    <tr class="expandable-row" id="dates-${show.id}">
+                    <tr class="expandable-row${
+        show.is_past ? " past-show-row" : ""
+      }" id="dates-${show.id}">
                       <td colspan="5">
                         <div id="dates-content-${show.id}" style="padding: 1rem;">Loading dates...</div>
                       </td>
                     </tr>
                   `;
-  }).join('')}
+    }).join("")
+  }
               </tbody>
+              ${
+    pastShowsCount > 0
+      ? `
+              <tfoot>
+                <tr>
+                  <td colspan="5" class="show-past-footer">
+                    <button type="button" class="btn btn-secondary" id="showPastShowsButton" onclick="showPastShows()">
+                      Show ${pastShowsCount} past production${
+        pastShowsCount === 1 ? "" : "s"
+      }
+                    </button>
+                  </td>
+                </tr>
+              </tfoot>
+              `
+      : ""
+  }
             </table>
           </div>
         </div>
@@ -182,25 +224,27 @@ export async function showShowsPage(ctx: RouterContext<string>) {
          MIN(sd.start_time AT TIME ZONE 'Australia/Adelaide') as first_date,
          MAX(sd.start_time AT TIME ZONE 'Australia/Adelaide') as last_date,
          COUNT(DISTINCT sh.id) as total_shifts,
-         COUNT(DISTINCT CASE WHEN vs.participant_id IS NOT NULL THEN sh.id END) as filled_shifts
+         COUNT(DISTINCT CASE WHEN vs.participant_id IS NOT NULL THEN sh.id END) as filled_shifts,
+         (COUNT(DISTINCT sd.id) > 0 AND MAX(sd.end_time) < NOW() - INTERVAL '3 hours') as is_past
       FROM shows s
       LEFT JOIN show_dates sd ON sd.show_id = s.id
       LEFT JOIN shifts sh ON sh.show_date_id = sd.id
       LEFT JOIN participant_shifts vs ON vs.shift_id = sh.id
       GROUP BY s.id, s.name, s.created_at
-      ORDER BY s.name
+      ORDER BY is_past, s.name
     `);
 
     // Convert BigInt count values to numbers
-    const shows = result.rows.map(show => ({
+    const shows = result.rows.map((show) => ({
       ...show,
       show_date_count: Number(show.show_date_count),
       total_shifts: Number(show.total_shifts),
-      filled_shifts: Number(show.filled_shifts)
+      filled_shifts: Number(show.filled_shifts),
+      is_past: Boolean(show.is_past),
     }));
 
     const data: ShowsPageData = {
-      shows
+      shows,
     };
 
     ctx.response.type = "text/html";

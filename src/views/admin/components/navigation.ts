@@ -13,10 +13,10 @@ export function getAdminNavigation(currentPage: string = "") {
           <li class="nav-item dropdown">
             <a href="/admin/shows" class="nav-link dropdown-toggle ${
     currentPage === "shows" ? "active" : ""
-  }" onclick="toggleMobileDropdown(event)">Shows</a>
+  }" onclick="toggleMobileDropdown(event)">Productions</a>
             <ul class="dropdown-menu">
-              <li><a href="/admin/shows" class="dropdown-link">All Shows</a></li>
-              <li><a href="/admin/shows/new" class="dropdown-link">New Show</a></li>
+              <li><a href="/admin/shows" class="dropdown-link">All Productions</a></li>
+              <li><a href="/admin/shows/new" class="dropdown-link">New Production</a></li>
             </ul>
           </li>
           <li class="nav-item dropdown">

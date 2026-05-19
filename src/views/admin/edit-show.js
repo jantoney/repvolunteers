@@ -20,12 +20,12 @@ document.addEventListener("DOMContentLoaded", function () {
         });
 
         if (response.ok) {
-          showSuccess("Show name updated successfully");
+          showSuccess("Production name updated.");
         } else {
-          showError("Failed to update show name");
+          showError("Failed to update production name");
         }
       } catch (_error) {
-        showError("Error updating show name");
+        showError("Error updating production name");
       }
     });
   }
@@ -69,17 +69,17 @@ async function updateShowDate(dateId) {
     });
 
     if (response.ok) {
-      showSuccess("Performance updated successfully");
+      showSuccess("Performance updated.");
     } else {
       showError("Failed to update performance");
     }
   } catch (_error) {
-    showError("Error updating show date");
+    showError("Error updating performance");
   }
 }
 
 async function deleteShowDate(dateId) {
-  if (!confirm("Are you sure you want to delete this show date?")) {
+  if (!confirm("Delete this performance?")) {
     return;
   }
 
@@ -91,12 +91,12 @@ async function deleteShowDate(dateId) {
 
     if (response.ok) {
       document.querySelector(`[data-date-id="${dateId}"]`).remove();
-      showSuccess("Show date deleted successfully");
+      showSuccess("Performance deleted.");
     } else {
-      showError("Failed to delete show date");
+      showError("Failed to delete performance");
     }
   } catch (_error) {
-    showError("Error deleting show date");
+    showError("Error deleting performance");
   }
 }
 
@@ -122,7 +122,7 @@ async function addNewDate() {
     });
 
     if (response.ok) {
-      showSuccess("New performance added successfully");
+      showSuccess("Performance added.");
       // Clear form
       document.getElementById("newStartDateTime").value = "";
       document.getElementById("newEndDateTime").value = "";
@@ -171,7 +171,7 @@ function renderIntervals(intervals) {
       AdminDOM.el(
         "p",
         {},
-        AdminDOM.el("em", {}, "No intervals configured for this show."),
+        AdminDOM.el("em", {}, "No intervals configured for this production."),
       ),
     );
     return;
@@ -213,7 +213,7 @@ function renderIntervals(intervals) {
             AdminDOM.el(
               "label",
               { htmlFor: `intervalStart_${interval.id}` },
-              "Start (minutes from show start):",
+              "Start (minutes from performance start):",
             ),
             AdminDOM.el("input", {
               type: "number",

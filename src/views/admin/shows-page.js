@@ -33,7 +33,7 @@ window.toggleDates = async function (showId) {
           if (dates.length === 0) {
             AdminDOM.setChildren(
               content,
-              AdminDOM.el("em", {}, "No performance dates set"),
+              AdminDOM.el("em", {}, "No performances set"),
             );
           } else {
             const table = AdminDOM.el("table", {
@@ -48,7 +48,7 @@ window.toggleDates = async function (showId) {
                   }, "Date"),
                   AdminDOM.el("th", {
                     style: { padding: "0.5rem", border: "none" },
-                  }, "Show Time"),
+                  }, "Performance Time"),
                   AdminDOM.el("th", {
                     style: { padding: "0.5rem", border: "none" },
                   }, "Shifts"),
@@ -150,24 +150,36 @@ window.toggleDates = async function (showId) {
         } else {
           AdminDOM.setChildren(
             content,
-            AdminDOM.el("em", {}, "Error loading dates"),
+            AdminDOM.el("em", {}, "Error loading performances"),
           );
         }
       } catch (error) {
         console.error("Error:", error);
         AdminDOM.setChildren(
           content,
-          AdminDOM.el("em", {}, "Error loading dates"),
+          AdminDOM.el("em", {}, "Error loading performances"),
         );
       }
     }
   }
 };
+
+window.showPastShows = function () {
+  const tableBody = document.getElementById("showsTableBody");
+  const button = document.getElementById("showPastShowsButton");
+  if (!tableBody) return;
+
+  tableBody.classList.remove("past-shows-hidden");
+  if (button) {
+    button.style.display = "none";
+  }
+};
+
 // Global function for deleting shows
 window.deleteShow = async function (id, name) {
   if (
     !confirm(
-      `Are you sure you want to delete the show "${name}"? This will also delete all associated performance dates and shifts.`,
+      `Delete the production "${name}"? This will also delete its performances and shifts.`,
     )
   ) {
     return;
@@ -180,10 +192,10 @@ window.deleteShow = async function (id, name) {
     if (response.ok) {
       location.reload();
     } else {
-      Modal.error("Error", "Failed to delete show");
+      Modal.error("Error", "Failed to delete production");
     }
   } catch (error) {
     console.error("Error:", error);
-    Modal.error("Error", "Error deleting show");
+    Modal.error("Error", "Error deleting production");
   }
 };

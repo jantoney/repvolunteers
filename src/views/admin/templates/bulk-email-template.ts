@@ -203,12 +203,12 @@ export function renderBulkEmailTemplate(): string {
           <!-- Show Week Email Content -->
           <div class="email-content active" id="show-week-content">
             <h3>Show Week Email</h3>
-            <p>Send "It's Show Week!" emails to volunteers who have shifts for a selected show. This includes their schedule PDF attachment.</p>
+            <p>Send "It's Show Week!" emails to volunteers who have shifts for a selected production. This includes their schedule PDF attachment.</p>
             
             <div class="form-group">
-              <label class="form-label" for="showSelect">Select Show:</label>
+              <label class="form-label" for="showSelect">Select Production:</label>
               <select class="form-select" id="showSelect">
-                <option value="">-- Select a show --</option>
+                <option value="">-- Select a production --</option>
               </select>
             </div>
 
