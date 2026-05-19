@@ -1043,7 +1043,9 @@
       <form id="signupForm">
         <div class="shifts-section">
           <h2>Available Shifts</h2>
-          <p class="section-subtitle">View and manage your shifts for upcoming performances.</p>
+          <p class="section-subtitle">
+            View and manage your shifts for upcoming performances.
+          </p>
           <div id="availableShifts"></div>
         </div>
 
@@ -2204,7 +2206,10 @@
               .join("");
 
             const currentShiftTime = assignedShift
-              ? formatShiftTime(assignedShift.arrive_time, assignedShift.depart_time)
+              ? formatShiftTime(
+                  assignedShift.arrive_time,
+                  assignedShift.depart_time,
+                )
               : "";
             const currentShiftRow = assignedShift
               ? `
