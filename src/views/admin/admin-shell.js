@@ -22,7 +22,9 @@
     const toggle = document.querySelector(".mobile-menu-toggle");
 
     if (
-      navMenu && toggle && !navMenu.contains(event.target) &&
+      navMenu &&
+      toggle &&
+      !navMenu.contains(event.target) &&
       !toggle.contains(event.target)
     ) {
       navMenu.classList.remove("active");
@@ -44,9 +46,10 @@
         return;
       }
 
-      unfilledNav.textContent = data.count > 0
-        ? "Unfilled Shifts (" + data.count + ")"
-        : "Unfilled Shifts";
+      unfilledNav.textContent =
+        data.count > 0
+          ? "Unfilled Shifts (" + data.count + ")"
+          : "Unfilled Shifts";
     } catch (error) {
       console.error("Error fetching unfilled count:", error);
     }
@@ -100,8 +103,8 @@
         0,
       );
 
-      const networkDelay = (clientTimeAfterRequest - clientTimeBeforeRequest) /
-        2;
+      const networkDelay =
+        (clientTimeAfterRequest - clientTimeBeforeRequest) / 2;
       const adjustedClientTime = clientTimeBeforeRequest + networkDelay;
       serverTimeOffset = serverTime.getTime() - adjustedClientTime;
       serverTimeInitialized = true;

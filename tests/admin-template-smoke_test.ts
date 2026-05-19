@@ -17,19 +17,22 @@ Deno.test("admin dashboard template includes shell and calendar hooks", () => {
   assertFalse(html.includes("Database Maintenance"));
 });
 
-Deno.test("admin settings template includes database maintenance controls", () => {
-  const html = renderSettingsTemplate();
+Deno.test(
+  "admin settings template includes database maintenance controls",
+  () => {
+    const html = renderSettingsTemplate();
 
-  assertStringIncludes(html, "Database Maintenance");
-  assertStringIncludes(
-    html,
-    "Do not touch these tools unless you know what you are doing.",
-  );
-  assertStringIncludes(html, 'id="runMigrationsBtn"');
-  assertStringIncludes(html, "/src/utils/modal.js");
-  assertStringIncludes(html, "/src/views/admin/settings.js");
-  assertStringIncludes(html, "/src/views/admin/admin-shell.js");
-});
+    assertStringIncludes(html, "Database Maintenance");
+    assertStringIncludes(
+      html,
+      "Do not touch these tools unless you know what you are doing.",
+    );
+    assertStringIncludes(html, 'id="runMigrationsBtn"');
+    assertStringIncludes(html, "/src/utils/modal.js");
+    assertStringIncludes(html, "/src/views/admin/settings.js");
+    assertStringIncludes(html, "/src/views/admin/admin-shell.js");
+  },
+);
 
 Deno.test(
   "admin volunteers template escapes volunteer content and includes actions",
