@@ -512,7 +512,9 @@ export function formatShiftForDisplay(shift: ShiftRow): string {
 /**
  * Gets current and future shifts only, ordered by date (next shift first)
  */
-export function filterCurrentAndFutureShifts(shifts: ShiftRow[]): ShiftRow[] {
+export function filterCurrentAndFutureShifts<T extends { show_date: string }>(
+  shifts: T[],
+): T[] {
   // Get current date in Adelaide timezone for comparison
   // Use a more reliable method to get Adelaide's current date
   const now = new Date();

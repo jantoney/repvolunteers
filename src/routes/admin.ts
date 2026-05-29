@@ -10,11 +10,14 @@ const knownAdminPaths = [
   /^\/reset-password$/,
   /^\/dashboard$/,
   /^\/settings$/,
+  /^\/help$/,
   /^\/shows$/,
   /^\/shows\/new$/,
   /^\/shows\/[^/]+\/edit$/,
   /^\/api\/shows$/,
   /^\/api\/maintenance\/migrations$/,
+  /^\/api\/email-defaults$/,
+  /^\/api\/settings\/email-contact$/,
   /^\/api\/shows\/[^/]+$/,
   /^\/api\/shows\/[^/]+\/dates$/,
   /^\/api\/shows\/[^/]+\/run-sheet\/[^/]+$/,
@@ -25,10 +28,14 @@ const knownAdminPaths = [
   /^\/api\/intervals\/[^/]+$/,
   /^\/volunteers$/,
   /^\/volunteers\/new$/,
+  /^\/volunteers\/[^/]+\/profile$/,
   /^\/volunteers\/[^/]+\/edit$/,
   /^\/volunteers\/[^/]+\/shifts$/,
   /^\/api\/volunteers$/,
   /^\/api\/volunteers\/[^/]+$/,
+  /^\/api\/volunteers\/[^/]+\/inactive$/,
+  /^\/api\/volunteers\/[^/]+\/active$/,
+  /^\/api\/volunteers\/[^/]+\/notes$/,
   /^\/api\/volunteers\/[^/]+\/approval$/,
   /^\/api\/volunteers\/[^/]+\/unavailable-performances$/,
   /^\/api\/volunteers\/[^/]+\/shifts$/,
@@ -103,9 +110,15 @@ router.use(async (ctx, next) => {
 router.use(requireAdminAuth);
 router.get("/dashboard", adminController.showDashboard);
 router.get("/settings", adminController.showSettingsPage);
+router.get("/help", adminController.showHelpPage);
 router.post(
   "/api/maintenance/migrations",
   adminController.runDatabaseMigrations,
+);
+router.get("/api/email-defaults", adminController.getAdminEmailDefaults);
+router.put(
+  "/api/settings/email-contact",
+  adminController.updateAdminEmailContactDefaults,
 );
 
 // Shows management pages
@@ -143,6 +156,7 @@ router.delete("/api/intervals/:id", adminController.deleteShowInterval);
 
 // Volunteers management pages
 router.get("/volunteers", adminController.showVolunteersPage);
+router.get("/volunteers/:id/profile", adminController.showEditVolunteerForm);
 router.get("/volunteers/:id/shifts", adminController.showVolunteerShiftsPage);
 router.get("/volunteers/new", adminController.showNewVolunteerForm);
 router.get("/volunteers/:id/edit", adminController.showEditVolunteerForm);
@@ -197,7 +211,15 @@ router.get(
   "/api/emails/attachments/:attachmentId/download",
   adminController.downloadEmailAttachment,
 );
-router.delete("/api/volunteers/:id", adminController.deleteVolunteer);
+router.post(
+  "/api/volunteers/:id/inactive",
+  adminController.markVolunteerInactive,
+);
+router.post(
+  "/api/volunteers/:id/active",
+  adminController.markVolunteerActive,
+);
+router.post("/api/volunteers/:id/notes", adminController.addVolunteerNote);
 
 // Shifts management pages
 router.get("/shifts", adminController.showShiftsPage);

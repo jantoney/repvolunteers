@@ -41,7 +41,8 @@ volunteer-facing experience simple and mobile friendly.
 - Admin users, sessions, accounts, and verification tokens are managed by Better
   Auth tables.
 - Times are stored as `TIMESTAMPTZ`; Adelaide timezone handling is centralized
-  in `src/utils/timezone.ts`.
+  in `src/utils/timezone.ts`. The app must always display performance and shift
+  times in Adelaide, Australia time regardless of the client's local timezone.
 - Sent emails and generated attachments are recorded in `sent_emails` and
   `email_attachments`.
 
@@ -98,11 +99,16 @@ For local browser/API testing on this PC, prefer `http://127.0.0.1:8044` over
 `http://localhost:8044`. `localhost` may resolve to the Docker/WSL listener
 first, while `127.0.0.1:8044` targets the local Deno watcher for this checkout.
 
-After code or configuration changes that affect the running Docker app, be
-helpful and rebuild/restart the local development container before handing off,
-then verify the changed route against the URL the user is using. Use the
-relevant compose/dev script, for example `.\dev.ps1 up` or
+After any code or configuration change in this repo, rebuild and restart the
+local development Docker app before handing off unless the user explicitly asks
+not to, Docker is unavailable, or the change is purely documentation that cannot
+affect the running app. Treat this as a required handoff step, not an optional
+courtesy. Use the relevant compose/dev script, for example `.\dev.ps1 up` or
 `docker compose -f docker-compose.dev.yml up -d --build`.
+
+After the rebuild, verify that the container is running and check the changed
+route against the URL the user is using. For local browser/API testing on this
+PC, prefer `http://127.0.0.1:8044`.
 
 ## Environment Variables
 
@@ -137,6 +143,9 @@ placeholder values only.
 - Use parameterized SQL queries. Do not interpolate user input into SQL strings.
 - Preserve Adelaide timezone behavior. Use helpers from `src/utils/timezone.ts`
   when formatting, inserting, or comparing show and shift times.
+- Do not use browser-local or host-local timezone formatting for app-visible
+  production, performance, shift, email, or PDF times. Show Adelaide time unless
+  the task explicitly introduces a separate labelled timezone.
 - Keep volunteer-facing screens mobile friendly.
 - Keep frontend changes in the existing server-rendered HTML/CSS/vanilla JS
   style unless the project deliberately adopts a frontend framework.

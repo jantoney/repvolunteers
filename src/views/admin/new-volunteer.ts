@@ -33,7 +33,7 @@ export function renderNewVolunteerTemplate(): string {
 
         <div class="form-container">
           <div id="successMessage" class="success" style="display: none;">
-            <strong>Success!</strong> Volunteer created successfully.
+            <strong>Success!</strong> Volunteer created successfully with website login enabled.
             <p>Signup link: <span id="signupLink"></span></p>
           </div>
 

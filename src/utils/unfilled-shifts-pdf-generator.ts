@@ -101,6 +101,7 @@ async function getUnfilledShiftsData(): Promise<UnfilledShiftsData> {
        JOIN shows sh ON sh.id = sd.show_id
        LEFT JOIN participant_shifts vs ON vs.shift_id = s.id
        WHERE s.depart_time >= NOW() - INTERVAL '3 hours'
+         AND s.assigned_participant_id IS NULL
        GROUP BY s.id, sh.name, DATE(sd.start_time), sd.start_time, sd.end_time, s.role, s.arrive_time, s.depart_time
        HAVING COUNT(vs.participant_id) = 0
        ORDER BY DATE(sd.start_time), s.arrive_time`,
@@ -788,6 +789,7 @@ async function getOutstandingShiftsData(
        JOIN shows sh ON sh.id = sd.show_id
        LEFT JOIN participant_shifts vs ON vs.shift_id = s.id
        WHERE s.depart_time >= NOW() - INTERVAL '3 hours'
+         AND s.assigned_participant_id IS NULL
        GROUP BY s.id, sh.name, DATE(sd.start_time), sd.start_time, sd.end_time, s.role, s.arrive_time, s.depart_time
        HAVING COUNT(vs.participant_id) = 0
        ORDER BY sd.start_time, s.arrive_time
@@ -833,6 +835,7 @@ async function getOutstandingShiftsDataForVolunteer(
        JOIN shows sh ON sh.id = sd.show_id
        LEFT JOIN participant_shifts vs ON vs.shift_id = s.id
        WHERE s.depart_time >= NOW() - INTERVAL '3 hours'
+         AND s.assigned_participant_id IS NULL
          AND NOT EXISTS (
            SELECT 1
            FROM volunteer_unavailable_performances vup
@@ -844,10 +847,13 @@ async function getOutstandingShiftsDataForVolunteer(
            SELECT DISTINCT unfilled.id
            FROM shifts unfilled
            JOIN show_dates unfilled_sd ON unfilled_sd.id = unfilled.show_date_id
-           JOIN shifts existing ON existing.id IN (
-             SELECT ps.shift_id 
-             FROM participant_shifts ps 
-             WHERE ps.participant_id = $1
+           JOIN shifts existing ON (
+             existing.assigned_participant_id = $1
+             OR existing.id IN (
+               SELECT ps.shift_id
+               FROM participant_shifts ps
+               WHERE ps.participant_id = $1
+             )
            )
            JOIN show_dates existing_sd ON existing_sd.id = existing.show_date_id
            WHERE unfilled.depart_time >= NOW() - INTERVAL '3 hours'

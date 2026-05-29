@@ -1,5 +1,10 @@
 // Get volunteer ID from the script tag
-const volunteerId = document.currentScript.getAttribute("data-volunteer-id");
+const profileVolunteerId = document.currentScript.getAttribute(
+  "data-volunteer-id",
+);
+const profileVolunteerName = document.currentScript.getAttribute(
+  "data-volunteer-name",
+);
 
 // Load email history when page loads
 document.addEventListener("DOMContentLoaded", function () {
@@ -12,6 +17,7 @@ document.addEventListener("DOMContentLoaded", function () {
   loadEmailHistory();
   loadUnavailablePerformances();
   setupEventListeners();
+  setupProfileTabs();
 });
 
 function setupEventListeners() {
@@ -29,18 +35,25 @@ function setupEventListeners() {
       };
 
       try {
-        const response = await fetch(`/admin/api/volunteers/${volunteerId}`, {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
+        const response = await fetch(
+          `/admin/api/volunteers/${profileVolunteerId}`,
+          {
+            method: "PUT",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(data),
+            credentials: "include",
           },
-          body: JSON.stringify(data),
-          credentials: "include",
-        });
+        );
 
         if (response.ok) {
-          globalThis.location.href = "/admin/volunteers";
+          setProfileSaveStatus("Details saved.", "success");
+          if (typeof Toast !== "undefined") {
+            Toast.success("Volunteer details saved.");
+          }
         } else {
+          setProfileSaveStatus("Details were not saved.", "error");
           if (typeof Modal !== "undefined") {
             Modal.error("Error", "Failed to update volunteer");
           } else {
@@ -49,6 +62,7 @@ function setupEventListeners() {
         }
       } catch (error) {
         console.error("Update error:", error);
+        setProfileSaveStatus("Details were not saved.", "error");
         if (typeof Modal !== "undefined") {
           Modal.error("Error", "Error updating volunteer");
         } else {
@@ -77,9 +91,105 @@ function setupEventListeners() {
       saveUnavailablePerformances,
     );
   }
+
+  const noteForm = document.getElementById("volunteerNoteForm");
+  if (noteForm) {
+    noteForm.addEventListener("submit", addVolunteerNote);
+  }
+}
+
+function setupProfileTabs() {
+  const tabs = document.querySelectorAll(".profile-tab");
+  const panels = document.querySelectorAll(".profile-panel");
+
+  const activateTab = (target) => {
+    const tab = document.querySelector(
+      `.profile-tab[data-tab-target="${target}"]`,
+    );
+    const panel = document.getElementById(`profile-tab-${target}`);
+    if (tab && panel) {
+      tabs.forEach((item) => item.classList.remove("active"));
+      panels.forEach((item) => item.classList.remove("active"));
+      tab.classList.add("active");
+      panel.classList.add("active");
+    }
+  };
+
+  tabs.forEach((tab) => {
+    tab.addEventListener("click", () => {
+      const target = tab.getAttribute("data-tab-target");
+      activateTab(target);
+    });
+  });
+
+  const params = new URLSearchParams(globalThis.location.search);
+  const initialTab = params.get("tab") || "";
+  if (initialTab) {
+    activateTab(initialTab);
+  }
+}
+
+function setProfileSaveStatus(message, type) {
+  const statusEl = document.getElementById("profileSaveStatus");
+  if (!statusEl) return;
+  statusEl.textContent = message;
+  statusEl.className = `profile-status ${type === "error" ? "error" : ""}`;
+}
+
+function setNoteSaveStatus(message, type) {
+  const statusEl = document.getElementById("noteSaveStatus");
+  if (!statusEl) return;
+  statusEl.textContent = message;
+  statusEl.className = `profile-status ${type === "error" ? "error" : ""}`;
+}
+
+async function addVolunteerNote(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const formData = new FormData(form);
+  const note = String(formData.get("note") || "").trim();
+
+  if (!note) {
+    setNoteSaveStatus("Enter a note first.", "error");
+    return;
+  }
+
+  try {
+    const response = await fetch(
+      `/admin/api/volunteers/${profileVolunteerId}/notes`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ note }),
+      },
+    );
+
+    if (!response.ok) {
+      throw new Error("Failed to add note");
+    }
+
+    if (typeof Toast !== "undefined") {
+      Toast.success("Note added.");
+    }
+    globalThis.location.reload();
+  } catch (error) {
+    console.error("Error adding volunteer note:", error);
+    setNoteSaveStatus("Note was not added.", "error");
+  }
+}
+
+function escapeHtml(text) {
+  return String(text || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
 }
 
 const unavailablePerformanceIds = new Set();
+const savedUnavailablePerformanceIds = new Set();
 const performanceById = new Map();
 let performanceOptions = [];
 
@@ -110,7 +220,7 @@ function populateUnavailablePerformanceSelect() {
         "option",
         { value: String(performance.id) },
         performance.label,
-      ),
+      )
     ),
   ]);
 }
@@ -123,7 +233,7 @@ function renderUnavailablePerformances() {
     .map((id) => performanceById.get(id))
     .filter(Boolean)
     .sort((a, b) =>
-      `${a.date} ${a.start_time}`.localeCompare(`${b.date} ${b.start_time}`),
+      `${a.date} ${a.start_time}`.localeCompare(`${b.date} ${b.start_time}`)
     );
 
   if (selectedPerformances.length === 0) {
@@ -149,18 +259,12 @@ function renderUnavailablePerformances() {
           {
             type: "button",
             className: "btn btn-sm btn-danger",
-            onclick: () => {
-              unavailablePerformanceIds.delete(String(performance.id));
-              renderUnavailablePerformances();
-              setUnavailablePerformancesStatus(
-                "Remember to save your changes.",
-                "",
-              );
-            },
+            onclick: (event) =>
+              removeUnavailablePerformance(performance, event.currentTarget),
           },
           "Remove",
         ),
-      ]),
+      ])
     ),
   );
 
@@ -170,7 +274,7 @@ function renderUnavailablePerformances() {
 async function loadUnavailablePerformances() {
   try {
     const response = await fetch(
-      `/admin/api/volunteers/${volunteerId}/unavailable-performances`,
+      `/admin/api/volunteers/${profileVolunteerId}/unavailable-performances`,
     );
     if (!response.ok) {
       throw new Error("Failed to load unavailable performances");
@@ -178,13 +282,15 @@ async function loadUnavailablePerformances() {
 
     const data = await response.json();
     unavailablePerformanceIds.clear();
+    savedUnavailablePerformanceIds.clear();
     performanceById.clear();
     performanceOptions = data.options || [];
     performanceOptions.forEach((performance) =>
-      performanceById.set(String(performance.id), performance),
+      performanceById.set(String(performance.id), performance)
     );
     (data.performances || []).forEach((performance) => {
       unavailablePerformanceIds.add(String(performance.id));
+      savedUnavailablePerformanceIds.add(String(performance.id));
       performanceById.set(String(performance.id), performance);
     });
     renderUnavailablePerformances();
@@ -210,6 +316,82 @@ function addUnavailablePerformance() {
   setUnavailablePerformancesStatus("Remember to save your changes.", "");
 }
 
+async function persistUnavailablePerformances(performanceIds) {
+  const response = await fetch(
+    `/admin/api/volunteers/${profileVolunteerId}/unavailable-performances`,
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({
+        performanceIds: performanceIds.map(Number).sort((a, b) => a - b),
+      }),
+    },
+  );
+
+  if (!response.ok) {
+    let message = "Failed to save unavailable performances";
+    try {
+      const error = await response.json();
+      message = error.error || message;
+    } catch {
+      message = `${message} (HTTP ${response.status})`;
+    }
+    throw new Error(message);
+  }
+
+  return await response.json();
+}
+
+function syncSavedUnavailablePerformanceIds(performanceIds) {
+  savedUnavailablePerformanceIds.clear();
+  performanceIds.forEach((id) =>
+    savedUnavailablePerformanceIds.add(String(id))
+  );
+}
+
+async function removeUnavailablePerformance(performance, button) {
+  const performanceId = String(performance.id);
+  const originalText = button ? button.textContent : "Remove";
+
+  if (button) {
+    button.disabled = true;
+    button.textContent = "Removing...";
+  }
+  setUnavailablePerformancesStatus(
+    `Removing ${performance.label}...`,
+    "",
+  );
+
+  try {
+    const savedIdsAfterRemoval = Array.from(savedUnavailablePerformanceIds)
+      .filter((id) => id !== performanceId);
+    const result = await persistUnavailablePerformances(savedIdsAfterRemoval);
+
+    unavailablePerformanceIds.delete(performanceId);
+    syncSavedUnavailablePerformanceIds(
+      result.performanceIds || savedIdsAfterRemoval,
+    );
+    renderUnavailablePerformances();
+    setUnavailablePerformancesStatus(
+      `${performance.label} was removed.`,
+      "success",
+    );
+  } catch (error) {
+    console.error("Error removing unavailable performance:", error);
+    setUnavailablePerformancesStatus(
+      error.message ||
+        `Could not remove ${performance.label}. Please try again.`,
+      "error",
+    );
+  } finally {
+    if (button) {
+      button.disabled = false;
+      button.textContent = originalText;
+    }
+  }
+}
+
 async function saveUnavailablePerformances() {
   const button = document.getElementById("saveUnavailablePerformancesBtn");
   const originalText = button ? button.textContent : "Save";
@@ -219,24 +401,9 @@ async function saveUnavailablePerformances() {
   }
 
   try {
-    const response = await fetch(
-      `/admin/api/volunteers/${volunteerId}/unavailable-performances`,
-      {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          performanceIds: Array.from(unavailablePerformanceIds)
-            .map(Number)
-            .sort((a, b) => a - b),
-        }),
-      },
-    );
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || "Failed to save unavailable performances");
-    }
+    const performanceIds = Array.from(unavailablePerformanceIds);
+    const result = await persistUnavailablePerformances(performanceIds);
+    syncSavedUnavailablePerformanceIds(result.performanceIds || performanceIds);
 
     setUnavailablePerformancesStatus(
       "Unavailable performances saved.",
@@ -267,7 +434,9 @@ async function loadEmailHistory() {
     if (contentEl) contentEl.style.display = "none";
     if (errorEl) errorEl.style.display = "none";
 
-    const response = await fetch(`/admin/api/volunteers/${volunteerId}/emails`);
+    const response = await fetch(
+      `/admin/api/volunteers/${profileVolunteerId}/emails`,
+    );
 
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}: Failed to load email history`);
@@ -303,7 +472,11 @@ async function loadEmailHistory() {
 
 function renderEmailHistory(emails) {
   return emails.map((email) => {
-    const sentDate = new Date(email.sent_at).toLocaleString();
+    const sentDate = new Date(email.sent_at).toLocaleString("en-AU", {
+      dateStyle: "medium",
+      timeStyle: "short",
+      timeZone: "Australia/Adelaide",
+    });
 
     return AdminDOM.el("div", { className: "email-item" }, [
       AdminDOM.el("div", { className: "email-header" }, [
@@ -350,7 +523,7 @@ async function viewEmailContent(emailId) {
   );
 
   // Show modal with animation
-  modal.style.display = "block";
+  modal.style.display = "flex";
 
   try {
     const response = await fetch(`/admin/api/emails/${emailId}/content`);
@@ -400,7 +573,14 @@ async function viewEmailContent(emailId) {
         `${email.recipient_name || "Unknown"} <${email.recipient_email || ""}>`,
       ],
       ["Subject:", email.subject || "No subject"],
-      ["Sent:", new Date(email.sent_at).toLocaleString()],
+      [
+        "Sent:",
+        new Date(email.sent_at).toLocaleString("en-AU", {
+          dateStyle: "medium",
+          timeStyle: "short",
+          timeZone: "Australia/Adelaide",
+        }),
+      ],
       ["Type:", (email.email_type || "unknown").replace("_", " ")],
     ].flatMap(([label, value]) => [
       AdminDOM.el("span", { className: "email-details-label" }, label),
@@ -454,7 +634,7 @@ async function viewEmailContent(emailId) {
                   ),
                   att.filename,
                 ],
-              ),
+              )
             ),
           ),
         ]),
@@ -523,8 +703,125 @@ globalThis.onclick = function (event) {
 document.addEventListener("keydown", function (event) {
   if (event.key === "Escape") {
     const modal = document.getElementById("emailContentModal");
-    if (modal && modal.style.display === "block") {
+    if (modal && modal.style.display !== "none") {
       closeEmailModal();
     }
   }
 });
+
+function getAbsoluteSignupUrl(volunteerIdForUrl) {
+  const input = document.getElementById(`url-${volunteerIdForUrl}`);
+  if (!input) return "";
+  if (!input.dataset.fullUrl) {
+    input.dataset.fullUrl = new URL(input.value, globalThis.location.origin)
+      .href;
+  }
+  return input.dataset.fullUrl;
+}
+
+async function copyProfileSignupUrl(volunteerIdForUrl) {
+  const url = getAbsoluteSignupUrl(volunteerIdForUrl);
+  if (!url) return;
+
+  try {
+    await navigator.clipboard.writeText(url);
+    if (typeof Toast !== "undefined") {
+      Toast.success("Portal link copied.");
+    } else {
+      alert("Portal link copied.");
+    }
+  } catch (error) {
+    console.error("Could not copy portal link:", error);
+    if (typeof Modal !== "undefined") {
+      Modal.error("Copy failed", "Could not copy the portal link.");
+    } else {
+      alert("Could not copy the portal link.");
+    }
+  }
+}
+
+function openProfileSignupUrl(volunteerIdForUrl) {
+  const url = getAbsoluteSignupUrl(volunteerIdForUrl);
+  if (url) {
+    globalThis.open(url, "_blank", "noopener");
+  }
+}
+
+async function toggleVolunteerStatusFromProfile(button) {
+  const id = button.dataset.volunteerId;
+  const name = button.dataset.volunteerName;
+  const nextStatus = button.dataset.nextStatus === "active"
+    ? "active"
+    : "inactive";
+
+  const statusAction = async () => {
+    try {
+      const response = await fetch(`/admin/api/volunteers/${id}/${nextStatus}`, {
+        method: "POST",
+        credentials: "include",
+      });
+
+      if (response.ok) {
+        if (typeof Toast !== "undefined") {
+          Toast.success(
+            nextStatus === "active"
+              ? "Volunteer marked active."
+              : "Volunteer marked inactive.",
+          );
+        }
+        globalThis.location.reload();
+      } else if (typeof Modal !== "undefined") {
+        Modal.error("Update failed", "Could not update this volunteer status.");
+      } else {
+        alert("Could not update this volunteer status.");
+      }
+    } catch (error) {
+      console.error("Error updating volunteer status:", error);
+      if (typeof Modal !== "undefined") {
+        Modal.error("Update failed", "Could not update this volunteer status.");
+      } else {
+        alert("Could not update this volunteer status.");
+      }
+    }
+  };
+
+  const message =
+    `Mark <strong>${
+      escapeHtml(name || profileVolunteerName || "this volunteer")
+    }</strong> ${nextStatus}?`;
+
+  if (typeof Modal !== "undefined") {
+    const isActivating = nextStatus === "active";
+    Modal.showModal(`status-volunteer-${id}`, {
+      title: isActivating ? "Reactivate volunteer" : "Stop future volunteering",
+      body: isActivating
+        ? `<p>${message}</p><p>This will allow website login and future shift requests again.</p>`
+        : `<p>${message}</p><p>We'll be sad to see you go, but we just wanted to confirm one last time. Clicking Confirm below will stop all future shift requests being sent to this volunteer and any shifts they're scheduled on in the future will be removed.</p>`,
+      buttons: [
+        {
+          text: "Cancel",
+          className: "modal-btn-outline",
+          action: "cancel",
+        },
+        {
+          text: "Confirm",
+          className: isActivating ? "modal-btn-primary" : "modal-btn-danger",
+          action: "confirm",
+          handler: async () => {
+            Modal.closeModal(`status-volunteer-${id}`);
+            await statusAction();
+          },
+        },
+      ],
+    });
+    return;
+  }
+
+  if (confirm(`Mark ${name || "this volunteer"} ${nextStatus}?`)) {
+    await statusAction();
+  }
+}
+
+globalThis.copyProfileSignupUrl = copyProfileSignupUrl;
+globalThis.openProfileSignupUrl = openProfileSignupUrl;
+globalThis.toggleVolunteerStatusFromProfile = toggleVolunteerStatusFromProfile;

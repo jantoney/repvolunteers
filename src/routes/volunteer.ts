@@ -12,6 +12,14 @@ router.put(
 );
 router.post("/signup/:id", volunteerController.submitSignup);
 router.post("/signup/:id/swap", volunteerController.swapShift);
+router.post(
+  "/signup/:id/opt-out",
+  volunteerController.optOutFutureVolunteering,
+);
+router.post(
+  "/signup/:id/opt-in",
+  volunteerController.optInFutureVolunteering,
+);
 router.delete("/signup/:id/shift", volunteerController.removeFromShift);
 
 export default router;

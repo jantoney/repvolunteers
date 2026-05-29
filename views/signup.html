@@ -107,6 +107,37 @@
         background: #c82333;
       }
 
+      .opt-out-link {
+        background: #fff7ed;
+        border: 1px solid #fed7aa;
+        color: #9a3412;
+        font-size: 0.9rem;
+        font-weight: 700;
+        padding: 0.55rem 0.85rem;
+      }
+
+      .opt-out-link:hover {
+        background: #ffedd5;
+        color: #7c2d12;
+      }
+
+      .reactivate-button {
+        background: #28a745;
+        color: white;
+        margin-top: 0.75rem;
+      }
+
+      .inactive-notice {
+        background: #f8fafc;
+        border: 1px solid #dbe3ef;
+        border-radius: 8px;
+        color: #334155;
+        font-weight: 600;
+        margin: 1rem 0 2rem;
+        padding: 1rem;
+        text-align: center;
+      }
+
       /* Mobile floating PDF and logout buttons */
       @media (max-width: 768px) {
         .header-actions {
@@ -144,6 +175,15 @@
           font-size: 1.2rem;
           box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
           margin-left: 0;
+        }
+
+        .opt-out-link {
+          position: static;
+          width: auto;
+          height: auto;
+          border-radius: 6px;
+          box-shadow: none;
+          margin-top: 0.75rem;
         }
 
         .pdf-button:hover,
@@ -992,6 +1032,7 @@
             <span class="logout-button-text">🚪 Logout</span>
             <span class="logout-button-icon">🚪</span>
           </button>
+          {{^inactive}}
           <button class="pdf-button" onclick="downloadPDF()">
             <span class="pdf-button-text">📄 Download PDF</span>
             <span class="pdf-button-icon">📄</span>
@@ -1000,12 +1041,32 @@
             <span class="pdf-button-text">📋 Quick Download</span>
             <span class="pdf-button-icon">📋</span>
           </button>
+          {{/inactive}}
         </div>
       </div>
       <div class="welcome-text">
         Hello, <strong>{{name}}</strong>! Manage your shifts below.
+        {{^inactive}}
+        <div>
+          <button type="button" class="opt-out-link" onclick="confirmVolunteerOptOut()">
+            Stop future volunteering
+          </button>
+        </div>
+        {{/inactive}}
       </div>
 
+      {{#inactive}}
+      <div class="inactive-notice">
+        This volunteer account is inactive, so future shift requests will not be sent.
+        <div>
+          <button type="button" class="reactivate-button" onclick="confirmVolunteerOptIn()">
+            Reactivate volunteering
+          </button>
+        </div>
+      </div>
+      {{/inactive}}
+
+      {{^inactive}}
       <!-- Calendar Section -->
       <div class="calendar-section">
         <div class="calendar-header">
@@ -1038,7 +1099,9 @@
         <h2>Future Shifts</h2>
         <div id="assignedShifts"></div>
       </div>
+      {{/inactive}}
 
+      {{^inactive}}
       <!-- Available Shifts Section -->
       <form id="signupForm">
         <div class="shifts-section">
@@ -1055,6 +1118,7 @@
           </button>
         </div>
       </form>
+      {{/inactive}}
 
       <div id="successMessage" class="success-message">
         <strong>Success!</strong> Your shift assignments have been updated.
@@ -1077,7 +1141,7 @@
       {{{unavailablePerformancesJson}}}
     </script>
     <script type="application/json" id="volunteerData">
-      { "id": "{{volunteerId}}" }
+      { "id": "{{volunteerId}}", "inactive": {{#inactive}}true{{/inactive}}{{^inactive}}false{{/inactive}} }
     </script>
     <script src="/src/utils/modal.js"></script>
     <script src="/src/utils/timezone-client.js"></script>
@@ -2500,6 +2564,113 @@
         window.location.href = "/";
       }
 
+      function confirmVolunteerOptOut() {
+        Modal.showModal("volunteer-opt-out", {
+          title: "Stop future volunteering?",
+          body: `
+            <p>We'll be sad to see you go, but we just wanted to confirm one last time.</p>
+            <p>Clicking Confirm below will stop all future shift requests being sent to you and any shifts you're scheduled on in the future will be removed.</p>
+          `,
+          buttons: [
+            {
+              text: "Cancel",
+              className: "modal-btn-outline",
+              action: "cancel",
+            },
+            {
+              text: "Confirm",
+              className: "modal-btn-danger",
+              action: "confirm",
+              handler: async () => {
+                Modal.closeModal("volunteer-opt-out");
+                await optOutFutureVolunteering();
+              },
+            },
+          ],
+        });
+      }
+
+      async function optOutFutureVolunteering() {
+        try {
+          const response = await fetch(
+            `/volunteer/signup/${volunteer.id}/opt-out`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+            },
+          );
+
+          if (!response.ok) {
+            throw new Error("Opt-out failed");
+          }
+
+          Modal.success(
+            "Confirmed",
+            "You have been marked inactive and future shifts have been removed.",
+            () => {
+              location.reload();
+            },
+          );
+        } catch (error) {
+          Modal.error(
+            "Could not update your account",
+            "Please try again or contact the theatre team.",
+          );
+        }
+      }
+
+      function confirmVolunteerOptIn() {
+        Modal.showModal("volunteer-opt-in", {
+          title: "Reactivate volunteering?",
+          body: "<p>This will reactivate your volunteer account so future shift requests can be sent to you again.</p>",
+          buttons: [
+            {
+              text: "Cancel",
+              className: "modal-btn-outline",
+              action: "cancel",
+            },
+            {
+              text: "Reactivate",
+              className: "modal-btn-primary",
+              action: "confirm",
+              handler: async () => {
+                Modal.closeModal("volunteer-opt-in");
+                await optInFutureVolunteering();
+              },
+            },
+          ],
+        });
+      }
+
+      async function optInFutureVolunteering() {
+        try {
+          const response = await fetch(
+            `/volunteer/signup/${volunteer.id}/opt-in`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+            },
+          );
+
+          if (!response.ok) {
+            throw new Error("Opt-in failed");
+          }
+
+          Modal.success(
+            "Reactivated",
+            "Your volunteer account has been reactivated.",
+            () => {
+              location.reload();
+            },
+          );
+        } catch (error) {
+          Modal.error(
+            "Could not update your account",
+            "Please try again or contact the theatre team.",
+          );
+        }
+      }
+
       function quickDownloadPDF() {
         const pdfUrl = `/volunteer/signup/${volunteer.id}/schedule-pdf`;
 
@@ -2584,15 +2755,17 @@
           );
         }
 
-        generateCalendar();
-        populateAssignedShifts();
-        populateAvailableShifts();
+        if (!volunteer.inactive) {
+          generateCalendar();
+          populateAssignedShifts();
+          populateAvailableShifts();
+        }
       });
 
       // Handle form submission for new shifts
-      document
-        .getElementById("signupForm")
-        .addEventListener("submit", async (e) => {
+      const signupForm = document.getElementById("signupForm");
+      if (signupForm) {
+        signupForm.addEventListener("submit", async (e) => {
           e.preventDefault();
 
           const selectedShifts = Array.from(
@@ -2724,6 +2897,7 @@
             submitBtn.textContent = originalText;
           }
         });
+      }
     </script>
   </body>
 </html>

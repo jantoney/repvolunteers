@@ -5,6 +5,11 @@ import {
   normalizeUnavailablePerformanceIds,
   setVolunteerUnavailablePerformances,
 } from "../utils/availability.ts";
+import {
+  markParticipantInactive,
+  markParticipantActive,
+  VOLUNTEER_OPT_OUT_NOTE,
+} from "../utils/participant-lifecycle.ts";
 import { render } from "../utils/template.ts";
 
 // ...existing code...
@@ -13,6 +18,7 @@ interface VolunteerRecord {
   name: string;
   email?: string;
   phone?: string;
+  status?: string;
 }
 
 export async function viewSignup(ctx: RouterContext<string>) {
@@ -27,6 +33,8 @@ export async function viewSignup(ctx: RouterContext<string>) {
     if (volunteerRes.rows.length === 0) {
       ctx.throw(404, "Volunteer not found");
     }
+    const volunteer = volunteerRes.rows[0];
+    const isInactive = volunteer.status === "inactive";
 
     // ...existing code...
     type ShiftRow = {
@@ -56,8 +64,9 @@ export async function viewSignup(ctx: RouterContext<string>) {
        JOIN shows sh ON sh.id = sd.show_id
        JOIN participant_shifts vs ON vs.shift_id = s.id
        WHERE vs.participant_id = $1
+         AND $2 = false
        ORDER BY sh.name, sd.start_time, s.arrive_time`,
-      [id],
+      [id, isInactive],
     );
 
     // Get available shifts (not assigned to any participant)
@@ -80,12 +89,14 @@ export async function viewSignup(ctx: RouterContext<string>) {
        JOIN shows sh ON sh.id = sd.show_id
        LEFT JOIN participant_shifts vs ON vs.shift_id = s.id
        WHERE vs.participant_id IS NULL
+         AND $2 = false
        ORDER BY sh.name, sd.start_time, s.arrive_time`,
-      [id],
+      [id, isInactive],
     );
 
-    const unavailablePerformances =
-      await getVolunteerUnavailablePerformances(id);
+    const unavailablePerformances = await getVolunteerUnavailablePerformances(
+      id,
+    );
 
     // Group assigned shifts by show, then by performance
     // ...existing code...
@@ -114,10 +125,9 @@ export async function viewSignup(ctx: RouterContext<string>) {
           startTimeStr = "";
         }
       }
-      const date =
-        startTimeStr && typeof startTimeStr === "string"
-          ? startTimeStr.split("T")[0]
-          : "";
+      const date = startTimeStr && typeof startTimeStr === "string"
+        ? startTimeStr.split("T")[0]
+        : "";
       const rowWithDate = { ...row, date };
       const showKey = `${row.show_id}`;
       if (!groupedAssigned[showKey]) {
@@ -165,10 +175,9 @@ export async function viewSignup(ctx: RouterContext<string>) {
           startTimeStr = "";
         }
       }
-      const date =
-        startTimeStr && typeof startTimeStr === "string"
-          ? startTimeStr.split("T")[0]
-          : "";
+      const date = startTimeStr && typeof startTimeStr === "string"
+        ? startTimeStr.split("T")[0]
+        : "";
       const rowWithDate = { ...row, date };
       const showKey = `${row.show_id}`;
       if (!groupedAvailable[showKey]) {
@@ -220,6 +229,7 @@ export async function viewSignup(ctx: RouterContext<string>) {
     const html = await render("views/signup.html", {
       name: volunteerRes.rows[0].name,
       volunteerId: id,
+      inactive: isInactive,
       assignedShiftsJson: safeAssignedJSON,
       shiftsJson: safeAvailableJSON,
       unavailablePerformancesJson: unavailablePerformancesJSON,
@@ -229,6 +239,62 @@ export async function viewSignup(ctx: RouterContext<string>) {
     ctx.response.body = html;
   } finally {
     client.release();
+  }
+}
+
+export async function optOutFutureVolunteering(ctx: RouterContext<string>) {
+  const id = ctx.params.id;
+
+  try {
+    const result = await markParticipantInactive(id, {
+      note: VOLUNTEER_OPT_OUT_NOTE,
+      createdByName: "Volunteer self-service",
+    });
+
+    ctx.response.status = 200;
+    ctx.response.body = {
+      success: true,
+      message: "You have been marked inactive.",
+      removedShiftCount: result.removedParticipantShiftCount +
+        result.removedDirectAssignmentCount,
+    };
+  } catch (error) {
+    if (error instanceof Error && error.message === "Volunteer not found") {
+      ctx.response.status = 404;
+      ctx.response.body = { error: "Volunteer not found" };
+      return;
+    }
+
+    console.error("Error opting out volunteer:", error);
+    ctx.response.status = 500;
+    ctx.response.body = { error: "Failed to opt out" };
+  }
+}
+
+export async function optInFutureVolunteering(ctx: RouterContext<string>) {
+  const id = ctx.params.id;
+
+  try {
+    await markParticipantActive(id, {
+      note: "Re-activated volunteering in the future",
+      createdByName: "Volunteer self-service",
+    });
+
+    ctx.response.status = 200;
+    ctx.response.body = {
+      success: true,
+      message: "You have been marked active.",
+    };
+  } catch (error) {
+    if (error instanceof Error && error.message === "Volunteer not found") {
+      ctx.response.status = 404;
+      ctx.response.body = { error: "Volunteer not found" };
+      return;
+    }
+
+    console.error("Error reactivating volunteer:", error);
+    ctx.response.status = 500;
+    ctx.response.body = { error: "Failed to reactivate" };
   }
 }
 
@@ -248,10 +314,9 @@ export async function updateUnavailablePerformances(
   } catch (error) {
     ctx.response.status = 400;
     ctx.response.body = {
-      error:
-        error instanceof Error
-          ? error.message
-          : "Failed to update unavailable performances",
+      error: error instanceof Error
+        ? error.message
+        : "Failed to update unavailable performances",
     };
   }
 }
@@ -264,6 +329,23 @@ export async function submitSignup(ctx: RouterContext<string>) {
   const client = await pool.connect();
   try {
     await client.queryObject("BEGIN");
+
+    const participantResult = await client.queryObject<{ status: string }>(
+      "SELECT status FROM participants WHERE id = $1",
+      [id],
+    );
+    if (participantResult.rows.length === 0) {
+      await client.queryObject("ROLLBACK");
+      ctx.response.status = 404;
+      ctx.response.body = { error: "Volunteer not found" };
+      return;
+    }
+    if (participantResult.rows[0].status === "inactive") {
+      await client.queryObject("ROLLBACK");
+      ctx.response.status = 403;
+      ctx.response.body = { error: "This volunteer account is inactive" };
+      return;
+    }
 
     // Check for conflicts before inserting any shifts
     for (const shiftId of shiftIds) {
@@ -396,6 +478,16 @@ export async function removeFromShift(ctx: RouterContext<string>) {
   const pool = getPool();
   const client = await pool.connect();
   try {
+    const participantResult = await client.queryObject<{ status: string }>(
+      "SELECT status FROM participants WHERE id = $1",
+      [volunteerId],
+    );
+    if (participantResult.rows[0]?.status === "inactive") {
+      ctx.response.status = 403;
+      ctx.response.body = { error: "This volunteer account is inactive" };
+      return;
+    }
+
     await client.queryObject(
       "DELETE FROM participant_shifts WHERE participant_id = $1 AND shift_id = $2",
       [volunteerId, shiftId],
@@ -418,6 +510,23 @@ export async function swapShift(ctx: RouterContext<string>) {
   const client = await pool.connect();
   try {
     await client.queryObject("BEGIN");
+
+    const participantResult = await client.queryObject<{ status: string }>(
+      "SELECT status FROM participants WHERE id = $1",
+      [volunteerId],
+    );
+    if (participantResult.rows.length === 0) {
+      await client.queryObject("ROLLBACK");
+      ctx.response.status = 404;
+      ctx.response.body = { error: "Volunteer not found" };
+      return;
+    }
+    if (participantResult.rows[0].status === "inactive") {
+      await client.queryObject("ROLLBACK");
+      ctx.response.status = 403;
+      ctx.response.body = { error: "This volunteer account is inactive" };
+      return;
+    }
 
     // Verify both shifts exist and are for the same performance
     const shiftsResult = await client.queryObject<{
@@ -461,8 +570,9 @@ export async function swapShift(ctx: RouterContext<string>) {
       return;
     }
 
-    const newShift =
-      String(shift1.shift_id) === String(newShiftId) ? shift1 : shift2;
+    const newShift = String(shift1.shift_id) === String(newShiftId)
+      ? shift1
+      : shift2;
     if (newShift.is_unavailable) {
       await client.queryObject("ROLLBACK");
       ctx.response.status = 409;
@@ -505,18 +615,22 @@ export async function downloadPDF(ctx: RouterContext<string>) {
   const id = ctx.params.id;
 
   try {
-    const { generateVolunteerPDFData } =
-      await import("../utils/pdf-generator.ts");
-    const { generateServerSidePDF } =
-      await import("../utils/server-pdf-generator.ts");
+    const { generateVolunteerPDFData } = await import(
+      "../utils/pdf-generator.ts"
+    );
+    const { generateServerSidePDF } = await import(
+      "../utils/server-pdf-generator.ts"
+    );
 
     const pdfData = await generateVolunteerPDFData(id);
     const pdfBuffer = await generateServerSidePDF(pdfData);
 
-    const filename = `theatre-shifts-${pdfData.volunteer.name.replace(
-      /[^a-zA-Z0-9]/g,
-      "-",
-    )}-${new Date().toISOString().split("T")[0]}.pdf`;
+    const filename = `theatre-shifts-${
+      pdfData.volunteer.name.replace(
+        /[^a-zA-Z0-9]/g,
+        "-",
+      )
+    }-${new Date().toISOString().split("T")[0]}.pdf`;
 
     ctx.response.headers.set("Content-Type", "application/pdf");
     ctx.response.headers.set(
@@ -535,18 +649,22 @@ export async function downloadSchedulePDF(ctx: RouterContext<string>) {
   const id = ctx.params.id;
 
   try {
-    const { generateVolunteerPDFData } =
-      await import("../utils/pdf-generator.ts");
-    const { generateServerSidePDF } =
-      await import("../utils/server-pdf-generator.ts");
+    const { generateVolunteerPDFData } = await import(
+      "../utils/pdf-generator.ts"
+    );
+    const { generateServerSidePDF } = await import(
+      "../utils/server-pdf-generator.ts"
+    );
 
     const pdfData = await generateVolunteerPDFData(id);
     const pdfBuffer = await generateServerSidePDF(pdfData);
 
-    const filename = `theatre-shifts-${pdfData.volunteer.name.replace(
-      /[^a-zA-Z0-9]/g,
-      "-",
-    )}-${new Date().toISOString().split("T")[0]}.pdf`;
+    const filename = `theatre-shifts-${
+      pdfData.volunteer.name.replace(
+        /[^a-zA-Z0-9]/g,
+        "-",
+      )
+    }-${new Date().toISOString().split("T")[0]}.pdf`;
 
     ctx.response.headers.set("Content-Type", "application/pdf");
     ctx.response.headers.set(

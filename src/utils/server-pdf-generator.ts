@@ -3,7 +3,7 @@
  * Generates PDFs using the same structure as the client-side implementation
  */
 
-import type { PDFData } from "./pdf-generator.ts";
+import { filterCurrentAndFutureShifts, type PDFData } from "./pdf-generator.ts";
 
 // Import jsPDF for server-side use
 import { jsPDF } from "jspdf";
@@ -138,28 +138,19 @@ export async function generateServerSidePDF(
     // Add footer to first page
     addPageFooter(doc, pageWidth, pageHeight, margin);
 
-    // Filter shifts to current month and future only
-    const now = new Date();
-    const currentYear = now.getFullYear();
-    const currentMonth = now.getMonth(); // 0-11
-    const currentMonthStart = new Date(currentYear, currentMonth, 1); // First day of current month
-
-    // Group shifts by date - add validation and filter for current month and future
-    const shiftsByDate: Record<string, ShiftRow[]> = {};
+    // Tables and summaries only show current/future shifts. Calendar pages
+    // still show all assigned shifts so volunteers can see the full roster
+    // context for any month included in the PDF.
+    const assignedShiftsForTable = filterCurrentAndFutureShifts(
+      data.assignedShifts || [],
+    );
+    const calendarShiftsByDate: Record<string, ShiftRow[]> = {};
     const unavailableByDate: Record<
       string,
       NonNullable<PDFData["unavailablePerformances"]>
     > = {};
-    const assignedShifts = (data.assignedShifts || []).filter((shift) => {
-      if (shift && shift.show_date) {
-        const shiftDate = new Date(shift.show_date);
-        // Include only shifts from current month onwards
-        return shiftDate >= currentMonthStart;
-      }
-      return false;
-    });
 
-    assignedShifts.forEach((shift) => {
+    (data.assignedShifts || []).forEach((shift) => {
       if (shift && shift.show_date) {
         // Handle show_date as Date or string
         let showDateStr = shift.show_date;
@@ -168,21 +159,16 @@ export async function generateServerSidePDF(
         }
         if (typeof showDateStr === "string") {
           const date = showDateStr.split("T")[0]; // Get YYYY-MM-DD part
-          if (!shiftsByDate[date]) {
-            shiftsByDate[date] = [];
+          if (!calendarShiftsByDate[date]) {
+            calendarShiftsByDate[date] = [];
           }
-          shiftsByDate[date].push(shift);
+          calendarShiftsByDate[date].push(shift);
         }
       }
     });
 
-    const unavailablePerformances = (data.unavailablePerformances || []).filter(
-      (performance) => {
-        if (performance && performance.show_date) {
-          return new Date(performance.show_date) >= currentMonthStart;
-        }
-        return false;
-      },
+    const unavailablePerformances = filterCurrentAndFutureShifts(
+      data.unavailablePerformances || [],
     );
 
     unavailablePerformances.forEach((performance) => {
@@ -203,13 +189,13 @@ export async function generateServerSidePDF(
 
     // Assigned Shifts Details table (on first page)
     doc.setFontSize(16);
-    doc.text("Assigned Shifts (Current Month On-wards)", margin, yPos);
+    doc.text("Assigned Shifts (Current and Future)", margin, yPos);
     yPos += 10;
 
-    if (assignedShifts.length === 0) {
+    if (assignedShiftsForTable.length === 0) {
       doc.setFontSize(10);
       doc.text(
-        "No shifts assigned for current month and future.",
+        "No current or future shifts assigned.",
         margin,
         yPos,
       );
@@ -245,19 +231,8 @@ export async function generateServerSidePDF(
       );
       yPos += 5;
 
-      // Sort shifts by date, then by arrive time
-      const sortedDates = Object.keys(shiftsByDate).sort();
-      const allShiftsForTable: ShiftRow[] = [];
-
-      sortedDates.forEach((date) => {
-        const shiftsOnDate = shiftsByDate[date];
-        shiftsOnDate.forEach((shift) => {
-          allShiftsForTable.push(shift);
-        });
-      });
-
       // Sort all shifts by date, then by arrive time
-      allShiftsForTable.sort((a, b) => {
+      const sortedShiftsForTable = [...assignedShiftsForTable].sort((a, b) => {
         const dateCompare =
           new Date(a.show_date).getTime() - new Date(b.show_date).getTime();
         if (dateCompare !== 0) return dateCompare;
@@ -268,7 +243,7 @@ export async function generateServerSidePDF(
 
       doc.setFont("helvetica", "normal");
 
-      allShiftsForTable.forEach((shift) => {
+      sortedShiftsForTable.forEach((shift) => {
         // Check if we need a new page
         if (yPos > maxY - 15) {
           doc.addPage("a4", "landscape");
@@ -373,7 +348,7 @@ export async function generateServerSidePDF(
 
     // Start calendars on new page if we have shifts or unavailable performances
     if (
-      Object.keys(shiftsByDate).length > 0 ||
+      Object.keys(calendarShiftsByDate).length > 0 ||
       Object.keys(unavailableByDate).length > 0
     ) {
       // Switch to portrait for calendar pages
@@ -387,7 +362,7 @@ export async function generateServerSidePDF(
 
       // Get unique months with shifts
       const monthsWithShifts = new Set<string>();
-      Object.keys(shiftsByDate).forEach((dateStr) => {
+      Object.keys(calendarShiftsByDate).forEach((dateStr) => {
         const date = new Date(dateStr);
         const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
         monthsWithShifts.add(monthKey);
@@ -477,7 +452,7 @@ export async function generateServerSidePDF(
             let dateStr = "";
             if (isDateCell) {
               dateStr = `${year}-${String(month).padStart(2, "0")}-${String(dayCount).padStart(2, "0")}`;
-              hasShifts = !!shiftsByDate[dateStr];
+              hasShifts = !!calendarShiftsByDate[dateStr];
               hasUnavailable = !!unavailableByDate[dateStr];
             }
 
@@ -520,7 +495,7 @@ export async function generateServerSidePDF(
               if (hasShifts) {
                 let shiftY = y + 9;
                 doc.setFontSize(8);
-                shiftsByDate[dateStr].forEach((shift) => {
+                calendarShiftsByDate[dateStr].forEach((shift) => {
                   // Use extractTime and plusOneDayIfNeeded as above
                   const arrive = extractTime(shift.arrive_time);
                   const depart =

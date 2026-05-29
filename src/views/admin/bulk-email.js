@@ -11,6 +11,7 @@ const emailTypes = new Set([
 ]);
 
 document.addEventListener("DOMContentLoaded", function () {
+  loadEmailDefaults();
   loadShows();
   loadUnfilledVolunteers();
   loadAvailabilityVolunteers();
@@ -25,6 +26,48 @@ async function fetchJson(url, options) {
   }
 
   return await response.json();
+}
+
+async function loadEmailDefaults() {
+  try {
+    const defaults = await fetchJson("/admin/api/email-defaults");
+    setFieldValue("showWeekMessage", defaults.messages?.showWeek || "");
+    setFieldValue(
+      "unfilledMessage",
+      defaults.messages?.lastMinuteShifts || "",
+    );
+    setFieldValue(
+      "availabilityMessage",
+      defaults.messages?.availabilityRequest || "",
+    );
+
+    [
+      "showWeek",
+      "unfilled",
+      "availability",
+    ].forEach((prefix) => {
+      setFieldValue(`${prefix}ContactName`, defaults.contactName || "");
+      setFieldValue(`${prefix}ContactPhone`, defaults.contactPhone || "");
+    });
+  } catch (error) {
+    console.error("Error loading email defaults:", error);
+    showStatus("Error loading email defaults", "error");
+  }
+}
+
+function setFieldValue(id, value) {
+  const field = document.getElementById(id);
+  if (field) {
+    field.value = value;
+  }
+}
+
+function getEmailOptions(prefix, messageFieldId) {
+  return {
+    message: document.getElementById(messageFieldId)?.value || "",
+    contactName: document.getElementById(`${prefix}ContactName`)?.value || "",
+    contactPhone: document.getElementById(`${prefix}ContactPhone`)?.value || "",
+  };
 }
 
 function setupEventListeners() {
@@ -168,12 +211,14 @@ async function loadAvailabilityVolunteers() {
 
 function hasAvailability(volunteer) {
   return (
+    volunteer.eligible_for_availability_request === true ||
     volunteer.has_availability === true ||
     Number(
-      volunteer.availability_performances_count ??
-        volunteer.unavailable_performances_count ??
-        0,
-    ) > 0
+        volunteer.actionable_shifts_count ??
+          volunteer.availability_performances_count ??
+          volunteer.unavailable_performances_count ??
+          0,
+      ) > 0
   );
 }
 
@@ -193,68 +238,155 @@ function createVolunteerTable(
     return;
   }
 
-  const table = AdminDOM.el("table", { className: "volunteer-table" }, [
-    AdminDOM.el(
-      "thead",
-      {},
-      AdminDOM.el("tr", {}, [
-        AdminDOM.el("th", { className: "select-column" }, "Select"),
-        ...columns.map((column) =>
-          AdminDOM.el(
-            "th",
-            { className: column.className || "" },
-            column.label,
-          ),
-        ),
-      ]),
-    ),
-    AdminDOM.el(
-      "tbody",
-      {},
-      volunteers.map((volunteer) => {
-        const isSelectable =
-          hasAvailability(volunteer) ||
-          volunteer.has_availability === undefined;
-        const volunteerId = String(volunteer.id);
-        return AdminDOM.el(
-          "tr",
-          {
-            className: isSelectable ? "" : "volunteer-unavailable",
-          },
-          [
-            AdminDOM.el(
-              "td",
-              { className: "select-column" },
-              AdminDOM.el("input", {
-                type: "checkbox",
-                className: "volunteer-checkbox",
-                dataset: { volunteerId },
-                disabled: !isSelectable,
-                checked: selection.has(volunteerId),
-                title: isSelectable
-                  ? "Select volunteer"
-                  : "No availability saved",
-                onchange: (event) =>
-                  onChange(volunteerId, event.target.checked),
-              }),
-            ),
-            ...columns.map((column) =>
+  const hasGroupedColumns = columns.some((column) => column.group);
+  const headerRows = hasGroupedColumns ? createGroupedTableHeader(columns) : [
+    AdminDOM.el("tr", {}, [
+      AdminDOM.el("th", { className: "select-column" }, "Select"),
+      ...columns.map((column) =>
+        AdminDOM.el(
+          "th",
+          { className: column.className || "" },
+          column.label,
+        )
+      ),
+    ]),
+  ];
+
+  const table = AdminDOM.el(
+    "table",
+    {
+      className: hasGroupedColumns
+        ? "volunteer-table has-column-groups"
+        : "volunteer-table",
+    },
+    [
+      AdminDOM.el(
+        "thead",
+        {},
+        headerRows,
+      ),
+      AdminDOM.el(
+        "tbody",
+        {},
+        volunteers.map((volunteer) => {
+          const isSelectable = hasAvailability(volunteer) ||
+            volunteer.has_availability === undefined;
+          const volunteerId = String(volunteer.id);
+          return AdminDOM.el(
+            "tr",
+            {
+              className: isSelectable ? "" : "volunteer-unavailable",
+            },
+            [
               AdminDOM.el(
                 "td",
-                { className: column.className || "" },
-                column.value(volunteer, isSelectable),
+                { className: "select-column" },
+                AdminDOM.el("input", {
+                  type: "checkbox",
+                  className: "volunteer-checkbox",
+                  dataset: { volunteerId },
+                  disabled: !isSelectable,
+                  checked: selection.has(volunteerId),
+                  title: isSelectable
+                    ? "Select volunteer"
+                    : "No eligible unfilled shifts",
+                  onchange: (event) =>
+                    onChange(volunteerId, event.target.checked),
+                }),
               ),
-            ),
-          ],
-        );
-      }),
-    ),
-  ]);
+              ...columns.map((column) =>
+                AdminDOM.el(
+                  "td",
+                  { className: column.className || "" },
+                  column.value(volunteer, isSelectable),
+                )
+              ),
+            ],
+          );
+        }),
+      ),
+    ],
+  );
 
   AdminDOM.setChildren(container, table);
 }
 
+function createGroupedTableHeader(columns) {
+  const firstRow = [
+    AdminDOM.el("th", { className: "select-column", rowSpan: 2 }, "Select"),
+  ];
+  const secondRow = [];
+
+  for (let index = 0; index < columns.length; index += 1) {
+    const column = columns[index];
+
+    if (!column.group) {
+      firstRow.push(
+        AdminDOM.el(
+          "th",
+          { className: column.className || "", rowSpan: 2 },
+          column.label,
+        ),
+      );
+      continue;
+    }
+
+    if (index === 0 || columns[index - 1].group !== column.group) {
+      let colSpan = 1;
+      for (
+        let nextIndex = index + 1;
+        nextIndex < columns.length;
+        nextIndex += 1
+      ) {
+        if (columns[nextIndex].group !== column.group) {
+          break;
+        }
+        colSpan += 1;
+      }
+
+      firstRow.push(
+        AdminDOM.el(
+          "th",
+          { colSpan, className: "column-group-heading" },
+          column.group,
+        ),
+      );
+    }
+
+    secondRow.push(
+      AdminDOM.el(
+        "th",
+        { className: column.className || "" },
+        column.label,
+      ),
+    );
+  }
+
+  return [
+    AdminDOM.el("tr", {}, firstRow),
+    AdminDOM.el("tr", {}, secondRow),
+  ];
+}
+
 function availabilityStatus(volunteer) {
+  if (volunteer.actionable_shifts_count !== undefined) {
+    const count = Number(volunteer.actionable_shifts_count ?? 0);
+
+    if (count === 0) {
+      return AdminDOM.el(
+        "span",
+        { className: "status-pill muted" },
+        "No eligible unfilled shifts",
+      );
+    }
+
+    return AdminDOM.el(
+      "span",
+      { className: "status-pill" },
+      `${count} shift opportunit${count === 1 ? "y" : "ies"}`,
+    );
+  }
+
   const count = Number(
     volunteer.availability_performances_count ??
       volunteer.unavailable_performances_count ??
@@ -274,6 +406,12 @@ function availabilityStatus(volunteer) {
     { className: "status-pill" },
     `${count} performance${count === 1 ? "" : "s"}`,
   );
+}
+
+function pastShiftCount(volunteer) {
+  const total = Number(volunteer.total_shifts ?? 0);
+  const upcoming = Number(volunteer.upcoming_shifts ?? 0);
+  return Math.max(total - upcoming, 0);
 }
 
 function renderShowVolunteers() {
@@ -316,14 +454,19 @@ function renderUnfilledVolunteers() {
       },
       { label: "Email", value: (volunteer) => volunteer.email },
       {
-        label: "Availability",
+        label: "Eligible shifts",
         value: (volunteer) => availabilityStatus(volunteer),
       },
       {
         label: "Upcoming",
+        group: "Shifts",
         value: (volunteer) => String(volunteer.upcoming_shifts),
       },
-      { label: "Total", value: (volunteer) => String(volunteer.total_shifts) },
+      {
+        label: "Past",
+        group: "Shifts",
+        value: (volunteer) => String(pastShiftCount(volunteer)),
+      },
     ],
     selectedUnfilledVolunteers,
     updateUnfilledSelection,
@@ -347,7 +490,7 @@ function renderAvailabilityVolunteers() {
       },
       { label: "Email", value: (volunteer) => volunteer.email },
       {
-        label: "Availability",
+        label: "Open shifts",
         value: (volunteer) => availabilityStatus(volunteer),
       },
     ],
@@ -476,6 +619,7 @@ async function sendShowWeekEmails() {
       body: JSON.stringify({
         showId: parseInt(showId, 10),
         volunteerIds: Array.from(selectedShowVolunteers),
+        ...getEmailOptions("showWeek", "showWeekMessage"),
       }),
     });
 
@@ -511,6 +655,7 @@ async function sendUnfilledShiftsEmails() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         volunteerIds: Array.from(selectedUnfilledVolunteers),
+        ...getEmailOptions("unfilled", "unfilledMessage"),
       }),
     });
 
@@ -548,6 +693,7 @@ async function sendAvailabilityRequestEmails() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           volunteerIds: Array.from(selectedAvailabilityVolunteers),
+          ...getEmailOptions("availability", "availabilityMessage"),
         }),
       },
     );

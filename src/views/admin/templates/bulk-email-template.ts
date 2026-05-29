@@ -96,6 +96,14 @@ export function renderBulkEmailTemplate(): string {
           letter-spacing: 0;
         }
 
+        .volunteer-table.has-column-groups thead tr:nth-child(2) th {
+          top: 2.55rem;
+        }
+
+        .volunteer-table .column-group-heading {
+          text-align: center;
+        }
+
         .volunteer-table tbody tr:last-child td {
           border-bottom: none;
         }
@@ -164,6 +172,27 @@ export function renderBulkEmailTemplate(): string {
           flex-wrap: wrap;
           gap: 1rem;
           margin-bottom: 1.5rem;
+        }
+
+        .email-editor {
+          display: grid;
+          gap: 1rem;
+          margin: 1.5rem 0;
+          padding: 1rem;
+          background: #f8f9fa;
+          border: 1px solid #e9ecef;
+          border-radius: 6px;
+        }
+
+        .email-editor textarea {
+          min-height: 150px;
+          resize: vertical;
+        }
+
+        .email-contact-grid {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 1rem;
         }
 
         /* Loading state */
@@ -236,6 +265,10 @@ export function renderBulkEmailTemplate(): string {
           .volunteer-actions .btn {
             width: 100%;
           }
+
+          .email-contact-grid {
+            grid-template-columns: 1fr;
+          }
         }
       </style>
     </head>
@@ -280,6 +313,23 @@ export function renderBulkEmailTemplate(): string {
               </select>
             </div>
 
+            <div class="email-editor">
+              <div class="form-group">
+                <label class="form-label" for="showWeekMessage">Email Text</label>
+                <textarea class="form-textarea" id="showWeekMessage" rows="8"></textarea>
+              </div>
+              <div class="email-contact-grid">
+                <div class="form-group">
+                  <label class="form-label" for="showWeekContactName">Contact Name</label>
+                  <input class="form-input" type="text" id="showWeekContactName">
+                </div>
+                <div class="form-group">
+                  <label class="form-label" for="showWeekContactPhone">Contact Phone</label>
+                  <input class="form-input" type="tel" id="showWeekContactPhone">
+                </div>
+              </div>
+            </div>
+
             <div id="showVolunteersSection" style="display: none;">
               <div class="selection-summary">
                 <div class="selection-count" id="showSelectionCount">0 volunteers selected</div>
@@ -303,6 +353,23 @@ export function renderBulkEmailTemplate(): string {
           <div class="email-content" id="unfilled-shifts-content">
             <h3>Unfilled Shifts Email</h3>
             <p>Send "Last Minute Shifts" emails to volunteers asking them to help fill outstanding shifts. This includes a PDF of the next 10 unfilled shifts.</p>
+
+            <div class="email-editor">
+              <div class="form-group">
+                <label class="form-label" for="unfilledMessage">Email Text</label>
+                <textarea class="form-textarea" id="unfilledMessage" rows="5"></textarea>
+              </div>
+              <div class="email-contact-grid">
+                <div class="form-group">
+                  <label class="form-label" for="unfilledContactName">Contact Name</label>
+                  <input class="form-input" type="text" id="unfilledContactName">
+                </div>
+                <div class="form-group">
+                  <label class="form-label" for="unfilledContactPhone">Contact Phone</label>
+                  <input class="form-input" type="tel" id="unfilledContactPhone">
+                </div>
+              </div>
+            </div>
             
             <div class="selection-summary">
               <div class="selection-count" id="unfilledSelectionCount">0 volunteers selected</div>
@@ -324,7 +391,24 @@ export function renderBulkEmailTemplate(): string {
           <!-- Availability Request Email Content -->
           <div class="email-content" id="availability-request-content">
             <h3>Availability Request</h3>
-            <p>Ask volunteers to add the days they cannot work before shifts are filled for a new production.</p>
+            <p>Ask volunteers with eligible unfilled shift opportunities to accept shifts or mark performances they cannot work.</p>
+
+            <div class="email-editor">
+              <div class="form-group">
+                <label class="form-label" for="availabilityMessage">Email Text</label>
+                <textarea class="form-textarea" id="availabilityMessage" rows="12"></textarea>
+              </div>
+              <div class="email-contact-grid">
+                <div class="form-group">
+                  <label class="form-label" for="availabilityContactName">Contact Name</label>
+                  <input class="form-input" type="text" id="availabilityContactName">
+                </div>
+                <div class="form-group">
+                  <label class="form-label" for="availabilityContactPhone">Contact Phone</label>
+                  <input class="form-input" type="tel" id="availabilityContactPhone">
+                </div>
+              </div>
+            </div>
             
             <div class="selection-summary">
               <div class="selection-count" id="availabilitySelectionCount">0 volunteers selected</div>

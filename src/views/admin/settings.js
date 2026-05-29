@@ -3,6 +3,11 @@ document.addEventListener("DOMContentLoaded", () => {
   if (runMigrationsBtn) {
     runMigrationsBtn.addEventListener("click", confirmMigrations);
   }
+
+  const emailContactForm = document.getElementById("emailContactForm");
+  if (emailContactForm) {
+    emailContactForm.addEventListener("submit", saveEmailContactDefaults);
+  }
 });
 
 function setMigrationStatus(message, type = "") {
@@ -13,6 +18,77 @@ function setMigrationStatus(message, type = "") {
   status.className = "migration-status visible";
   if (type) {
     status.classList.add(type);
+  }
+}
+
+function setEmailContactStatus(message, type = "") {
+  const status = document.getElementById("emailContactStatus");
+  if (!status) return;
+
+  status.textContent = message;
+  status.className = "settings-status visible";
+  if (type) {
+    status.classList.add(type);
+  }
+}
+
+async function saveEmailContactDefaults(event) {
+  event.preventDefault();
+
+  const form = event.currentTarget;
+  const button = document.getElementById("saveEmailContactBtn");
+  const originalText = button ? button.textContent : "Save Email Contact";
+  const formData = new FormData(form);
+  const contactName = String(formData.get("contactName") || "").trim();
+  const contactPhone = String(formData.get("contactPhone") || "").trim();
+
+  if (!contactName || !contactPhone) {
+    setEmailContactStatus("Enter a contact name and phone number.", "error");
+    return;
+  }
+
+  if (button) {
+    button.disabled = true;
+    button.textContent = "Saving...";
+  }
+
+  try {
+    const response = await fetch("/admin/api/settings/email-contact", {
+      method: "PUT",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ contactName, contactPhone }),
+    });
+    const result = await response.json().catch(() => ({}));
+
+    if (!response.ok || !result.success) {
+      setEmailContactStatus(
+        result.error || "Email contact defaults could not be saved.",
+        "error",
+      );
+      if (typeof Toast !== "undefined") {
+        Toast.error(
+          result.error || "Email contact defaults could not be saved",
+        );
+      }
+      return;
+    }
+
+    setEmailContactStatus("Email contact defaults saved.", "success");
+    if (typeof Toast !== "undefined") {
+      Toast.success("Email contact defaults saved");
+    }
+  } catch (error) {
+    console.error("Error saving email contact defaults:", error);
+    setEmailContactStatus("Error saving email contact defaults.", "error");
+    if (typeof Toast !== "undefined") {
+      Toast.error("Error saving email contact defaults");
+    }
+  } finally {
+    if (button) {
+      button.disabled = false;
+      button.textContent = originalText;
+    }
   }
 }
 

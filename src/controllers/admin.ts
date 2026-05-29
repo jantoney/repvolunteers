@@ -15,6 +15,21 @@ import {
   type ShiftData,
   type VolunteerData,
 } from "../utils/pdf-generator.ts";
+import {
+  addInternalParticipantNote,
+  markParticipantActive,
+  markParticipantInactive,
+  VOLUNTEER_OPT_OUT_NOTE,
+} from "../utils/participant-lifecycle.ts";
+import {
+  DEFAULT_AVAILABILITY_REQUEST_MESSAGE,
+  DEFAULT_LAST_MINUTE_SHIFTS_MESSAGE,
+  DEFAULT_SHOW_WEEK_MESSAGE,
+  type EmailSendOverrides,
+  getEmailDefaults,
+  resolveEmailOverrides,
+  updateEmailContactDefaults,
+} from "../utils/email-settings.ts";
 
 let migrationsRunning = false;
 
@@ -25,6 +40,7 @@ export {
   showEditShiftForm,
   showEditShowForm,
   showEditVolunteerForm,
+  showHelpPage,
   showLoginForm,
   showNewShiftForm,
   showNewShowForm,
@@ -130,6 +146,58 @@ export async function runDatabaseMigrations(ctx: RouterContext<string>) {
   }
 }
 
+export async function getAdminEmailDefaults(ctx: RouterContext<string>) {
+  try {
+    ctx.response.body = await getEmailDefaults();
+  } catch (error) {
+    console.error("Error loading email defaults:", error);
+    ctx.response.status = 500;
+    ctx.response.body = { error: "Failed to load email defaults" };
+  }
+}
+
+export async function updateAdminEmailContactDefaults(
+  ctx: RouterContext<string>,
+) {
+  try {
+    const body = await ctx.request.body.json();
+    const defaults = await updateEmailContactDefaults(
+      body.contactName,
+      body.contactPhone,
+    );
+    ctx.response.body = { success: true, defaults };
+  } catch (error) {
+    console.error("Error updating email contact defaults:", error);
+    ctx.response.status = 400;
+    ctx.response.body = {
+      error: error instanceof Error
+        ? error.message
+        : "Failed to update email contact defaults",
+    };
+  }
+}
+
+async function getEmailSendOptions(
+  ctx: RouterContext<string>,
+  defaultMessage: string,
+): Promise<
+  {
+    message: string;
+    contactInfo: ReturnType<typeof resolveEmailOverrides>["contactInfo"];
+  }
+> {
+  const body = await ctx.request.body.json().catch(() => ({}));
+  const defaults = await getEmailDefaults();
+  const overrides = resolveEmailOverrides(
+    defaults,
+    body as EmailSendOverrides,
+  );
+  return {
+    message: overrides.message || defaultMessage,
+    contactInfo: overrides.contactInfo,
+  };
+}
+
 // Generate and download running sheet PDF for a show/date
 export async function downloadRunSheetPDF(ctx: RouterContext<string>) {
   const showId = ctx.params.showId;
@@ -166,7 +234,8 @@ export async function downloadRunSheetPDF(ctx: RouterContext<string>) {
       ctx.throw(404, "Performance not found");
     }
     const perf = perfRes.rows[0];
-    const performanceTime = `${perf.performance_start} - ${perf.performance_end}`;
+    const performanceTime =
+      `${perf.performance_start} - ${perf.performance_end}`;
 
     // Get all shifts for this performance (with Adelaide timezone conversion)
     const shiftsRes = await client.queryObject<{
@@ -264,8 +333,9 @@ export async function downloadRunSheetPDF(ctx: RouterContext<string>) {
     const intervals = intervalsRes.rows;
 
     // Generate PDF using the updated PDF generator
-    const { generateRunSheetPDF } =
-      await import("../utils/run-sheet-pdf-generator.ts");
+    const { generateRunSheetPDF } = await import(
+      "../utils/run-sheet-pdf-generator.ts"
+    );
     const pdfBuffer = generateRunSheetPDF({
       showName,
       date,
@@ -320,7 +390,8 @@ export async function downloadRunSheetPDFByShowDate(
     }
 
     const showDate = showDateRes.rows[0];
-    const performanceTime = `${showDate.performance_start} - ${showDate.performance_end}`;
+    const performanceTime =
+      `${showDate.performance_start} - ${showDate.performance_end}`;
 
     // Get all shifts for this specific performance (for reference, but not directly used)
     const _shiftsRes = await client.queryObject<{
@@ -407,8 +478,9 @@ export async function downloadRunSheetPDFByShowDate(
     const intervals = intervalsRes.rows;
 
     // Generate PDF using the updated PDF generator
-    const { generateRunSheetPDF } =
-      await import("../utils/run-sheet-pdf-generator.ts");
+    const { generateRunSheetPDF } = await import(
+      "../utils/run-sheet-pdf-generator.ts"
+    );
     const pdfBuffer = generateRunSheetPDF({
       showName: showDate.show_name,
       date: showDate.date,
@@ -418,7 +490,8 @@ export async function downloadRunSheetPDFByShowDate(
       intervals,
     });
 
-    const filename = `run-sheet-${showDate.show_id}-${showDateId}-${showDate.date}.pdf`;
+    const filename =
+      `run-sheet-${showDate.show_id}-${showDateId}-${showDate.date}.pdf`;
 
     ctx.response.status = 200;
     ctx.response.headers.set("Content-Type", "application/pdf");
@@ -693,9 +766,11 @@ export async function createShowDate(ctx: RouterContext<string>) {
     // Use SQL AT TIME ZONE to ensure dates are treated as Adelaide time
     const result = await client.queryObject<{ id: number }>(
       `INSERT INTO show_dates (show_id, start_time, end_time) 
-       VALUES ($1, ${getAdelaideTimeParameterSQL("$2")}, ${getAdelaideTimeParameterSQL(
-         "$3",
-       )}) 
+       VALUES ($1, ${getAdelaideTimeParameterSQL("$2")}, ${
+        getAdelaideTimeParameterSQL(
+          "$3",
+        )
+      })
        RETURNING id`,
       [show_id, `${startDate} ${startTimeOnly}`, `${endDate} ${endTimeOnly}`],
     );
@@ -816,7 +891,7 @@ export async function listVolunteers(ctx: RouterContext<string>) {
   const client = await pool.connect();
   try {
     const result = await client.queryObject(
-      "SELECT id, name, email, phone FROM participants ORDER BY name",
+      "SELECT id, name, email, phone, status FROM participants ORDER BY name",
     );
     ctx.response.body = result.rows;
   } finally {
@@ -831,7 +906,7 @@ export async function createVolunteer(ctx: RouterContext<string>) {
   const client = await pool.connect();
   try {
     const result = await client.queryObject<{ id: string }>(
-      "INSERT INTO participants (name, email, phone) VALUES ($1, $2, $3) RETURNING id",
+      "INSERT INTO participants (name, email, phone, approved, status) VALUES ($1, $2, $3, true, 'active') RETURNING id",
       [name, email, phone],
     );
     const volunteerId = result.rows[0].id;
@@ -855,7 +930,10 @@ export async function getVolunteer(ctx: RouterContext<string>) {
       name: string;
       email: string;
       phone: string;
-    }>("SELECT id, name, email, phone FROM participants WHERE id=$1", [id]);
+      status: string;
+    }>("SELECT id, name, email, phone, status FROM participants WHERE id=$1", [
+      id,
+    ]);
     if (result.rows.length === 0) {
       ctx.throw(404, "Volunteer not found");
     }
@@ -921,23 +999,96 @@ export async function updateVolunteerUnavailablePerformances(
     console.error("Error updating volunteer unavailable performances:", error);
     ctx.response.status = 400;
     ctx.response.body = {
-      error:
-        error instanceof Error
-          ? error.message
-          : "Failed to update unavailable performances",
+      error: error instanceof Error
+        ? error.message
+        : "Failed to update unavailable performances",
     };
   }
 }
 
-export async function deleteVolunteer(ctx: RouterContext<string>) {
+export async function markVolunteerInactive(ctx: RouterContext<string>) {
   const id = ctx.params.id;
-  const pool = getPool();
-  const client = await pool.connect();
+
   try {
-    await client.queryObject("DELETE FROM participants WHERE id=$1", [id]);
-    ctx.response.status = 204;
-  } finally {
-    client.release();
+    const user = ctx.state?.user;
+    const result = await markParticipantInactive(id, {
+      note: VOLUNTEER_OPT_OUT_NOTE,
+      createdByUserId: user?.id ?? null,
+      createdByName: user?.name ?? "Admin",
+      createdByEmail: user?.email ?? null,
+    });
+
+    ctx.response.status = 200;
+    ctx.response.body = {
+      success: true,
+      removedShiftCount: result.removedParticipantShiftCount +
+        result.removedDirectAssignmentCount,
+    };
+  } catch (error) {
+    if (error instanceof Error && error.message === "Volunteer not found") {
+      ctx.response.status = 404;
+      ctx.response.body = { error: "Volunteer not found" };
+      return;
+    }
+
+    console.error("Error marking volunteer inactive:", error);
+    ctx.response.status = 500;
+    ctx.response.body = { error: "Failed to mark volunteer inactive" };
+  }
+}
+
+export async function markVolunteerActive(ctx: RouterContext<string>) {
+  const id = ctx.params.id;
+
+  try {
+    const user = ctx.state?.user;
+    await markParticipantActive(id, {
+      note: "Re-activated volunteer account",
+      createdByUserId: user?.id ?? null,
+      createdByName: user?.name ?? "Admin",
+      createdByEmail: user?.email ?? null,
+    });
+
+    ctx.response.status = 200;
+    ctx.response.body = { success: true };
+  } catch (error) {
+    if (error instanceof Error && error.message === "Volunteer not found") {
+      ctx.response.status = 404;
+      ctx.response.body = { error: "Volunteer not found" };
+      return;
+    }
+
+    console.error("Error marking volunteer active:", error);
+    ctx.response.status = 500;
+    ctx.response.body = { error: "Failed to mark volunteer active" };
+  }
+}
+
+export async function addVolunteerNote(ctx: RouterContext<string>) {
+  const id = ctx.params.id;
+  const body = await ctx.request.body.json();
+  const note = typeof body.note === "string" ? body.note.trim() : "";
+
+  if (!note) {
+    ctx.response.status = 400;
+    ctx.response.body = { error: "Note is required" };
+    return;
+  }
+
+  try {
+    const user = ctx.state?.user;
+    await addInternalParticipantNote(id, note, {
+      createdByUserId: user?.id ?? null,
+      createdByName: user?.name ?? "Admin",
+      createdByEmail: user?.email ?? null,
+    });
+
+    ctx.response.status = 201;
+    ctx.response.body = { success: true };
+  } catch (error) {
+    console.error("Error adding volunteer note:", error);
+    ctx.response.status = 500;
+    ctx.response.body = { error: "Failed to add note" };
   }
 }
 
@@ -950,9 +1101,9 @@ export async function getShiftCalendarData(ctx: RouterContext<string>) {
     const showIds = ctx.request.url.searchParams.get("shows");
     const showIdArray = showIds
       ? showIds
-          .split(",")
-          .map((id) => parseInt(id))
-          .filter((id) => !isNaN(id))
+        .split(",")
+        .map((id) => parseInt(id))
+        .filter((id) => !isNaN(id))
       : [];
 
     // Build the WHERE clause for show filtering
@@ -1202,11 +1353,9 @@ export async function createShift(ctx: RouterContext<string>) {
           console.log("  Initial Depart Timestamp:", departTimestamp);
 
           // Handle next day if depart time is before arrive time
-          const arriveTime24 =
-            parseInt(arriveTime.split(":")[0]) * 60 +
+          const arriveTime24 = parseInt(arriveTime.split(":")[0]) * 60 +
             parseInt(arriveTime.split(":")[1]);
-          const departTime24 =
-            parseInt(departTime.split(":")[0]) * 60 +
+          const departTime24 = parseInt(departTime.split(":")[0]) * 60 +
             parseInt(departTime.split(":")[1]);
 
           let isNextDay = false;
@@ -1376,10 +1525,9 @@ export async function removeDuplicateShiftsForPerformance(
     const shiftIdsToDelete: number[] = [];
     for (const group of duplicateGroups.rows) {
       const unfilledShiftIds = group.unfilled_shift_ids ?? [];
-      const deleteCount =
-        group.filled_count === 1
-          ? unfilledShiftIds.length
-          : Math.max(0, unfilledShiftIds.length - 1);
+      const deleteCount = group.filled_count === 1
+        ? unfilledShiftIds.length
+        : Math.max(0, unfilledShiftIds.length - 1);
       shiftIdsToDelete.push(...unfilledShiftIds.slice(0, deleteCount));
     }
 
@@ -1392,13 +1540,13 @@ export async function removeDuplicateShiftsForPerformance(
 
     await client.queryObject("COMMIT");
     const blockedRoleList = blockedGroups.map((group) => group.role).join(", ");
-    const removedMessage =
-      shiftIdsToDelete.length === 1
-        ? "Removed 1 unfilled duplicate shift."
-        : `Removed ${shiftIdsToDelete.length} unfilled duplicate shifts.`;
+    const removedMessage = shiftIdsToDelete.length === 1
+      ? "Removed 1 unfilled duplicate shift."
+      : `Removed ${shiftIdsToDelete.length} unfilled duplicate shifts.`;
 
     if (blockedGroups.length > 0) {
-      const blockedMessage = `Cannot remove duplicate shifts for ${blockedRoleList}. Each duplicate copy has assigned volunteers, so the app cannot safely choose one to delete. Move or remove volunteers from one copy, then try again.`;
+      const blockedMessage =
+        `Cannot remove duplicate shifts for ${blockedRoleList}. Each duplicate copy has assigned volunteers, so the app cannot safely choose one to delete. Move or remove volunteers from one copy, then try again.`;
 
       if (shiftIdsToDelete.length === 0) {
         ctx.response.status = 409;
@@ -1457,6 +1605,7 @@ export async function unfilledShifts(ctx: RouterContext<string>) {
        JOIN shows sh ON sh.id = sd.show_id
        LEFT JOIN participant_shifts vs ON vs.shift_id = s.id
        WHERE s.depart_time >= NOW() - INTERVAL '3 hours'
+         AND s.assigned_participant_id IS NULL
        GROUP BY s.id, s.show_date_id, s.role, s.arrive_time, s.depart_time, 
                 DATE(sd.start_time), sd.start_time, sd.end_time, sh.name, sh.id
        HAVING COUNT(vs.participant_id) = 0
@@ -1672,6 +1821,16 @@ export async function assignVolunteerToShift(ctx: RouterContext<string>) {
   const pool = getPool();
   const client = await pool.connect();
   try {
+    const volunteerResult = await client.queryObject<{ status: string }>(
+      "SELECT status FROM participants WHERE id = $1",
+      [volunteerId],
+    );
+    if (volunteerResult.rows[0]?.status !== "active") {
+      ctx.response.status = 400;
+      ctx.response.body = { error: "Cannot assign an inactive volunteer" };
+      return;
+    }
+
     // Check if assignment already exists
     const existing = await client.queryObject(
       "SELECT 1 FROM participant_shifts WHERE participant_id = $1 AND shift_id = $2",
@@ -1728,6 +1887,7 @@ export async function getAvailableVolunteersForShift(
          FROM participant_shifts vs 
          WHERE vs.shift_id = $1
        )
+       AND v.status = 'active'
        ORDER BY v.name`,
       [shiftId],
     );
@@ -1744,6 +1904,15 @@ export async function getAvailableShiftsForVolunteer(
   const pool = getPool();
   const client = await pool.connect();
   try {
+    const participantResult = await client.queryObject<{ status: string }>(
+      "SELECT status FROM participants WHERE id = $1",
+      [volunteerId],
+    );
+    if (participantResult.rows[0]?.status !== "active") {
+      ctx.response.body = [];
+      return;
+    }
+
     type ShiftRow = {
       id: number;
       show_id: number;
@@ -1972,10 +2141,12 @@ export async function generateShiftRemovalPDF(ctx: RouterContext<string>) {
     const pdfBuffer = generatePDF(volunteer, shiftData);
 
     // Set response headers for download
-    const filename = `shift-removal-${volunteer.name.replace(
-      /[^a-zA-Z0-9]/g,
-      "-",
-    )}-${new Date().toISOString().split("T")[0]}.${getFileExtension()}`;
+    const filename = `shift-removal-${
+      volunteer.name.replace(
+        /[^a-zA-Z0-9]/g,
+        "-",
+      )
+    }-${new Date().toISOString().split("T")[0]}.${getFileExtension()}`;
 
     ctx.response.headers.set("Content-Type", getMimeType());
     ctx.response.headers.set(
@@ -2046,10 +2217,12 @@ export async function downloadVolunteerSchedulePDF(ctx: RouterContext<string>) {
     const pdfData = await generateVolunteerPDFData(volunteerId);
     const pdfBuffer = generateVolunteerSchedulePDF(pdfData);
 
-    const filename = `theatre-shifts-${pdfData.volunteer.name.replace(
-      /[^a-zA-Z0-9]/g,
-      "-",
-    )}-${
+    const filename = `theatre-shifts-${
+      pdfData.volunteer.name.replace(
+        /[^a-zA-Z0-9]/g,
+        "-",
+      )
+    }-${
       new Date().toISOString().split("T")[0]
     }.${getVolunteerScheduleFileExtension()}`;
 
@@ -2073,10 +2246,16 @@ export async function emailVolunteerSchedulePDF(ctx: RouterContext<string>) {
   const volunteerId = ctx.params.id;
 
   try {
+    if (!(await isParticipantActive(volunteerId))) {
+      respondInactiveVolunteer(ctx);
+      return;
+    }
+
     const { generateVolunteerPDFData, filterCurrentAndFutureShifts } =
       await import("../utils/pdf-generator.ts");
-    const { generateServerSidePDF } =
-      await import("../utils/server-pdf-generator.ts");
+    const { generateServerSidePDF } = await import(
+      "../utils/server-pdf-generator.ts"
+    );
     const { sendVolunteerScheduleEmail, createVolunteerLoginUrl } =
       await import("../utils/email.ts");
 
@@ -2092,16 +2271,19 @@ export async function emailVolunteerSchedulePDF(ctx: RouterContext<string>) {
 
     // Generate PDF buffer (real PDF)
     const pdfBuffer = await generateServerSidePDF(pdfData);
-    const filename = `theatre-shifts-${pdfData.volunteer.name.replace(
-      /[^a-zA-Z0-9]/g,
-      "-",
-    )}-${new Date().toISOString().split("T")[0]}.pdf`;
+    const filename = `theatre-shifts-${
+      pdfData.volunteer.name.replace(
+        /[^a-zA-Z0-9]/g,
+        "-",
+      )
+    }-${new Date().toISOString().split("T")[0]}.pdf`;
 
     // Prepare email data
     const currentAndFutureShifts = filterCurrentAndFutureShifts(
       pdfData.assignedShifts,
     );
     const hasShifts = currentAndFutureShifts.length > 0;
+
     // Improved shift preview formatting: date/time on first line, show/role on second, indented
     const shifts = currentAndFutureShifts.slice(0, 5).map((shift) => {
       const date = new Date(shift.show_date).toLocaleDateString("en-AU", {
@@ -2144,10 +2326,13 @@ export async function emailVolunteerSchedulePDF(ctx: RouterContext<string>) {
         return `${date} ${startTime}<br><span style="margin-left:1.5em;display:inline-block;">${performance.show_name}</span>`;
       });
 
-    const baseUrl =
-      Deno.env.get("BASE_URL") ||
+    const baseUrl = Deno.env.get("BASE_URL") ||
       `${ctx.request.url.protocol}//${ctx.request.url.host}`;
     const loginUrl = createVolunteerLoginUrl(baseUrl, pdfData.volunteer.id);
+    const emailOptions = await getEmailSendOptions(
+      ctx,
+      DEFAULT_SHOW_WEEK_MESSAGE,
+    );
 
     const emailData = {
       volunteerName: pdfData.volunteer.name,
@@ -2156,6 +2341,8 @@ export async function emailVolunteerSchedulePDF(ctx: RouterContext<string>) {
       hasShifts,
       shifts,
       unavailablePerformances,
+      message: emailOptions.message,
+      contactInfo: emailOptions.contactInfo,
     };
 
     // Send email with PDF attachment
@@ -2198,12 +2385,19 @@ export async function emailShowWeekPDF(ctx: RouterContext<string>) {
   const volunteerId = ctx.params.id;
 
   try {
+    if (!(await isParticipantActive(volunteerId))) {
+      respondInactiveVolunteer(ctx);
+      return;
+    }
+
     const { generateVolunteerPDFData, filterCurrentAndFutureShifts } =
       await import("../utils/pdf-generator.ts");
-    const { generateServerSidePDF } =
-      await import("../utils/server-pdf-generator.ts");
-    const { sendShowWeekEmail, createVolunteerLoginUrl } =
-      await import("../utils/email.ts");
+    const { generateServerSidePDF } = await import(
+      "../utils/server-pdf-generator.ts"
+    );
+    const { sendShowWeekEmail, createVolunteerLoginUrl } = await import(
+      "../utils/email.ts"
+    );
 
     // Generate PDF data (pass volunteerId as string, not Number)
     const pdfData = await generateVolunteerPDFData(volunteerId);
@@ -2215,18 +2409,31 @@ export async function emailShowWeekPDF(ctx: RouterContext<string>) {
       return;
     }
 
-    // Generate PDF buffer (real PDF)
-    const pdfBuffer = await generateServerSidePDF(pdfData);
-    const filename = `show-week-shifts-${pdfData.volunteer.name.replace(
-      /[^a-zA-Z0-9]/g,
-      "-",
-    )}-${new Date().toISOString().split("T")[0]}.pdf`;
-
-    // Prepare email data
+    // Prepare email data. Only current/future shifts are used for email
+    // previews and send eligibility.
     const currentAndFutureShifts = filterCurrentAndFutureShifts(
       pdfData.assignedShifts,
     );
     const hasShifts = currentAndFutureShifts.length > 0;
+
+    if (!hasShifts) {
+      ctx.response.status = 400;
+      ctx.response.body = {
+        error: "Volunteer does not have any current or future shifts",
+      };
+      return;
+    }
+
+    // Generate PDF buffer (real PDF). The PDF generator keeps past shifts on
+    // calendar pages but excludes them from tables and summaries.
+    const pdfBuffer = await generateServerSidePDF(pdfData);
+    const filename = `show-week-shifts-${
+      pdfData.volunteer.name.replace(
+        /[^a-zA-Z0-9]/g,
+        "-",
+      )
+    }-${new Date().toISOString().split("T")[0]}.pdf`;
+
     // Improved shift preview formatting: date/time on first line, show/role on second, indented
     const shifts = currentAndFutureShifts.slice(0, 5).map((shift) => {
       const date = new Date(shift.show_date).toLocaleDateString("en-AU", {
@@ -2269,10 +2476,11 @@ export async function emailShowWeekPDF(ctx: RouterContext<string>) {
         return `${date} ${startTime}<br><span style="margin-left:1.5em;display:inline-block;">${performance.show_name}</span>`;
       });
 
-    const baseUrl =
-      Deno.env.get("BASE_URL") ||
+    const baseUrl = Deno.env.get("BASE_URL") ||
       `${ctx.request.url.protocol}//${ctx.request.url.host}`;
     const loginUrl = createVolunteerLoginUrl(baseUrl, pdfData.volunteer.id);
+    const scheduleDefaults = await getEmailDefaults();
+    const scheduleContact = resolveEmailOverrides(scheduleDefaults, {});
 
     const emailData = {
       volunteerName: pdfData.volunteer.name,
@@ -2281,6 +2489,7 @@ export async function emailShowWeekPDF(ctx: RouterContext<string>) {
       hasShifts,
       shifts,
       unavailablePerformances,
+      contactInfo: scheduleContact.contactInfo,
     };
 
     // Send email with PDF attachment
@@ -2323,8 +2532,14 @@ export async function emailLastMinuteShifts(ctx: RouterContext<string>) {
   const volunteerId = ctx.params.id;
 
   try {
-    const { generateOutstandingShiftsPDFForVolunteer } =
-      await import("../utils/unfilled-shifts-pdf-generator.ts");
+    if (!(await isParticipantActive(volunteerId))) {
+      respondInactiveVolunteer(ctx);
+      return;
+    }
+
+    const { generateOutstandingShiftsPDFForVolunteer } = await import(
+      "../utils/unfilled-shifts-pdf-generator.ts"
+    );
     const { sendLastMinuteShiftsEmail } = await import("../utils/email.ts");
 
     // Get volunteer data
@@ -2374,10 +2589,12 @@ export async function emailLastMinuteShifts(ctx: RouterContext<string>) {
       volunteerId,
       10,
     );
-    const filename = `last-minute-shifts-${volunteer.name.replace(
-      /[^a-zA-Z0-9]/g,
-      "-",
-    )}-${new Date().toISOString().split("T")[0]}.pdf`;
+    const filename = `last-minute-shifts-${
+      volunteer.name.replace(
+        /[^a-zA-Z0-9]/g,
+        "-",
+      )
+    }-${new Date().toISOString().split("T")[0]}.pdf`;
 
     // Format shifts for email preview (similar to existing email formats)
     const shifts = unfilledShifts.map((shift) => {
@@ -2404,6 +2621,7 @@ export async function emailLastMinuteShifts(ctx: RouterContext<string>) {
       volunteerId: volunteerId, // Add the volunteer ID for tracking
       hasShifts,
       shifts,
+      ...(await getEmailSendOptions(ctx, DEFAULT_LAST_MINUTE_SHIFTS_MESSAGE)),
     };
 
     // Send email with PDF attachment
@@ -2443,6 +2661,11 @@ export async function emailAvailabilityRequest(ctx: RouterContext<string>) {
   const volunteerId = ctx.params.id;
 
   try {
+    if (!(await isParticipantActive(volunteerId))) {
+      respondInactiveVolunteer(ctx);
+      return;
+    }
+
     const { createVolunteerLoginUrl, sendAvailabilityRequestEmail } =
       await import("../utils/email.ts");
     const pool = getPool();
@@ -2472,13 +2695,16 @@ export async function emailAvailabilityRequest(ctx: RouterContext<string>) {
         return;
       }
 
-      const baseUrl =
-        Deno.env.get("BASE_URL") ||
+      const baseUrl = Deno.env.get("BASE_URL") ||
         `${ctx.request.url.protocol}//${ctx.request.url.host}`;
       const loginUrl = createVolunteerLoginUrl(baseUrl, volunteer.id);
       const currentUserId = ctx.state?.user?.id;
       const forceProduction =
         ctx.request.url.searchParams.get("force") === "true";
+      const emailOptions = await getEmailSendOptions(
+        ctx,
+        DEFAULT_AVAILABILITY_REQUEST_MESSAGE,
+      );
 
       const emailSent = await sendAvailabilityRequestEmail(
         {
@@ -2486,6 +2712,8 @@ export async function emailAvailabilityRequest(ctx: RouterContext<string>) {
           volunteerEmail: volunteer.email,
           volunteerId: volunteer.id,
           loginUrl,
+          message: emailOptions.message,
+          contactInfo: emailOptions.contactInfo,
         },
         currentUserId,
         forceProduction,
@@ -2536,6 +2764,7 @@ async function _getNext10UnfilledShifts() {
        JOIN shows sh ON sh.id = sd.show_id
        LEFT JOIN participant_shifts vs ON vs.shift_id = s.id
        WHERE s.depart_time >= NOW() - INTERVAL '3 hours'
+         AND s.assigned_participant_id IS NULL
        GROUP BY s.id, sh.name, DATE(sd.start_time), sd.start_time, s.role, s.arrive_time
        HAVING COUNT(vs.participant_id) = 0
        ORDER BY sd.start_time, s.arrive_time
@@ -2577,6 +2806,7 @@ async function getUnfilledShiftsForVolunteer(volunteerId: string, limit = 10) {
        JOIN shows sh ON sh.id = sd.show_id
        LEFT JOIN participant_shifts vs ON vs.shift_id = s.id
        WHERE s.depart_time >= NOW() - INTERVAL '3 hours'
+         AND s.assigned_participant_id IS NULL
          AND NOT EXISTS (
            SELECT 1
            FROM volunteer_unavailable_performances vup
@@ -2588,10 +2818,13 @@ async function getUnfilledShiftsForVolunteer(volunteerId: string, limit = 10) {
            SELECT DISTINCT unfilled.id
            FROM shifts unfilled
            JOIN show_dates unfilled_sd ON unfilled_sd.id = unfilled.show_date_id
-           JOIN shifts existing ON existing.id IN (
-             SELECT ps.shift_id 
-             FROM participant_shifts ps 
-             WHERE ps.participant_id = $1
+           JOIN shifts existing ON (
+             existing.assigned_participant_id = $1
+             OR existing.id IN (
+               SELECT ps.shift_id
+               FROM participant_shifts ps
+               WHERE ps.participant_id = $1
+             )
            )
            JOIN show_dates existing_sd ON existing_sd.id = existing.show_date_id
            WHERE unfilled.depart_time >= NOW() - INTERVAL '3 hours'
@@ -2621,8 +2854,9 @@ async function getUnfilledShiftsForVolunteer(volunteerId: string, limit = 10) {
  */
 export async function downloadUnfilledShiftsPDF(ctx: RouterContext<string>) {
   try {
-    const { generateUnfilledShiftsPDF } =
-      await import("../utils/unfilled-shifts-pdf-generator.ts");
+    const { generateUnfilledShiftsPDF } = await import(
+      "../utils/unfilled-shifts-pdf-generator.ts"
+    );
 
     // Generate PDF buffer
     const pdfBuffer = await generateUnfilledShiftsPDF();
@@ -2651,8 +2885,9 @@ export async function getParticipantEmailHistory(ctx: RouterContext<string>) {
   const participantId = ctx.params.id;
 
   try {
-    const { getEmailsForParticipant } =
-      await import("../utils/email-tracking.ts");
+    const { getEmailsForParticipant } = await import(
+      "../utils/email-tracking.ts"
+    );
     const emails = await getEmailsForParticipant(participantId);
 
     // Format the response with safe data (don't expose full HTML content in list)
@@ -2812,7 +3047,7 @@ export async function getShowsForBulkEmail(ctx: RouterContext<string>) {
   const pool = getPool();
   const client = await pool.connect();
   try {
-    // Get shows that have upcoming performances with volunteers
+    // Get shows that have current/future assigned shifts.
     const result = await client.queryObject<{
       id: number;
       name: string;
@@ -2825,10 +3060,10 @@ export async function getShowsForBulkEmail(ctx: RouterContext<string>) {
        FROM shows s
        JOIN show_dates sd ON sd.show_id = s.id
        JOIN shifts sh ON sh.show_date_id = sd.id
-       LEFT JOIN participant_shifts vs ON vs.shift_id = sh.id
-       WHERE sd.start_time >= NOW() - INTERVAL '1 week'
+       JOIN participant_shifts vs ON vs.shift_id = sh.id
+       WHERE sh.depart_time >= NOW() - INTERVAL '3 hours'
        GROUP BY s.id, s.name
-       HAVING COUNT(DISTINCT sd.id) > 0
+       HAVING COUNT(DISTINCT vs.participant_id) > 0
        ORDER BY MIN(sd.start_time), s.name`,
     );
 
@@ -2865,7 +3100,8 @@ export async function getVolunteersForShow(ctx: RouterContext<string>) {
        JOIN shifts s ON s.id = vs.shift_id
        JOIN show_dates sd ON sd.id = s.show_date_id
        WHERE sd.show_id = $1
-         AND sd.start_time >= NOW() - INTERVAL '1 week'
+         AND s.depart_time >= NOW() - INTERVAL '3 hours'
+         AND p.status = 'active'
          AND p.email IS NOT NULL
          AND p.email != ''
        GROUP BY p.id, p.name, p.email
@@ -2891,41 +3127,70 @@ export async function getVolunteersForUnfilledShifts(
   const pool = getPool();
   const client = await pool.connect();
   try {
-    // Get all approved volunteers with email addresses
     const result = await client.queryObject<{
       id: string;
       name: string;
       email: string;
       total_shifts: number;
       upcoming_shifts: number;
-      availability_performances_count: number;
+      actionable_shifts_count: number;
     }>(
       `SELECT p.id, p.name, p.email,
               COUNT(DISTINCT vs.shift_id) as total_shifts,
               COUNT(DISTINCT CASE WHEN sd.start_time >= NOW() THEN vs.shift_id END) as upcoming_shifts,
-              COUNT(DISTINCT vup_sd.id) as availability_performances_count
+              COUNT(DISTINCT actionable_shift.id)::int as actionable_shifts_count
        FROM participants p
        LEFT JOIN participant_shifts vs ON vs.participant_id = p.id
        LEFT JOIN shifts s ON s.id = vs.shift_id
        LEFT JOIN show_dates sd ON sd.id = s.show_date_id
-       LEFT JOIN volunteer_unavailable_performances vup ON vup.participant_id = p.id
-       LEFT JOIN show_dates vup_sd ON vup_sd.id = vup.show_date_id
-         AND vup_sd.end_time >= NOW() - INTERVAL '3 hours'
+       LEFT JOIN LATERAL (
+         SELECT unfilled.id
+         FROM shifts unfilled
+         JOIN show_dates unfilled_sd ON unfilled_sd.id = unfilled.show_date_id
+         WHERE unfilled.depart_time >= NOW() - INTERVAL '3 hours'
+           AND unfilled.assigned_participant_id IS NULL
+           AND NOT EXISTS (
+             SELECT 1
+             FROM participant_shifts assigned_ps
+             WHERE assigned_ps.shift_id = unfilled.id
+           )
+           AND NOT EXISTS (
+             SELECT 1
+             FROM volunteer_unavailable_performances vup
+             WHERE vup.participant_id = p.id
+               AND vup.show_date_id = unfilled.show_date_id
+           )
+           AND NOT EXISTS (
+             SELECT 1
+             FROM shifts existing
+             WHERE existing.show_date_id = unfilled.show_date_id
+               AND (
+                 existing.assigned_participant_id = p.id
+                 OR EXISTS (
+                   SELECT 1
+                   FROM participant_shifts existing_ps
+                   WHERE existing_ps.shift_id = existing.id
+                     AND existing_ps.participant_id = p.id
+                 )
+               )
+           )
+       ) actionable_shift ON true
        WHERE p.approved = true
+         AND p.status = 'active'
          AND p.email IS NOT NULL
          AND p.email != ''
        GROUP BY p.id, p.name, p.email
-       ORDER BY (COUNT(DISTINCT vup_sd.id) > 0) DESC, p.name`,
+       ORDER BY (COUNT(DISTINCT actionable_shift.id) > 0) DESC, p.name`,
     );
 
     ctx.response.body = result.rows.map((volunteer) => ({
       ...volunteer,
       total_shifts: Number(volunteer.total_shifts),
       upcoming_shifts: Number(volunteer.upcoming_shifts),
-      availability_performances_count: Number(
-        volunteer.availability_performances_count,
+      actionable_shifts_count: Number(
+        volunteer.actionable_shifts_count,
       ),
-      has_availability: Number(volunteer.availability_performances_count) > 0,
+      has_availability: Number(volunteer.actionable_shifts_count) > 0,
     }));
   } finally {
     client.release();
@@ -2942,47 +3207,132 @@ export async function getVolunteersForAvailabilityRequest(
       id: string;
       name: string;
       email: string;
-      unavailable_performances_count: number;
+      actionable_shifts_count: number;
     }>(
       `SELECT p.id, p.name, p.email,
-              COUNT(DISTINCT sd.id) as unavailable_performances_count
+              COUNT(DISTINCT actionable_shift.id)::int as actionable_shifts_count
        FROM participants p
-       LEFT JOIN volunteer_unavailable_performances vup ON vup.participant_id = p.id
-       LEFT JOIN show_dates sd ON sd.id = vup.show_date_id
-         AND sd.end_time >= NOW() - INTERVAL '3 hours'
+       LEFT JOIN LATERAL (
+         SELECT s.id
+         FROM shifts s
+         JOIN show_dates sd ON sd.id = s.show_date_id
+         WHERE s.depart_time >= NOW() - INTERVAL '3 hours'
+           AND s.assigned_participant_id IS NULL
+           AND NOT EXISTS (
+             SELECT 1
+             FROM participant_shifts ps
+             WHERE ps.shift_id = s.id
+           )
+           AND NOT EXISTS (
+             SELECT 1
+             FROM volunteer_unavailable_performances vup
+             WHERE vup.participant_id = p.id
+               AND vup.show_date_id = s.show_date_id
+           )
+           AND NOT EXISTS (
+             SELECT 1
+             FROM shifts existing
+             JOIN show_dates existing_sd ON existing_sd.id = existing.show_date_id
+             WHERE (
+                 existing.assigned_participant_id = p.id
+                 OR EXISTS (
+                   SELECT 1
+                   FROM participant_shifts existing_ps
+                   WHERE existing_ps.shift_id = existing.id
+                     AND existing_ps.participant_id = p.id
+                 )
+               )
+               AND (
+                 (s.arrive_time < existing.depart_time AND s.depart_time > existing.arrive_time)
+                 OR (sd.start_time < existing_sd.end_time AND sd.end_time > existing_sd.start_time)
+               )
+           )
+       ) actionable_shift ON true
        WHERE p.approved = true
+         AND p.status = 'active'
          AND p.email IS NOT NULL
          AND p.email != ''
        GROUP BY p.id, p.name, p.email
-       ORDER BY (COUNT(DISTINCT sd.id) > 0) DESC, p.name`,
+       ORDER BY (COUNT(DISTINCT actionable_shift.id) > 0) DESC, p.name`,
     );
 
     ctx.response.body = result.rows.map((volunteer) => ({
       ...volunteer,
-      unavailable_performances_count: Number(
-        volunteer.unavailable_performances_count,
+      actionable_shifts_count: Number(
+        volunteer.actionable_shifts_count,
       ),
-      has_availability: Number(volunteer.unavailable_performances_count) > 0,
+      eligible_for_availability_request:
+        Number(volunteer.actionable_shifts_count) > 0,
+      has_availability: Number(volunteer.actionable_shifts_count) > 0,
     }));
   } finally {
     client.release();
   }
 }
 
-async function hasFutureAvailabilityPerformance(
+async function isParticipantActive(volunteerId: string): Promise<boolean> {
+  const pool = getPool();
+  const client = await pool.connect();
+  try {
+    const result = await client.queryObject<{ status: string }>(
+      "SELECT status FROM participants WHERE id = $1",
+      [volunteerId],
+    );
+    return result.rows[0]?.status === "active";
+  } finally {
+    client.release();
+  }
+}
+
+function respondInactiveVolunteer(ctx: RouterContext<string>) {
+  ctx.response.status = 400;
+  ctx.response.body = {
+    error: "Inactive volunteers are excluded from future email outs",
+  };
+}
+
+async function hasAvailabilityRequestOpportunity(
   client: ReturnType<ReturnType<typeof getPool>["connect"]> extends Promise<
     infer T
-  >
-    ? T
+  > ? T
     : never,
   volunteerId: string,
 ): Promise<boolean> {
   const result = await client.queryObject<{ count: number }>(
-    `SELECT COUNT(DISTINCT sd.id) as count
-     FROM volunteer_unavailable_performances vup
-     JOIN show_dates sd ON sd.id = vup.show_date_id
-     WHERE vup.participant_id = $1
-       AND sd.end_time >= NOW() - INTERVAL '3 hours'`,
+    `SELECT COUNT(DISTINCT s.id)::int as count
+     FROM shifts s
+     JOIN show_dates sd ON sd.id = s.show_date_id
+     WHERE s.depart_time >= NOW() - INTERVAL '3 hours'
+       AND s.assigned_participant_id IS NULL
+       AND NOT EXISTS (
+         SELECT 1
+         FROM participant_shifts ps
+         WHERE ps.shift_id = s.id
+       )
+       AND NOT EXISTS (
+         SELECT 1
+         FROM volunteer_unavailable_performances vup
+         WHERE vup.participant_id = $1
+           AND vup.show_date_id = s.show_date_id
+       )
+       AND NOT EXISTS (
+         SELECT 1
+         FROM shifts existing
+         JOIN show_dates existing_sd ON existing_sd.id = existing.show_date_id
+         WHERE (
+             existing.assigned_participant_id = $1
+             OR EXISTS (
+               SELECT 1
+               FROM participant_shifts existing_ps
+               WHERE existing_ps.shift_id = existing.id
+                 AND existing_ps.participant_id = $1
+             )
+           )
+           AND (
+             (s.arrive_time < existing.depart_time AND s.depart_time > existing.arrive_time)
+             OR (sd.start_time < existing_sd.end_time AND sd.end_time > existing_sd.start_time)
+           )
+       )`,
     [volunteerId],
   );
 
@@ -2993,7 +3343,8 @@ async function hasFutureAvailabilityPerformance(
  * Sends bulk show week emails to volunteers with shifts for a specific show - admin only
  */
 export async function sendBulkShowWeekEmails(ctx: RouterContext<string>) {
-  const { showId, volunteerIds } = await ctx.request.body.json();
+  const { showId, volunteerIds, message, contactName, contactPhone } = await ctx
+    .request.body.json();
 
   if (!showId || !volunteerIds || !Array.isArray(volunteerIds)) {
     ctx.response.status = 400;
@@ -3005,6 +3356,12 @@ export async function sendBulkShowWeekEmails(ctx: RouterContext<string>) {
   const client = await pool.connect();
   const currentUserId = ctx.state?.user?.id;
   const forceProduction = ctx.request.url.searchParams.get("force") === "true";
+  const showWeekOptions = resolveEmailOverrides(await getEmailDefaults(), {
+    message,
+    contactName,
+    contactPhone,
+  });
+  const showWeekMessage = showWeekOptions.message || DEFAULT_SHOW_WEEK_MESSAGE;
 
   const results = [];
   let successCount = 0;
@@ -3013,17 +3370,28 @@ export async function sendBulkShowWeekEmails(ctx: RouterContext<string>) {
   try {
     const { generateVolunteerPDFData, filterCurrentAndFutureShifts } =
       await import("../utils/pdf-generator.ts");
-    const { generateServerSidePDF } =
-      await import("../utils/server-pdf-generator.ts");
-    const { sendShowWeekEmail, createVolunteerLoginUrl } =
-      await import("../utils/email.ts");
+    const { generateServerSidePDF } = await import(
+      "../utils/server-pdf-generator.ts"
+    );
+    const { sendShowWeekEmail, createVolunteerLoginUrl } = await import(
+      "../utils/email.ts"
+    );
 
-    const baseUrl =
-      Deno.env.get("BASE_URL") ||
+    const baseUrl = Deno.env.get("BASE_URL") ||
       `${ctx.request.url.protocol}//${ctx.request.url.host}`;
 
     for (const volunteerId of volunteerIds) {
       try {
+        if (!(await isParticipantActive(volunteerId))) {
+          results.push({
+            volunteerId,
+            success: false,
+            error: "Inactive volunteer",
+          });
+          errorCount++;
+          continue;
+        }
+
         // Generate PDF data for this volunteer
         const pdfData = await generateVolunteerPDFData(volunteerId);
 
@@ -3039,18 +3407,32 @@ export async function sendBulkShowWeekEmails(ctx: RouterContext<string>) {
           continue;
         }
 
-        // Generate PDF buffer
-        const pdfBuffer = await generateServerSidePDF(pdfData);
-        const filename = `show-week-shifts-${pdfData.volunteer.name.replace(
-          /[^a-zA-Z0-9]/g,
-          "-",
-        )}-${new Date().toISOString().split("T")[0]}.pdf`;
-
-        // Prepare email data
+        // Prepare email data and guard against stale selections from the UI.
         const currentAndFutureShifts = filterCurrentAndFutureShifts(
           pdfData.assignedShifts,
         );
         const hasShifts = currentAndFutureShifts.length > 0;
+
+        if (!hasShifts) {
+          results.push({
+            volunteerId,
+            volunteerName: pdfData.volunteer.name,
+            volunteerEmail: pdfData.volunteer.email,
+            success: true,
+            info: "No current or future shifts, email not sent",
+          });
+          continue;
+        }
+
+        // Generate PDF buffer. Calendar pages include all assigned shifts, but
+        // tables and summaries use current/future shifts only.
+        const pdfBuffer = await generateServerSidePDF(pdfData);
+        const filename = `show-week-shifts-${
+          pdfData.volunteer.name.replace(
+            /[^a-zA-Z0-9]/g,
+            "-",
+          )
+        }-${new Date().toISOString().split("T")[0]}.pdf`;
 
         // Format shifts for email preview
         const shifts = currentAndFutureShifts.slice(0, 5).map((shift) => {
@@ -3101,6 +3483,8 @@ export async function sendBulkShowWeekEmails(ctx: RouterContext<string>) {
           hasShifts,
           shifts,
           unavailablePerformances,
+          message: showWeekMessage,
+          contactInfo: showWeekOptions.contactInfo,
         };
 
         // Send email
@@ -3153,7 +3537,8 @@ export async function sendBulkShowWeekEmails(ctx: RouterContext<string>) {
     ctx.response.status = 200;
     ctx.response.body = {
       success: true,
-      message: `Bulk show week emails completed: ${successCount} sent, ${errorCount} failed`,
+      message:
+        `Bulk show week emails completed: ${successCount} sent, ${errorCount} failed`,
       successCount,
       errorCount,
       results,
@@ -3171,7 +3556,8 @@ export async function sendBulkShowWeekEmails(ctx: RouterContext<string>) {
  * Sends bulk unfilled shifts emails to selected volunteers - admin only
  */
 export async function sendBulkUnfilledShiftsEmails(ctx: RouterContext<string>) {
-  const { volunteerIds } = await ctx.request.body.json();
+  const { volunteerIds, message, contactName, contactPhone } = await ctx.request
+    .body.json();
 
   if (!volunteerIds || !Array.isArray(volunteerIds)) {
     ctx.response.status = 400;
@@ -3183,14 +3569,22 @@ export async function sendBulkUnfilledShiftsEmails(ctx: RouterContext<string>) {
   const client = await pool.connect();
   const currentUserId = ctx.state?.user?.id;
   const forceProduction = ctx.request.url.searchParams.get("force") === "true";
+  const unfilledOptions = resolveEmailOverrides(await getEmailDefaults(), {
+    message,
+    contactName,
+    contactPhone,
+  });
+  const unfilledMessage = unfilledOptions.message ||
+    DEFAULT_LAST_MINUTE_SHIFTS_MESSAGE;
 
   const results = [];
   let successCount = 0;
   let errorCount = 0;
 
   try {
-    const { generateOutstandingShiftsPDFForVolunteer } =
-      await import("../utils/unfilled-shifts-pdf-generator.ts");
+    const { generateOutstandingShiftsPDFForVolunteer } = await import(
+      "../utils/unfilled-shifts-pdf-generator.ts"
+    );
     const { sendLastMinuteShiftsEmail } = await import("../utils/email.ts");
 
     for (const volunteerId of volunteerIds) {
@@ -3200,7 +3594,8 @@ export async function sendBulkUnfilledShiftsEmails(ctx: RouterContext<string>) {
           id: string;
           name: string;
           email: string;
-        }>("SELECT id, name, email FROM participants WHERE id = $1", [
+          status: string;
+        }>("SELECT id, name, email, status FROM participants WHERE id = $1", [
           volunteerId,
         ]);
 
@@ -3215,6 +3610,16 @@ export async function sendBulkUnfilledShiftsEmails(ctx: RouterContext<string>) {
         }
 
         const volunteer = volunteerResult.rows[0];
+        if (volunteer.status !== "active") {
+          results.push({
+            volunteerId,
+            volunteerName: volunteer.name,
+            success: false,
+            error: "Inactive volunteer",
+          });
+          errorCount++;
+          continue;
+        }
 
         // Check if volunteer has email
         if (!volunteer.email) {
@@ -3225,17 +3630,6 @@ export async function sendBulkUnfilledShiftsEmails(ctx: RouterContext<string>) {
             error: "No email address",
           });
           errorCount++;
-          continue;
-        }
-
-        if (!(await hasFutureAvailabilityPerformance(client, volunteerId))) {
-          results.push({
-            volunteerId,
-            volunteerName: volunteer.name,
-            volunteerEmail: volunteer.email,
-            success: true,
-            info: "No availability saved, email not sent",
-          });
           continue;
         }
 
@@ -3280,9 +3674,11 @@ export async function sendBulkUnfilledShiftsEmails(ctx: RouterContext<string>) {
           volunteerId,
           10,
         );
-        const filename = `last-minute-shifts-${volunteer.name
-          .replace(/\s+/g, "-")
-          .toLowerCase()}-${new Date().toISOString().split("T")[0]}.pdf`;
+        const filename = `last-minute-shifts-${
+          volunteer.name
+            .replace(/\s+/g, "-")
+            .toLowerCase()
+        }-${new Date().toISOString().split("T")[0]}.pdf`;
 
         const emailData = {
           volunteerName: volunteer.name,
@@ -3290,6 +3686,8 @@ export async function sendBulkUnfilledShiftsEmails(ctx: RouterContext<string>) {
           volunteerId: volunteerId,
           hasShifts: true,
           shifts,
+          message: unfilledMessage,
+          contactInfo: unfilledOptions.contactInfo,
         };
 
         // Send email
@@ -3342,7 +3740,8 @@ export async function sendBulkUnfilledShiftsEmails(ctx: RouterContext<string>) {
     ctx.response.status = 200;
     ctx.response.body = {
       success: true,
-      message: `Bulk unfilled shifts emails completed: ${successCount} sent, ${errorCount} failed`,
+      message:
+        `Bulk unfilled shifts emails completed: ${successCount} sent, ${errorCount} failed`,
       successCount,
       errorCount,
       results,
@@ -3359,7 +3758,8 @@ export async function sendBulkUnfilledShiftsEmails(ctx: RouterContext<string>) {
 export async function sendBulkAvailabilityRequestEmails(
   ctx: RouterContext<string>,
 ) {
-  const { volunteerIds } = await ctx.request.body.json();
+  const { volunteerIds, message, contactName, contactPhone } = await ctx.request
+    .body.json();
 
   if (!volunteerIds || !Array.isArray(volunteerIds)) {
     ctx.response.status = 400;
@@ -3371,6 +3771,13 @@ export async function sendBulkAvailabilityRequestEmails(
   const client = await pool.connect();
   const currentUserId = ctx.state?.user?.id;
   const forceProduction = ctx.request.url.searchParams.get("force") === "true";
+  const availabilityOptions = resolveEmailOverrides(await getEmailDefaults(), {
+    message,
+    contactName,
+    contactPhone,
+  });
+  const availabilityMessage = availabilityOptions.message ||
+    DEFAULT_AVAILABILITY_REQUEST_MESSAGE;
   const results = [];
   let successCount = 0;
   let errorCount = 0;
@@ -3378,8 +3785,7 @@ export async function sendBulkAvailabilityRequestEmails(
   try {
     const { createVolunteerLoginUrl, sendAvailabilityRequestEmail } =
       await import("../utils/email.ts");
-    const baseUrl =
-      Deno.env.get("BASE_URL") ||
+    const baseUrl = Deno.env.get("BASE_URL") ||
       `${ctx.request.url.protocol}//${ctx.request.url.host}`;
 
     for (const volunteerId of volunteerIds) {
@@ -3388,7 +3794,8 @@ export async function sendBulkAvailabilityRequestEmails(
           id: string;
           name: string;
           email: string;
-        }>("SELECT id, name, email FROM participants WHERE id = $1", [
+          status: string;
+        }>("SELECT id, name, email, status FROM participants WHERE id = $1", [
           volunteerId,
         ]);
 
@@ -3403,6 +3810,17 @@ export async function sendBulkAvailabilityRequestEmails(
         }
 
         const volunteer = volunteerResult.rows[0];
+        if (volunteer.status !== "active") {
+          results.push({
+            volunteerId,
+            volunteerName: volunteer.name,
+            success: false,
+            error: "Inactive volunteer",
+          });
+          errorCount++;
+          continue;
+        }
+
         if (!volunteer.email) {
           results.push({
             volunteerId,
@@ -3414,13 +3832,13 @@ export async function sendBulkAvailabilityRequestEmails(
           continue;
         }
 
-        if (!(await hasFutureAvailabilityPerformance(client, volunteerId))) {
+        if (!(await hasAvailabilityRequestOpportunity(client, volunteerId))) {
           results.push({
             volunteerId,
             volunteerName: volunteer.name,
             volunteerEmail: volunteer.email,
             success: true,
-            info: "No availability saved, email not sent",
+            info: "No eligible unfilled shifts, email not sent",
           });
           continue;
         }
@@ -3431,6 +3849,8 @@ export async function sendBulkAvailabilityRequestEmails(
             volunteerEmail: volunteer.email,
             volunteerId: volunteer.id,
             loginUrl: createVolunteerLoginUrl(baseUrl, volunteer.id),
+            message: availabilityMessage,
+            contactInfo: availabilityOptions.contactInfo,
           },
           currentUserId,
           forceProduction,
@@ -3473,7 +3893,8 @@ export async function sendBulkAvailabilityRequestEmails(
     ctx.response.status = 200;
     ctx.response.body = {
       success: true,
-      message: `Availability request emails completed: ${successCount} sent, ${errorCount} failed`,
+      message:
+        `Availability request emails completed: ${successCount} sent, ${errorCount} failed`,
       successCount,
       errorCount,
       results,

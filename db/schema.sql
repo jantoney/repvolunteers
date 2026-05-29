@@ -21,8 +21,25 @@ CREATE TABLE IF NOT EXISTS participants (
   email TEXT,
   phone TEXT,
   approved BOOLEAN NOT NULL DEFAULT FALSE,
+  status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'inactive')),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+ALTER TABLE participants
+  ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'active';
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'participants_status_check'
+  ) THEN
+    ALTER TABLE participants
+      ADD CONSTRAINT participants_status_check
+      CHECK (status IN ('active', 'inactive'));
+  END IF;
+END $$;
 
 -- Shifts now reference show_dates instead of shows directly
 -- Also renamed start_time/end_time to arrive_time/depart_time for clarity
@@ -98,6 +115,17 @@ CREATE TABLE IF NOT EXISTS verification (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS participant_notes (
+  id SERIAL PRIMARY KEY,
+  participant_id UUID NOT NULL REFERENCES participants(id) ON DELETE CASCADE,
+  note TEXT NOT NULL,
+  visibility TEXT NOT NULL DEFAULT 'internal' CHECK (visibility IN ('internal')),
+  created_by_user_id TEXT REFERENCES "user"(id) ON DELETE SET NULL,
+  created_by_name TEXT,
+  created_by_email TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- Show intervals table to track interval times within performances
 CREATE TABLE IF NOT EXISTS show_intervals (
   id SERIAL PRIMARY KEY,
@@ -134,8 +162,16 @@ CREATE TABLE IF NOT EXISTS email_attachments (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS app_settings (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- Index for performance
 CREATE INDEX IF NOT EXISTS idx_sent_emails_participant ON sent_emails(to_participant_id, sent_at DESC);
 CREATE INDEX IF NOT EXISTS idx_sent_emails_user ON sent_emails(to_user_id, sent_at DESC);
 CREATE INDEX IF NOT EXISTS idx_sent_emails_type ON sent_emails(email_type, sent_at DESC);
 CREATE INDEX IF NOT EXISTS idx_volunteer_unavailable_performances_show_date ON volunteer_unavailable_performances(show_date_id);
+CREATE INDEX IF NOT EXISTS idx_participants_status ON participants(status);
+CREATE INDEX IF NOT EXISTS idx_participant_notes_participant ON participant_notes(participant_id, created_at DESC);

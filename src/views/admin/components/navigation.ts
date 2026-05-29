@@ -43,6 +43,9 @@ export function getAdminNavigation(currentPage: string = "") {
               <li><a href="/admin/bulk-email" class="dropdown-link">Bulk Email</a></li>
             </ul>
           </li>
+          <li class="nav-item"><a href="/admin/help" class="nav-link ${
+            currentPage === "help" ? "active" : ""
+          }">Help</a></li>
         </ul>
         <div class="nav-item" id="server-time">
           <span class="server-time-display"></span>

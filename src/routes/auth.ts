@@ -163,7 +163,7 @@ router.post("/send-link", async (ctx) => {
 
     try {
       const result = await client.queryObject(
-        "SELECT id, name, email FROM participants WHERE email = $1 AND approved = true",
+        "SELECT id, name, email FROM participants WHERE email = $1 AND approved = true AND status = 'active'",
         [email],
       );
 
@@ -183,6 +183,9 @@ router.post("/send-link", async (ctx) => {
       const { sendVolunteerLoginEmail, createVolunteerLoginUrl } = await import(
         "../utils/email.ts"
       );
+      const { getEmailDefaults, resolveEmailOverrides } = await import(
+        "../utils/email-settings.ts"
+      );
 
       const loginUrl = createVolunteerLoginUrl(
         Deno.env.get("BASE_URL") || ctx.request.url.origin,
@@ -192,11 +195,13 @@ router.post("/send-link", async (ctx) => {
       // Send the email using our template
       const forceProduction =
         ctx.request.url.searchParams.get("force") === "true";
+      const loginContact = resolveEmailOverrides(await getEmailDefaults(), {});
       const emailSent = await sendVolunteerLoginEmail(
         {
           volunteerName: volunteer.name,
           volunteerEmail: volunteer.email,
           loginUrl: loginUrl,
+          contactInfo: loginContact.contactInfo,
         },
         undefined,
         forceProduction,

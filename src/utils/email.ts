@@ -1,8 +1,8 @@
 import { createResendClient, getFromAddress } from "./resend-config.ts";
 import {
-  recordSentEmail,
-  CreateEmailRecord,
   CreateEmailAttachment,
+  CreateEmailRecord,
+  recordSentEmail,
 } from "./email-tracking.ts";
 
 export interface ContactInfo {
@@ -37,6 +37,7 @@ export interface ShowWeekEmailData {
   shifts: string[];
   unavailablePerformances?: string[];
   contactInfo?: ContactInfo;
+  message?: string;
 }
 
 export interface LastMinuteShiftsEmailData {
@@ -46,6 +47,7 @@ export interface LastMinuteShiftsEmailData {
   hasShifts: boolean;
   shifts: string[];
   contactInfo?: ContactInfo;
+  message?: string;
 }
 
 export interface AvailabilityRequestEmailData {
@@ -55,6 +57,7 @@ export interface AvailabilityRequestEmailData {
   loginUrl: string;
   showName?: string;
   contactInfo?: ContactInfo;
+  message?: string;
 }
 
 /**
@@ -64,19 +67,22 @@ export function renderVolunteerLoginEmail(data: VolunteerEmailData): string {
   // Generate contact section if contact info is provided
   const contactSection = data.contactInfo
     ? `<p style="font-size:14px;line-height:24px;color:#333;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;margin:20px 0;text-align:center;background:#f8f9fa;padding:15px;border-radius:6px;">
-        <strong>Questions? Contact ${createClickablePhoneNumber(
-          data.contactInfo.name,
-          data.contactInfo.phone,
-          {
-            organization: data.contactInfo.organization,
-            displayFormat: data.contactInfo.displayFormat,
-          },
-        )}</strong>
+        <strong>Questions? Contact ${
+      createClickablePhoneNumber(
+        data.contactInfo.name,
+        data.contactInfo.phone,
+        {
+          organization: data.contactInfo.organization,
+          displayFormat: data.contactInfo.displayFormat,
+        },
+      )
+    }</strong>
       </p>`
     : "";
 
   // Use the beautiful template from volunteer-login-email.html
-  const template = `<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+  const template =
+    `<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html dir="ltr" lang="en">
   <head>
     <meta content="text/html; charset=UTF-8" http-equiv="Content-Type" />
@@ -232,25 +238,19 @@ export function renderAvailabilityRequestEmail(
   data: AvailabilityRequestEmailData,
 ): string {
   const showText = data.showName ? ` for ${escapeHtml(data.showName)}` : "";
-  const contactSection = data.contactInfo
-    ? `<p style="font-size:14px;line-height:24px;color:#333;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;margin:20px 0;text-align:center;background:#f8f9fa;padding:15px;border-radius:6px;">
-        <strong>Questions? Contact ${createClickablePhoneNumber(
-          data.contactInfo.name,
-          data.contactInfo.phone,
-          {
-            organization: data.contactInfo.organization,
-            displayFormat: data.contactInfo.displayFormat,
-          },
-        )}</strong>
-      </p>`
-    : "";
+  const availabilityTitle = "Thanks for helping us plan the next show";
+  const messageSection = data.message
+    ? renderPlainTextParagraphs(data.message)
+    : `<p style="font-size:15px;line-height:24px;color:#333;margin:0 0 16px 0;">We are getting ready to schedule volunteer shifts${showText}. There is now a <strong>Performances You Cannot Work</strong> section in Theatre Shifts where you can choose the exact performances you cannot volunteer for.</p>
+                <p style="font-size:15px;line-height:24px;color:#333;margin:0 0 24px 0;">Please open your shifts page and add any performances you cannot work before signing up for shifts.</p>`;
+  const contactSection = renderContactCard(data.contactInfo, "Questions?");
 
   return `<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Share Your Availability</title>
+    <title>${availabilityTitle}</title>
   </head>
   <body style="margin:0;padding:0;background:#f6f7f9;color:#212121;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f6f7f9;padding:24px 12px;">
@@ -259,10 +259,11 @@ export function renderAvailabilityRequestEmail(
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;background:#ffffff;border-radius:8px;border:1px solid #e5e7eb;overflow:hidden;">
             <tr>
               <td style="padding:28px 32px;">
-                <h1 style="margin:0 0 16px 0;color:#111827;font-size:24px;line-height:32px;">Can you update your availability${showText}?</h1>
-                <p style="font-size:15px;line-height:24px;color:#333;margin:0 0 16px 0;">Hi ${escapeHtml(data.volunteerName)},</p>
-                <p style="font-size:15px;line-height:24px;color:#333;margin:0 0 16px 0;">We are getting ready to schedule volunteer shifts${showText}. There is now a <strong>Performances You Cannot Work</strong> section in Theatre Shifts where you can choose the exact performances you cannot volunteer for.</p>
-                <p style="font-size:15px;line-height:24px;color:#333;margin:0 0 24px 0;">Please open your shifts page and add any performances you cannot work before signing up for shifts.</p>
+                <h1 style="margin:0 0 16px 0;color:#111827;font-size:24px;line-height:32px;">${availabilityTitle}</h1>
+                <p style="font-size:15px;line-height:24px;color:#333;margin:0 0 16px 0;">Hi ${
+    escapeHtml(data.volunteerName)
+  },</p>
+                ${messageSection}
                 <p style="text-align:center;margin:30px 0;">
                   <a href="${data.loginUrl}" style="display:inline-block;padding:14px 24px;background:#007bff;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:bold;">Update My Availability</a>
                 </p>
@@ -286,11 +287,8 @@ export async function sendAvailabilityRequestEmail(
   try {
     const htmlContent = renderAvailabilityRequestEmail(data);
     const fromAddress = getFromAddress();
-    const subject = data.showName
-      ? `Share your availability for ${data.showName}`
-      : "Share your theatre shift availability";
-    const isDevelopment =
-      !forceProduction &&
+    const subject = "Thanks for helping us plan the next show";
+    const isDevelopment = !forceProduction &&
       (Deno.env.get("DENO_ENV") === "development" ||
         !Deno.env.get("RESEND_API_KEY"));
 
@@ -355,18 +353,6 @@ Login URL: ${data.loginUrl}
 }
 
 /**
- * Creates standard contact information for theatre volunteer coordination
- */
-export function createTheatreContactInfo(): ContactInfo {
-  return {
-    name: "Jay - Theatre Volunteer Coordinator",
-    phone: "0434586878",
-    organization: "Theatre Volunteer Management",
-    displayFormat: "0434 586 878",
-  };
-}
-
-/**
  * Creates a VCF (vCard) data URI for adding a contact to phone/contacts app
  */
 function createVcfDataUri(
@@ -415,21 +401,69 @@ function createClickablePhoneNumber(
   const telPhone = phone.startsWith("0") ? `+61${phone.substring(1)}` : phone;
 
   // Use provided display format or format with spaces for readability
-  const displayPhone =
-    displayFormat || phone.replace(/(\d{4})(\d{3})(\d{3})/, "$1 $2 $3");
+  const displayPhone = displayFormat ||
+    phone.replace(/(\d{4})(\d{3})(\d{3})/, "$1 $2 $3");
 
-  let html = `<a href="tel:${telPhone}" style="color:#007bff;text-decoration:none;">${displayPhone}</a>`;
+  let html =
+    `<a href="tel:${telPhone}" style="color:#007bff;text-decoration:none;">${displayPhone}</a>`;
 
   if (showAddToContacts) {
     const vcfUri = createVcfDataUri(name, phone, organization);
     const filename = `${name.toLowerCase().replace(/\s+/g, "-")}-contact.vcf`;
 
     html += `<br><small style="color:#666;font-size:12px;">`;
-    html += `<a href="${vcfUri}" download="${filename}" style="color:#007bff;text-decoration:none;">`;
+    html +=
+      `<a href="${vcfUri}" download="${filename}" style="color:#007bff;text-decoration:none;">`;
     html += `📱 Add to contacts</a></small>`;
   }
 
   return html;
+}
+
+function renderPlainTextParagraphs(text: string): string {
+  return text
+    .split(/\n{2,}/)
+    .map((paragraph) => paragraph.trim())
+    .filter(Boolean)
+    .map((paragraph) =>
+      `<p style="font-size:14px;line-height:24px;color:#333;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;margin:24px 0;margin-bottom:14px;margin-top:24px;margin-right:0;margin-left:0">${
+        escapeHtml(paragraph).replace(/\n/g, "<br>")
+      }</p>`
+    )
+    .join("");
+}
+
+function renderContactCard(
+  contactInfo?: ContactInfo,
+  heading?: string,
+): string {
+  if (!contactInfo) {
+    return "";
+  }
+
+  const clickablePhone = createClickablePhoneNumber(
+    contactInfo.name,
+    contactInfo.phone,
+    {
+      organization: contactInfo.organization,
+      displayFormat: contactInfo.displayFormat,
+    },
+  );
+  const headingHtml = heading
+    ? `<h3 style="color:#333;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;font-size:16px;font-weight:bold;margin:0 0 10px 0;">${
+      escapeHtml(heading)
+    }</h3>`
+    : "";
+
+  return `<div style="background:#f8f9fa;border-radius:6px;padding:20px;margin:25px 0;">
+            ${headingHtml}
+            <div style="text-align:center;background:#fff;padding:15px;border-radius:6px;border:2px solid #007bff;">
+              <strong>${
+    escapeHtml(contactInfo.name)
+  } - ${clickablePhone}</strong><br>
+              <small style="color:#666;">Volunteer coordination contact</small>
+            </div>
+          </div>`;
 }
 
 /**
@@ -468,8 +502,7 @@ export async function sendVolunteerLoginEmail(
 
     // Check if we're in development mode or if Resend is not configured
     // forceProduction parameter can override development mode for testing
-    const isDevelopment =
-      !forceProduction &&
+    const isDevelopment = !forceProduction &&
       (Deno.env.get("DENO_ENV") === "development" ||
         !Deno.env.get("RESEND_API_KEY"));
 
@@ -589,14 +622,16 @@ export function renderVolunteerScheduleEmail(
   // Generate contact section if contact info is provided
   const contactSection = data.contactInfo
     ? `<div style="font-size:14px;line-height:24px;color:#333;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;margin:20px 0;text-align:center;background:#f8f9fa;padding:15px;border-radius:6px;">
-        <strong>Questions? Contact ${createClickablePhoneNumber(
-          data.contactInfo.name,
-          data.contactInfo.phone,
-          {
-            organization: data.contactInfo.organization,
-            displayFormat: data.contactInfo.displayFormat,
-          },
-        )}</strong>
+        <strong>Questions? Contact ${
+      createClickablePhoneNumber(
+        data.contactInfo.name,
+        data.contactInfo.phone,
+        {
+          organization: data.contactInfo.organization,
+          displayFormat: data.contactInfo.displayFormat,
+        },
+      )
+    }</strong>
       </div>`
     : "";
 
@@ -630,7 +665,8 @@ export function renderVolunteerScheduleEmail(
     renderUnavailablePerformancesEmailSection(data.unavailablePerformances);
 
   // Use a simplified template inline
-  const template = `<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+  const template =
+    `<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html dir="ltr" lang="en">
   <head>
     <meta content="text/html; charset=UTF-8" http-equiv="Content-Type" />
@@ -749,23 +785,21 @@ export function renderShowWeekEmail(data: ShowWeekEmailData): string {
   const unavailablePerformancesSection =
     renderUnavailablePerformancesEmailSection(data.unavailablePerformances);
 
-  // Generate clickable phone contact section
-  const phoneContactSection = data.contactInfo
-    ? createClickablePhoneNumber(
-        data.contactInfo.name,
-        data.contactInfo.phone,
-        {
-          organization: data.contactInfo.organization,
-          displayFormat: data.contactInfo.displayFormat,
-        },
-      )
-    : createClickablePhoneNumber("Jay Antoney - Adelaide Rep", "0434586878", {
-        organization: "Adelaide Repertory Theatre",
-        displayFormat: "0434 586 878",
-      });
+  const messageSection = data.message
+    ? renderPlainTextParagraphs(data.message)
+    : `<p style="font-size:14px;line-height:24px;color:#333;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;margin:24px 0;margin-bottom:14px;margin-top:24px;margin-right:0;margin-left:0">
+                              How exciting! We're so close to showtime and we couldn't do it without amazing volunteers like you. 
+                              Your shift details are attached as a PDF for easy reference.
+                            </p>
+                            <p style="font-size:14px;line-height:24px;color:#333;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;margin:24px 0;margin-bottom:14px;margin-top:24px;margin-right:0;margin-left:0">
+                              <strong>Quick reminder:</strong> Uniform is still neat casual - black, white & navy are all perfectly fine. 
+                              Any other questions, don't hesitate to contact me. Feel free to save my number in your phone just in case you're running late or something pops up.
+                            </p>`;
+  const contactSection = renderContactCard(data.contactInfo, "Questions?");
 
   // Use a simplified template inline
-  const template = `<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+  const template =
+    `<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html dir="ltr" lang="en">
   <head>
     <meta content="text/html; charset=UTF-8" http-equiv="Content-Type" />
@@ -801,17 +835,8 @@ export function renderShowWeekEmail(data: ShowWeekEmailData): string {
                             <h1 style="color:#333;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;font-size:20px;font-weight:bold;margin-bottom:15px">
                               Hey {{volunteerName}}, it's Show Week! 🎭✨
                             </h1>
-                            <p style="font-size:14px;line-height:24px;color:#333;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;margin:24px 0;margin-bottom:14px;margin-top:24px;margin-right:0;margin-left:0">
-                              How exciting! We're so close to showtime and we couldn't do it without amazing volunteers like you. 
-                              Your shift details are attached as a PDF for easy reference.
-                            </p>
-                            <p style="font-size:14px;line-height:24px;color:#333;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;margin:24px 0;margin-bottom:14px;margin-top:24px;margin-right:0;margin-left:0">
-                              <strong>Quick reminder:</strong> Uniform is still neat casual - black, white & navy are all perfectly fine. 
-                              Any other questions, don't hesitate to contact me. Feel free to save my number in your phone just in case you're running late or something pops up.
-                            </p>
-                            <div style="font-size:14px;line-height:24px;color:#333;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;margin:24px 0;margin-bottom:14px;margin-top:24px;margin-right:0;margin-left:0;text-align:center;background:#f8f9fa;padding:15px;border-radius:6px;">
-                              <strong>Jay - {{phoneContactSection}}</strong>
-                            </div>
+                            {{messageSection}}
+                            {{contactSection}}
                             {{shiftsSection}}
                             {{unavailablePerformancesSection}}
                             <p style="font-size:14px;line-height:24px;color:#333;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;margin:24px 0;margin-bottom:14px;margin-top:24px;margin-right:0;margin-left:0">
@@ -862,7 +887,8 @@ export function renderShowWeekEmail(data: ShowWeekEmailData): string {
       /\{\{unavailablePerformancesSection\}\}/g,
       unavailablePerformancesSection,
     )
-    .replace(/\{\{phoneContactSection\}\}/g, phoneContactSection);
+    .replace(/\{\{messageSection\}\}/g, messageSection)
+    .replace(/\{\{contactSection\}\}/g, contactSection);
 }
 
 /**
@@ -897,8 +923,20 @@ export function renderLastMinuteShiftsEmail(
             </div>`;
   }
 
+  const messageSection = data.message
+    ? renderPlainTextParagraphs(data.message)
+    : `<p style="font-size:14px;line-height:24px;color:#333;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;margin:24px 0;margin-bottom:14px;margin-top:24px;margin-right:0;margin-left:0">
+                              We understand that people get sick last minute, or have to pull out of a shift every now and then. 
+                              If you can, we would love any assistance you can provide in filling a shift.
+                            </p>`;
+  const contactSection = renderContactCard(
+    data.contactInfo,
+    "For urgent shifts or last minute sickness:",
+  );
+
   // Use a simplified template inline
-  const template = `<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+  const template =
+    `<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html dir="ltr" lang="en">
   <head>
     <meta content="text/html; charset=UTF-8" http-equiv="Content-Type" />
@@ -934,24 +972,13 @@ export function renderLastMinuteShiftsEmail(
                             <h1 style="color:#333;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;font-size:20px;font-weight:bold;margin-bottom:15px">
                               Hi {{volunteerName}}, can you help us out?
                             </h1>
-                            <p style="font-size:14px;line-height:24px;color:#333;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;margin:24px 0;margin-bottom:14px;margin-top:24px;margin-right:0;margin-left:0">
-                              We understand that people get sick last minute, or have to pull out of a shift every now and then. 
-                              If you can, we would love any assistance you can provide in filling a shift.
-                            </p>
+                            {{messageSection}}
                             <p style="font-size:14px;line-height:24px;color:#333;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;margin:24px 0;margin-bottom:14px;margin-top:24px;margin-right:0;margin-left:0">
                               We've attached a PDF with the next 10 outstanding shifts that need volunteers. 
                               If any of these times work for you, please let us know!
                             </p>
                             {{shiftsSection}}
-                            <div style="background:#f8f9fa;border-radius:6px;padding:20px;margin:25px 0;">
-                              <h3 style="color:#333;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;font-size:16px;font-weight:bold;margin:0 0 10px 0;">
-                                📞 For urgent shifts or last minute sickness:
-                              </h3>
-                              <div style="text-align:center;background:#fff;padding:15px;border-radius:6px;border:2px solid #007bff;">
-                                <strong>Please message or call Jay - 0434586878</strong><br>
-                                <small style="color:#666;">Available for urgent volunteer coordination</small>
-                              </div>
-                            </div>
+                            {{contactSection}}
                           </td>
                         </tr>
                       </tbody>
@@ -970,7 +997,7 @@ export function renderLastMinuteShiftsEmail(
                               <li>Details about available volunteer opportunities</li>
                             </ul>
                             <p style="font-size:14px;line-height:24px;color:#666;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;margin:20px 0 0 0;">
-                              <strong>Can you help out?</strong> Contact Jay to let us know which shifts work for you, or if you have any questions about volunteering.
+                              <strong>Can you help out?</strong> Contact the volunteer coordination contact above to let us know which shifts work for you, or if you have any questions about volunteering.
                             </p>
                           </td>
                         </tr>
@@ -983,7 +1010,7 @@ export function renderLastMinuteShiftsEmail(
             <p style="font-size:12px;line-height:24px;color:#666;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;margin:24px 0;padding:0 20px;margin-top:24px;margin-right:0;margin-bottom:24px;margin-left:0;text-align:center;">
               This email was sent by Theatre Shifts volunteer management system. 
               The outstanding shifts list is attached for your reference. 
-              If you have any questions, please contact Jay on 0434586878.
+              If you have any questions, please use the contact details above.
             </p>
           </td>
         </tr>
@@ -995,7 +1022,9 @@ export function renderLastMinuteShiftsEmail(
   // Replace placeholders with actual data
   return template
     .replace(/\{\{volunteerName\}\}/g, escapeHtml(data.volunteerName))
-    .replace(/\{\{shiftsSection\}\}/g, shiftsSection);
+    .replace(/\{\{messageSection\}\}/g, messageSection)
+    .replace(/\{\{shiftsSection\}\}/g, shiftsSection)
+    .replace(/\{\{contactSection\}\}/g, contactSection);
 }
 
 /**
@@ -1013,8 +1042,7 @@ export async function sendVolunteerScheduleEmail(
 
     // Check if we're in development mode or if Resend is not configured
     // forceProduction parameter can override development mode for testing
-    const isDevelopment =
-      !forceProduction &&
+    const isDevelopment = !forceProduction &&
       (Deno.env.get("DENO_ENV") === "development" ||
         !Deno.env.get("RESEND_API_KEY"));
 
@@ -1132,8 +1160,7 @@ export async function sendShowWeekEmail(
 
     // Check if we're in development mode or if Resend is not configured
     // forceProduction parameter can override development mode for testing
-    const isDevelopment =
-      !forceProduction &&
+    const isDevelopment = !forceProduction &&
       (Deno.env.get("DENO_ENV") === "development" ||
         !Deno.env.get("RESEND_API_KEY"));
 
@@ -1252,8 +1279,7 @@ export async function sendLastMinuteShiftsEmail(
 
     // Check if we're in development mode or if Resend is not configured
     // forceProduction parameter can override development mode for testing
-    const isDevelopment =
-      !forceProduction &&
+    const isDevelopment = !forceProduction &&
       (Deno.env.get("DENO_ENV") === "development" ||
         !Deno.env.get("RESEND_API_KEY"));
 

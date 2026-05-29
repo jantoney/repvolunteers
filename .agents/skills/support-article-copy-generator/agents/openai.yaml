@@ -1,0 +1,4 @@
+interface:
+  display_name: "Support Article Copy Generator"
+  short_description: "Write simple RepVolunteers help articles"
+  default_prompt: "Use $support-article-copy-generator to draft a simple support article for RepVolunteers."

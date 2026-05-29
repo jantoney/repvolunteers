@@ -20,7 +20,7 @@ async function getVolunteerSignupHref(
   const client = await pool.connect();
   try {
     const result = await client.queryObject<{ id: string }>(
-      "SELECT id FROM participants WHERE lower(email) = lower($1) AND approved = true ORDER BY name LIMIT 1",
+      "SELECT id FROM participants WHERE lower(email) = lower($1) AND approved = true AND status = 'active' ORDER BY name LIMIT 1",
       [email],
     );
 

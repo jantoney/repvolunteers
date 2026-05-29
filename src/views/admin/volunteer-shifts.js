@@ -51,8 +51,25 @@ globalThis.removeShift = function(buttonElement) {
           });
           
           if (response.ok) {
-            Modal.success('Success', 'Shift assignment removed successfully');
-            setTimeout(() => globalThis.location.reload(), 1500);
+            if (typeof Toast !== 'undefined') {
+              Toast.success('Shift assignment removed.');
+            }
+
+            const shiftCard = buttonElement.closest('.profile-shift-card');
+            const shiftList = shiftCard?.parentElement;
+            if (shiftCard) {
+              shiftCard.remove();
+            }
+
+            if (shiftList && !shiftList.querySelector('.profile-shift-card')) {
+              shiftList.innerHTML = '<div class="profile-empty">No upcoming shifts assigned.</div>';
+            }
+
+            const upcomingCount = document.querySelector('.profile-stat strong');
+            if (upcomingCount) {
+              const nextCount = Math.max(0, Number.parseInt(upcomingCount.textContent || '0', 10) - 1);
+              upcomingCount.textContent = String(nextCount);
+            }
           } else {
             const error = await response.text();
             Modal.error('Error', 'Failed to remove shift assignment: ' + error);
