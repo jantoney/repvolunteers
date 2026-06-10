@@ -1,6 +1,6 @@
 import { Router } from "oak";
 import * as adminController from "../controllers/admin.ts";
-import { requireAdminAuth } from "../middlewares/better-auth.ts";
+import { requireAdminAuth, requireAuth } from "../middlewares/better-auth.ts";
 
 const router = new Router();
 
@@ -10,6 +10,7 @@ const knownAdminPaths = [
   /^\/reset-password$/,
   /^\/dashboard$/,
   /^\/settings$/,
+  /^\/maintenance\/migrations$/,
   /^\/help$/,
   /^\/shows$/,
   /^\/shows\/new$/,
@@ -105,6 +106,17 @@ router.use(async (ctx, next) => {
 
   await next();
 });
+
+router.get(
+  "/maintenance/migrations",
+  requireAuth,
+  adminController.showMigrationRunnerPage,
+);
+router.post(
+  "/maintenance/migrations",
+  requireAuth,
+  adminController.runDatabaseMigrations,
+);
 
 // Protected admin routes - apply middleware first
 router.use(requireAdminAuth);

@@ -42,6 +42,7 @@ export {
   showEditVolunteerForm,
   showHelpPage,
   showLoginForm,
+  showMigrationRunnerPage,
   showNewShiftForm,
   showNewShowForm,
   showNewVolunteerForm,

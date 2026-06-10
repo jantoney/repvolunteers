@@ -14,4 +14,5 @@ export { showEditShiftForm } from "./edit-shift.ts";
 export { showUnfilledShiftsPage } from "./unfilled-shifts.ts";
 export { showBulkEmailPage } from "./bulk-email.ts";
 export { showSettingsPage } from "./settings.ts";
+export { showMigrationRunnerPage } from "./migration-runner.ts";
 export { showHelpPage } from "./help.ts";
