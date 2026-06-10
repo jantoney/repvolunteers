@@ -768,6 +768,11 @@
         white-space: nowrap;
       }
 
+      .performance-meta-separator {
+        color: #94a3b8;
+        padding: 0 0.25rem;
+      }
+
       .performance-group-header .shift-actions {
         flex: 0 0 auto;
       }
@@ -875,7 +880,7 @@
         }
 
         .performance-heading-text {
-          align-items: center;
+          align-items: flex-start;
           gap: 0.5rem;
           width: 100%;
         }
@@ -891,7 +896,43 @@
         }
 
         .performance-meta {
-          padding-left: 0.5rem;
+          border-left: 0;
+          display: flex;
+          flex-direction: column;
+          gap: 0.15rem;
+          overflow: visible;
+          padding-left: 0;
+          text-overflow: clip;
+          white-space: normal;
+        }
+
+        .performance-date-heading,
+        .performance-meta {
+          min-width: 0;
+        }
+
+        .performance-heading-text {
+          display: grid;
+          grid-template-columns: auto minmax(0, 1fr);
+        }
+
+        .performance-calendar-icon {
+          grid-row: span 2;
+        }
+
+        .performance-meta-separator {
+          display: none;
+        }
+
+        .performance-meta-title,
+        .performance-meta-time {
+          display: block;
+        }
+
+        .performance-meta-time {
+          color: #111827;
+          font-weight: 700;
+          order: -1;
         }
 
         .performance-summary {
@@ -2399,7 +2440,9 @@
                   <div class="performance-heading-text">
                     <span class="performance-calendar-icon ${statusClass}" aria-hidden="true">▣</span>
                     <span class="performance-date-heading">${escapeHtml(performanceDate)}</span>
-                    <span class="performance-meta" title="${escapeHtml(performance.showName)}">${escapeHtml(displayShowName)} | ${escapeHtml(performanceTime)}</span>
+                    <span class="performance-meta" title="${escapeHtml(performance.showName)}">
+                      <span class="performance-meta-title">${escapeHtml(displayShowName)}</span><span class="performance-meta-separator" aria-hidden="true">|</span><span class="performance-meta-time">${escapeHtml(performanceTime)}</span>
+                    </span>
                   </div>
                   <div class="performance-header-actions">
                     ${headerAvailabilityAction}
