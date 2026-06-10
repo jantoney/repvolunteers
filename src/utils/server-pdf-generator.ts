@@ -43,6 +43,42 @@ function formatCurrentTimeAdelaide(): string {
   });
 }
 
+function getAdelaideToday(): Date {
+  const now = new Date();
+  const adelaideDate = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Australia/Adelaide",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(now);
+  const [year, month, day] = adelaideDate.split("-").map(Number);
+  return new Date(year, month - 1, day);
+}
+
+function getMondayForWeek(date: Date): Date {
+  const dayOfWeek = date.getDay();
+  const daysSinceMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+  return new Date(
+    date.getFullYear(),
+    date.getMonth(),
+    date.getDate() - daysSinceMonday,
+  );
+}
+
+function getMonthKeyFromDateString(dateString: string): string | null {
+  const [datePart] = dateString.split("T");
+  const [year, month] = datePart.split("-").map(Number);
+  if (!year || !month) return null;
+  return `${year}-${String(month).padStart(2, "0")}`;
+}
+
+function shouldPrintCalendarMonth(monthKey: string): boolean {
+  const [year, month] = monthKey.split("-").map(Number);
+  const monthEnd = new Date(year, month, 0);
+  const currentWeekStart = getMondayForWeek(getAdelaideToday());
+  return monthEnd >= currentWeekStart;
+}
+
 /**
  * Generates a PDF buffer using the same logic as the client-side implementation
  */
@@ -351,29 +387,36 @@ export async function generateServerSidePDF(
       Object.keys(calendarShiftsByDate).length > 0 ||
       Object.keys(unavailableByDate).length > 0
     ) {
-      // Switch to portrait for calendar pages
-      doc.addPage("a4", "portrait");
-      pageWidth = 210;
-      pageHeight = 297;
-      yPos = margin;
-
-      // Add footer to calendar page
-      addPageFooter(doc, pageWidth, pageHeight, margin);
-
       // Get unique months with shifts
       const monthsWithShifts = new Set<string>();
       Object.keys(calendarShiftsByDate).forEach((dateStr) => {
-        const date = new Date(dateStr);
-        const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
-        monthsWithShifts.add(monthKey);
+        const monthKey = getMonthKeyFromDateString(dateStr);
+        if (monthKey) {
+          monthsWithShifts.add(monthKey);
+        }
       });
       Object.keys(unavailableByDate).forEach((dateStr) => {
-        const date = new Date(dateStr);
-        const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
-        monthsWithShifts.add(monthKey);
+        const monthKey = getMonthKeyFromDateString(dateStr);
+        if (monthKey) {
+          monthsWithShifts.add(monthKey);
+        }
       });
 
-      const sortedMonths = Array.from(monthsWithShifts).sort();
+      const sortedMonths = Array.from(monthsWithShifts)
+        .filter(shouldPrintCalendarMonth)
+        .sort();
+
+      if (sortedMonths.length > 0) {
+        // Switch to portrait for calendar pages
+        doc.addPage("a4", "portrait");
+        pageWidth = 210;
+        pageHeight = 297;
+        yPos = margin;
+
+        // Add footer to calendar page
+        addPageFooter(doc, pageWidth, pageHeight, margin);
+      }
+
       let calendarsOnPage = 0;
       const maxCalendarsPerPage = 2;
 

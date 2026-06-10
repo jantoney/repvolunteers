@@ -772,6 +772,20 @@
         flex: 0 0 auto;
       }
 
+      .performance-header-actions {
+        align-items: center;
+        display: flex;
+        flex: 0 0 auto;
+        gap: 0.75rem;
+      }
+
+      .performance-action-btn {
+        min-width: 112px;
+        padding-left: 1rem;
+        padding-right: 1rem;
+        text-align: center;
+      }
+
       .status-pill {
         align-items: center;
         border: 1px solid currentColor;
@@ -864,6 +878,16 @@
           align-items: center;
           gap: 0.5rem;
           width: 100%;
+        }
+
+        .performance-header-actions {
+          width: 100%;
+        }
+
+        .performance-header-actions .btn,
+        .performance-header-actions .status-pill {
+          flex: 1 1 auto;
+          justify-content: center;
         }
 
         .performance-meta {
@@ -986,21 +1010,34 @@
       }
 
       .btn-outline-danger {
-        background: white;
-        border: 1px solid #fecaca;
-        color: #dc2626;
+        background: #dc2626;
+        border: 1px solid #dc2626;
+        color: white;
       }
 
       .btn-outline-danger.availability-toggle.unavailable {
-        background: white;
-        border-color: #fecaca;
-        color: #dc2626;
+        background: #dc2626;
+        border-color: #dc2626;
+        color: white;
       }
 
       .btn-outline-danger:hover,
       .btn-outline-danger.availability-toggle.unavailable:hover {
-        background: #fff1f2;
-        color: #b91c1c;
+        background: #b91c1c;
+        border-color: #b91c1c;
+        color: white;
+      }
+
+      .btn.performance-action-btn {
+        align-items: center;
+        box-sizing: border-box;
+        display: inline-flex;
+        font-size: 1rem;
+        justify-content: center;
+        line-height: 1.2;
+        min-height: 44px;
+        padding: 0.65rem 0.75rem;
+        width: 112px;
       }
 
       .btn-link-action {
@@ -1144,6 +1181,7 @@
       { "id": "{{volunteerId}}", "inactive": {{#inactive}}true{{/inactive}}{{^inactive}}false{{/inactive}} }
     </script>
     <script src="/src/utils/modal.js"></script>
+    <script src="/src/utils/toast.js"></script>
     <script src="/src/utils/timezone-client.js"></script>
     <script
       src="https://unpkg.com/jspdf@latest/dist/jspdf.umd.min.js"
@@ -1328,6 +1366,25 @@
           .replace(/'/g, "&#39;");
       }
 
+      function showSuccessToast(message, reload = false) {
+        if (window.Toast) {
+          Toast.success(message);
+        } else {
+          showMessage("success", message);
+        }
+
+        if (reload) {
+          setTimeout(() => location.reload(), 900);
+        }
+      }
+
+      function canRemoveShift(shift) {
+        const shiftDate = new Date(shift.arrive_time);
+        const now = new Date();
+        const hoursUntilShift = (shiftDate - now) / (1000 * 60 * 60);
+        return hoursUntilShift >= 48;
+      }
+
       function truncateShowName(showName) {
         const value = String(showName ?? "");
         return value.length > 30 ? `${value.slice(0, 30)}...` : value;
@@ -1499,10 +1556,9 @@
             populateAvailableShifts();
             generateCalendar();
             if (removeAssignedShift) {
-              Modal.success(
-                "Shift removed",
-                "Your shift was removed and this performance was marked unavailable.",
-                () => location.reload(),
+              showSuccessToast(
+                "Shift removed and performance marked unavailable.",
+                true,
               );
             }
           } catch (error) {
@@ -1937,11 +1993,7 @@
           } else {
             assignedContainer.innerHTML = allShifts
               .map((shift) => {
-                // Check if shift is less than 48 hours away
-                const shiftDate = new Date(shift.arrive_time);
-                const now = new Date();
-                const hoursUntilShift = (shiftDate - now) / (1000 * 60 * 60); // Convert to hours
-                const canRemove = hoursUntilShift >= 48;
+                const canRemove = canRemoveShift(shift);
 
                 // Remove any '+1 day' or similar from the formatted time before appending our own (+1d) marker
                 let plusOneDay = "";
@@ -1977,7 +2029,7 @@
               <div class="shift-row" style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1rem; padding: 1rem;">
                 <div class="shift-details" style="flex: 1 1 250px; min-width: 200px;">
                   <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 4px; font-weight: 600; color: #222;">
-                    ${shift.date ? DateTimeFormat.formatDate(shift.date) : shift.start_time ? DateTimeFormat.formatDate(shift.start_time) : ""} | 
+                    ${shift.date ? DateTimeFormat.formatDate(shift.date) : shift.start_time ? DateTimeFormat.formatDate(shift.start_time) : ""} |
                     ${shift.show_name}
                   </div>
                   <div style="color: #222; margin-bottom: 2px;">
@@ -2084,7 +2136,7 @@
                 unavailablePerformanceIds.has(performanceId);
               const availabilityButtonLabel = isUnavailable
                 ? "Mark available"
-                : "Mark unavailable";
+                : "Unavailable";
               const availabilityButtonClass = isUnavailable
                 ? "available"
                 : "unavailable";
@@ -2100,7 +2152,7 @@
               <div class="shift-row" style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1rem; padding: 1rem;">
                 <div class="shift-details" style="flex: 1 1 250px; min-width: 200px;">
                   <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 4px; font-weight: 600; color: #222;">
-                    ${shift.date ? DateTimeFormat.formatDate(shift.date) : shift.start_time ? DateTimeFormat.formatDate(shift.start_time) : ""} | 
+                    ${shift.date ? DateTimeFormat.formatDate(shift.date) : shift.start_time ? DateTimeFormat.formatDate(shift.start_time) : ""} |
                     ${shift.show_name}
                   </div>
                   <div style="color: #222; margin-bottom: 2px;">
@@ -2220,6 +2272,12 @@
                 ? "Unavailable"
                 : "No shift selected";
             const statusIcon = assignedShift ? "✓" : isUnavailable ? "−" : "○";
+            const canCancelAssignedShift = assignedShift
+              ? canRemoveShift(assignedShift)
+              : false;
+            const headerAvailabilityAction = assignedShift
+              ? `<button type="button" class="btn btn-outline-danger availability-toggle unavailable performance-action-btn" data-performance-key="${escapeHtml(performanceKey)}" data-performance-date="${escapeHtml(performance.date)}" onclick="togglePerformanceAvailability(this, ${performance.performanceId})">Unavailable</button>`
+              : "";
 
             const shiftCards = performance.shifts
               .map((shift) => {
@@ -2305,8 +2363,8 @@
                     </div>
                   </div>
                   <div class="performance-summary-actions">
-                    <button type="button" class="btn btn-primary-action alternate-toggle" data-performance-id="${escapeHtml(performance.performanceId)}" data-collapsed-label="Change shift" data-expanded-label="Hide shifts" onclick="toggleAlternateRoles(this)">Change shift</button>
-                    <button type="button" class="btn btn-outline-danger availability-toggle unavailable" data-performance-key="${escapeHtml(performanceKey)}" data-performance-date="${escapeHtml(performance.date)}" onclick="togglePerformanceAvailability(this, ${performance.performanceId})">Mark unavailable</button>
+                    <button type="button" class="btn btn-primary-action alternate-toggle performance-action-btn" data-performance-id="${escapeHtml(performance.performanceId)}" data-collapsed-label="Swap" data-expanded-label="Hide shifts" onclick="toggleAlternateRoles(this)">Swap</button>
+                    <button type="button" class="btn btn-danger performance-action-btn" data-shift-id="${escapeHtml(assignedShift.id)}" onclick="cancelShift(this)" ${canCancelAssignedShift ? "" : 'disabled title="Cannot cancel shifts less than 48 hours away"'}>Cancel</button>
                   </div>
                 `
               : isUnavailable
@@ -2325,6 +2383,9 @@
                       <span class="performance-state-icon open" aria-hidden="true">♙</span>
                       <div class="performance-summary-title">${performance.shifts.length} shifts available</div>
                     </div>
+                    <div class="performance-summary-actions">
+                      <button type="button" class="btn btn-outline-danger availability-toggle unavailable performance-action-btn" data-performance-key="${escapeHtml(performanceKey)}" data-performance-date="${escapeHtml(performance.date)}" onclick="togglePerformanceAvailability(this, ${performance.performanceId})">I'm unavailable</button>
+                    </div>
                   `;
 
             const shouldShowRoles = !isUnavailable && !assignedShift;
@@ -2340,7 +2401,10 @@
                     <span class="performance-date-heading">${escapeHtml(performanceDate)}</span>
                     <span class="performance-meta" title="${escapeHtml(performance.showName)}">${escapeHtml(displayShowName)} | ${escapeHtml(performanceTime)}</span>
                   </div>
-                  <span class="status-pill ${statusClass}"><span aria-hidden="true">${statusIcon}</span>${statusLabel}</span>
+                  <div class="performance-header-actions">
+                    ${headerAvailabilityAction}
+                    <span class="status-pill ${statusClass}"><span aria-hidden="true">${statusIcon}</span>${statusLabel}</span>
+                  </div>
                 </div>
                 <div class="performance-summary">
                   ${summaryContent}
@@ -2363,9 +2427,7 @@
 
         try {
           await performAcceptShift(shiftId);
-          Modal.success("Success", "You have accepted this shift.", () => {
-            location.reload();
-          });
+          showSuccessToast("Shift accepted.", true);
         } catch (error) {
           Modal.error(
             "Could not accept shift",
@@ -2421,13 +2483,7 @@
                     button.dataset.newShiftId,
                   );
                   Modal.closeModal("direct-shift-swap");
-                  Modal.success(
-                    "Success",
-                    "Shift swapped successfully.",
-                    () => {
-                      location.reload();
-                    },
-                  );
+                  showSuccessToast("Shift swapped.", true);
                 } catch (error) {
                   Modal.closeModal("direct-shift-swap");
                   Modal.error(
@@ -2552,6 +2608,24 @@
         );
       }
 
+      async function cancelShift(button) {
+        const originalText = button.textContent;
+        button.disabled = true;
+        button.textContent = "Cancelling...";
+
+        try {
+          await performRemoveShift(button.dataset.shiftId);
+          showSuccessToast("Shift cancelled.", true);
+        } catch (error) {
+          Modal.error(
+            "Could not cancel shift",
+            "Please try again or contact the theatre team.",
+          );
+          button.disabled = false;
+          button.textContent = originalText;
+        }
+      }
+
       function showCannotRemoveMessage() {
         Modal.alert(
           "Cannot Remove Shift",
@@ -2604,12 +2678,9 @@
             throw new Error("Opt-out failed");
           }
 
-          Modal.success(
-            "Confirmed",
-            "You have been marked inactive and future shifts have been removed.",
-            () => {
-              location.reload();
-            },
+          showSuccessToast(
+            "Future volunteering stopped and future shifts removed.",
+            true,
           );
         } catch (error) {
           Modal.error(
@@ -2656,13 +2727,7 @@
             throw new Error("Opt-in failed");
           }
 
-          Modal.success(
-            "Reactivated",
-            "Your volunteer account has been reactivated.",
-            () => {
-              location.reload();
-            },
-          );
+          showSuccessToast("Volunteer account reactivated.", true);
         } catch (error) {
           Modal.error(
             "Could not update your account",
@@ -2795,13 +2860,7 @@
             });
 
             if (response.ok) {
-              Modal.success(
-                "Success",
-                "You have successfully signed up for the selected shifts.",
-                () => {
-                  location.reload();
-                },
-              );
+              showSuccessToast("Selected shifts accepted.", true);
             } else if (response.status === 409) {
               // Handle conflict - already assigned to a shift for this performance
               const conflictData = await response.json();
@@ -2859,13 +2918,7 @@
                           );
 
                           if (swapResponse.ok) {
-                            Modal.success(
-                              "Success",
-                              "Shift swapped successfully!",
-                              () => {
-                                location.reload();
-                              },
-                            );
+                            showSuccessToast("Shift swapped.", true);
                           } else {
                             Modal.error(
                               "Error",
