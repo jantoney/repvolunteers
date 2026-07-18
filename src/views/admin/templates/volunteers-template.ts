@@ -76,7 +76,7 @@ export function renderVolunteersTemplate(data: VolunteersPageData): string {
       return `
                 <tr data-search="${searchAttr}">
                   <td data-label="Name">
-                    <strong>${displayName}</strong>
+                    <strong><a class="volunteer-profile-link" href="/admin/volunteers/${volunteer.id}/profile">${displayName}</a></strong>
                   </td>
                   <td data-label="Email" class="cell-email">
                     ${displayEmail}
@@ -407,6 +407,22 @@ export function renderVolunteersTemplate(data: VolunteersPageData): string {
 
         .cell-email {
           word-break: break-word;
+        }
+
+        .volunteer-profile-link {
+          color: #1d4ed8;
+          text-decoration: none;
+          text-underline-offset: 0.15em;
+        }
+
+        .volunteer-profile-link:hover {
+          text-decoration: underline;
+        }
+
+        .volunteer-profile-link:focus-visible {
+          border-radius: 3px;
+          outline: 2px solid #1d4ed8;
+          outline-offset: 2px;
         }
 
         .approval-toggle {

@@ -5,6 +5,8 @@
 
 import { getPool } from "../models/db.ts";
 import { jsPDF } from "jspdf";
+import { buildContactInfo, getEmailDefaults } from "./email-settings.ts";
+import type { ContactInfo } from "./email.ts";
 
 interface UnfilledShift {
   id: number;
@@ -24,6 +26,23 @@ interface UnfilledShiftsData {
   totalShifts: number;
   affectedShows: number;
   performanceDates: number;
+}
+
+async function resolvePdfContactInfo(
+  contactInfo?: ContactInfo,
+): Promise<ContactInfo> {
+  if (contactInfo) {
+    return contactInfo;
+  }
+
+  const defaults = await getEmailDefaults();
+  return buildContactInfo(defaults.contactName, defaults.contactPhone);
+}
+
+function getContactSummary(contactInfo: ContactInfo): string {
+  return `${contactInfo.name} (${
+    contactInfo.displayFormat || contactInfo.phone
+  })`;
 }
 
 // Helper functions for date/time formatting (Adelaide timezone)
@@ -435,9 +454,12 @@ export async function generateUnfilledShiftsPDF(): Promise<Uint8Array> {
  */
 export async function generateOutstandingShiftsPDF(
   limit: number = 10,
+  contactInfo?: ContactInfo,
 ): Promise<Uint8Array> {
   try {
     const data = await getOutstandingShiftsData(limit);
+    const pdfContactInfo = await resolvePdfContactInfo(contactInfo);
+    const contactSummary = getContactSummary(pdfContactInfo);
 
     const doc = new jsPDF({
       orientation: "portrait",
@@ -503,7 +525,7 @@ export async function generateOutstandingShiftsPDF(
       );
       doc.setFont("helvetica", "normal");
       doc.text(
-        "Contact Jay (0434586878) if you can help with any of these shifts:",
+        `Contact ${contactSummary} if you can help with any of these shifts:`,
         margin + 3,
         yPos + 12,
       );
@@ -574,7 +596,7 @@ export async function generateOutstandingShiftsPDF(
       );
       doc.setFontSize(14);
       doc.text(
-        "Please message or call Jay - 0434586878",
+        `Please message or call ${contactSummary}`,
         margin + 3,
         yPos + 15,
       );
@@ -602,9 +624,12 @@ export async function generateOutstandingShiftsPDF(
 export async function generateOutstandingShiftsPDFForVolunteer(
   volunteerId: string,
   limit: number = 10,
+  contactInfo?: ContactInfo,
 ): Promise<Uint8Array> {
   try {
     const data = await getOutstandingShiftsDataForVolunteer(volunteerId, limit);
+    const pdfContactInfo = await resolvePdfContactInfo(contactInfo);
+    const contactSummary = getContactSummary(pdfContactInfo);
 
     const doc = new jsPDF({
       orientation: "portrait",
@@ -675,7 +700,7 @@ export async function generateOutstandingShiftsPDFForVolunteer(
         yPos + 12,
       );
       doc.text(
-        "commitments. Contact Jay (0434586878) if you can help with any:",
+        `commitments. Contact ${contactSummary} if you can help with any:`,
         margin + 3,
         yPos + 19,
       );
@@ -744,7 +769,7 @@ export async function generateOutstandingShiftsPDFForVolunteer(
       // Contact message
       doc.setFontSize(14);
       doc.text(
-        "Please message or call Jay - 0434586878",
+        `Please message or call ${contactSummary}`,
         margin + 3,
         yPos + 15,
       );

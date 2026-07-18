@@ -2586,9 +2586,14 @@ export async function emailLastMinuteShifts(ctx: RouterContext<string>) {
       return;
     }
 
+    const emailOptions = await getEmailSendOptions(
+      ctx,
+      DEFAULT_LAST_MINUTE_SHIFTS_MESSAGE,
+    );
     const pdfBuffer = await generateOutstandingShiftsPDFForVolunteer(
       volunteerId,
       10,
+      emailOptions.contactInfo,
     );
     const filename = `last-minute-shifts-${
       volunteer.name.replace(
@@ -2622,7 +2627,7 @@ export async function emailLastMinuteShifts(ctx: RouterContext<string>) {
       volunteerId: volunteerId, // Add the volunteer ID for tracking
       hasShifts,
       shifts,
-      ...(await getEmailSendOptions(ctx, DEFAULT_LAST_MINUTE_SHIFTS_MESSAGE)),
+      ...emailOptions,
     };
 
     // Send email with PDF attachment
@@ -3674,6 +3679,7 @@ export async function sendBulkUnfilledShiftsEmails(ctx: RouterContext<string>) {
         const pdfBuffer = await generateOutstandingShiftsPDFForVolunteer(
           volunteerId,
           10,
+          unfilledOptions.contactInfo,
         );
         const filename = `last-minute-shifts-${
           volunteer.name
