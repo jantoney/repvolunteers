@@ -82,49 +82,14 @@ export async function requireAdminAuth(
   ctx: Context,
   next: () => Promise<unknown>,
 ) {
+  const request = new Request(ctx.request.url, {
+    method: ctx.request.method,
+    headers: ctx.request.headers,
+  });
+
+  let session;
   try {
-    const request = new Request(ctx.request.url, {
-      method: ctx.request.method,
-      headers: ctx.request.headers,
-    });
-
-    const session = await auth.api.getSession({ headers: request.headers });
-
-    if (!session || !session.user) {
-      if (wantsHtmlPage(ctx)) {
-        await respondWithAdminAccessPage(ctx);
-        return;
-      }
-      ctx.response.status = 403;
-      ctx.response.body = { error: "Admin access required" };
-      return;
-    }
-
-    const adminAccess = await getMicrosoftAdminAccessForUser(session.user.id);
-    const isAdmin = adminAccess.isAdmin;
-
-    if (!isAdmin) {
-      console.log(
-        "User is not admin:",
-        session.user.email,
-        "microsoftAccount:",
-        adminAccess.hasMicrosoftAccount,
-      );
-      if (wantsHtmlPage(ctx)) {
-        await respondWithAdminAccessPage(ctx, session.user.email);
-        return;
-      }
-      ctx.response.status = 403;
-      ctx.response.body = { error: "Admin access required" };
-      return;
-    }
-
-    // Add user to context with isAdmin field
-    const user = { ...session.user, isAdmin } as User;
-    ctx.state.user = user;
-    ctx.state.session = session;
-
-    await next();
+    session = await auth.api.getSession({ headers: request.headers });
   } catch (error) {
     console.error("Admin auth middleware error:", error);
     if (wantsHtmlPage(ctx)) {
@@ -133,7 +98,58 @@ export async function requireAdminAuth(
     }
     ctx.response.status = 403;
     ctx.response.body = { error: "Admin access required" };
+    return;
   }
+
+  if (!session || !session.user) {
+    if (wantsHtmlPage(ctx)) {
+      await respondWithAdminAccessPage(ctx);
+      return;
+    }
+    ctx.response.status = 403;
+    ctx.response.body = { error: "Admin access required" };
+    return;
+  }
+
+  let adminAccess;
+  try {
+    adminAccess = await getMicrosoftAdminAccessForUser(session.user.id);
+  } catch (error) {
+    console.error("Admin access lookup error:", error);
+    if (wantsHtmlPage(ctx)) {
+      await respondWithAdminAccessPage(ctx);
+      return;
+    }
+    ctx.response.status = 403;
+    ctx.response.body = { error: "Admin access required" };
+    return;
+  }
+
+  const isAdmin = adminAccess.isAdmin;
+  if (!isAdmin) {
+    console.log(
+      "User is not admin:",
+      session.user.email,
+      "microsoftAccount:",
+      adminAccess.hasMicrosoftAccount,
+    );
+    if (wantsHtmlPage(ctx)) {
+      await respondWithAdminAccessPage(ctx, session.user.email);
+      return;
+    }
+    ctx.response.status = 403;
+    ctx.response.body = { error: "Admin access required" };
+    return;
+  }
+
+  // Add user to context with isAdmin field
+  const user = { ...session.user, isAdmin } as User;
+  ctx.state.user = user;
+  ctx.state.session = session;
+
+  // Controller errors must propagate to the application's error handler rather
+  // than being reported as authentication failures.
+  await next();
 }
 
 export async function requireVolunteerAccessOrAdmin(

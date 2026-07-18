@@ -208,7 +208,7 @@ export function getAdelaideTimeSelectSQL(columnName: string, alias?: string): st
  * @return {string} SQL fragment for parameterized query
  */
 export function getAdelaideTimeParameterSQL(paramName: string): string {
-  return `TIMESTAMP ${paramName} AT TIME ZONE '${ADELAIDE_TIMEZONE}'`;
+  return `${paramName}::timestamp AT TIME ZONE '${ADELAIDE_TIMEZONE}'`;
 }
 
 /**
