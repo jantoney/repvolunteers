@@ -1064,7 +1064,7 @@ export function renderVolunteersTemplate(data: VolunteersPageData): string {
             normalized = normalized.replace(/[\u0300-\u036f]/g, '');
             return normalized
               .toLowerCase()
-              .replace(/\s+/g, ' ')
+              .replace(/\\s+/g, ' ')
               .trim();
           };
 

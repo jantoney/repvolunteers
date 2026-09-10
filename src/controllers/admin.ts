@@ -2541,7 +2541,7 @@ export async function emailLastMinuteShifts(ctx: RouterContext<string>) {
     const { generateOutstandingShiftsPDFForVolunteer } = await import(
       "../utils/unfilled-shifts-pdf-generator.ts"
     );
-    const { sendLastMinuteShiftsEmail } = await import("../utils/email.ts");
+    const { sendLastMinuteShiftsEmail, createVolunteerLoginUrl } = await import("../utils/email.ts");
 
     // Get volunteer data
     const pool = getPool();
@@ -2625,6 +2625,10 @@ export async function emailLastMinuteShifts(ctx: RouterContext<string>) {
       volunteerName: volunteer.name,
       volunteerEmail: volunteer.email,
       volunteerId: volunteerId, // Add the volunteer ID for tracking
+      loginUrl: createVolunteerLoginUrl(
+        Deno.env.get("BASE_URL") || `${ctx.request.url.protocol}//${ctx.request.url.host}`,
+        volunteerId,
+      ),
       hasShifts,
       shifts,
       ...emailOptions,
@@ -3591,7 +3595,7 @@ export async function sendBulkUnfilledShiftsEmails(ctx: RouterContext<string>) {
     const { generateOutstandingShiftsPDFForVolunteer } = await import(
       "../utils/unfilled-shifts-pdf-generator.ts"
     );
-    const { sendLastMinuteShiftsEmail } = await import("../utils/email.ts");
+    const { sendLastMinuteShiftsEmail, createVolunteerLoginUrl } = await import("../utils/email.ts");
 
     for (const volunteerId of volunteerIds) {
       try {
@@ -3691,6 +3695,10 @@ export async function sendBulkUnfilledShiftsEmails(ctx: RouterContext<string>) {
           volunteerName: volunteer.name,
           volunteerEmail: volunteer.email,
           volunteerId: volunteerId,
+          loginUrl: createVolunteerLoginUrl(
+            Deno.env.get("BASE_URL") || `${ctx.request.url.protocol}//${ctx.request.url.host}`,
+            volunteerId,
+          ),
           hasShifts: true,
           shifts,
           message: unfilledMessage,
