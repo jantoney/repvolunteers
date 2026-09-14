@@ -695,12 +695,12 @@ export async function generateOutstandingShiftsPDFForVolunteer(
       );
       doc.setFont("helvetica", "normal");
       doc.text(
-        "These shifts are filtered to exclude any that overlap with your existing",
+        "Use the link in your email to update your shifts,",
         margin + 3,
         yPos + 12,
       );
       doc.text(
-        `commitments. Contact ${contactSummary} if you can help with any:`,
+        `or contact ${contactSummary} if you need help.`,
         margin + 3,
         yPos + 19,
       );
