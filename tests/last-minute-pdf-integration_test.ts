@@ -61,8 +61,8 @@ Deno.test({
       const preview = buildLastMinutePreview(shifts);
       assertEquals(preview.length, 10);
       assertEquals(
-        (preview.join("").match(/volunteer role/g) || []).length,
-        60,
+        (preview.join("").match(/A Long Production Title/g) || []).length,
+        10,
       );
       assert(!preview.join("").includes("LASTVACANCY"));
       const pdf = await generateOutstandingShiftsPDFForVolunteer(

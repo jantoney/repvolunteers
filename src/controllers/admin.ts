@@ -2803,15 +2803,18 @@ export async function getUnfilledShiftsForVolunteer(volunteerId: string, limit: 
       show_name: string;
       date: string;
       show_start: string;
+      show_end: string;
+      show_date_id: number;
       role: string;
       arrive_time: string;
       depart_time: string;
     };
 
     const result = await client.queryObject<ShiftRow>(
-      `SELECT s.id, sh.name as show_name, 
+      `SELECT s.id, s.show_date_id, sh.name as show_name,
               DATE(sd.start_time) as date, 
               sd.start_time as show_start,
+              sd.end_time as show_end,
               s.role, 
               s.arrive_time as arrive_time,
               s.depart_time as depart_time
@@ -2850,7 +2853,7 @@ export async function getUnfilledShiftsForVolunteer(volunteerId: string, limit: 
                (unfilled_sd.start_time < existing_sd.end_time AND unfilled_sd.end_time > existing_sd.start_time)
              )
          )
-       GROUP BY s.id, sh.name, DATE(sd.start_time), sd.start_time, s.role, s.arrive_time, s.depart_time
+       GROUP BY s.id, sh.name, DATE(sd.start_time), sd.start_time, sd.end_time, s.role, s.arrive_time, s.depart_time
        HAVING COUNT(vs.participant_id) = 0
        ORDER BY sd.start_time, s.arrive_time
        LIMIT $2`,

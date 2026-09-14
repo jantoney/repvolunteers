@@ -2,9 +2,9 @@ import { getAdelaideTimezoneOffset } from "./timezone.ts";
 
 interface PreviewShift {
   show_start: string | Date;
-  arrive_time: string | Date;
+  show_end: string | Date;
+  show_date_id: number;
   show_name: string;
-  role: string;
 }
 
 const escape = (value: string) =>
@@ -16,7 +16,7 @@ const escape = (value: string) =>
     "'": "&#39;",
   }[char]!));
 
-/** Include every vacancy on the next ten distinct Adelaide performance dates. */
+/** Summarize each performance once on the next ten distinct Adelaide performance dates. */
 export function buildLastMinutePreview(shifts: PreviewShift[]): string[] {
   const timeZone = getAdelaideTimezoneOffset();
   const dateKey = new Intl.DateTimeFormat("en-CA", {
@@ -38,27 +38,34 @@ export function buildLastMinutePreview(shifts: PreviewShift[]): string[] {
     minute: "2-digit",
     hour12: true,
   });
-  const days = new Map<string, { date: Date; shifts: PreviewShift[] }>();
+  const days = new Map<
+    string,
+    { date: Date; performances: Map<number, PreviewShift> }
+  >();
   const sorted = [...shifts].sort((a, b) =>
-    +new Date(a.show_start) - +new Date(b.show_start) ||
-    +new Date(a.arrive_time) - +new Date(b.arrive_time)
+    +new Date(a.show_start) - +new Date(b.show_start)
   );
   for (const shift of sorted) {
     const date = new Date(shift.show_start);
     const key = dateKey.format(date);
     if (!days.has(key)) {
       if (days.size === 10) break;
-      days.set(key, { date, shifts: [] });
+      days.set(key, { date, performances: new Map() });
     }
-    days.get(key)!.shifts.push(shift);
+    days.get(key)!.performances.set(shift.show_date_id, shift);
   }
   return [...days.values()].map((day) =>
     `<strong>${dateLabel.format(day.date)}</strong><br>${
-      day.shifts.map((shift) =>
-        `${timeLabel.format(new Date(shift.arrive_time))} — ${
-          escape(shift.show_name)
-        } (${escape(shift.role)})`
-      ).join("<br>")
+      [...day.performances.values()].map((performance) => {
+        const start = new Date(performance.show_start);
+        const end = new Date(performance.show_end);
+        const endDate = dateKey.format(start) === dateKey.format(end)
+          ? ""
+          : ` (${dateLabel.format(end)})`;
+        return `${escape(performance.show_name)} — ${
+          timeLabel.format(start)
+        } – ${timeLabel.format(end)}${endDate}`;
+      }).join("<br>")
     }`
   );
 }
