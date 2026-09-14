@@ -1,3 +1,4 @@
+import { buildLastMinutePreview } from "../utils/last-minute-preview.ts";
 import type { RouterContext } from "oak";
 import { getPool } from "../models/db.ts";
 import {
@@ -892,7 +893,7 @@ export async function listVolunteers(ctx: RouterContext<string>) {
   const client = await pool.connect();
   try {
     const result = await client.queryObject(
-      "SELECT id, name, email, phone, status FROM participants ORDER BY name",
+      "SELECT id, name, email, phone, status FROM participants WHERE deleted_at IS NULL ORDER BY name",
     );
     ctx.response.body = result.rows;
   } finally {
@@ -1004,6 +1005,25 @@ export async function updateVolunteerUnavailablePerformances(
         ? error.message
         : "Failed to update unavailable performances",
     };
+  }
+}
+
+export async function deleteVolunteer(ctx: RouterContext<string>) {
+  try {
+    const user = ctx.state?.user;
+    const result = await markParticipantInactive(ctx.params.id, {
+      softDelete: true,
+      note: "Volunteer record soft-deleted by admin",
+      createdByUserId: user?.id ?? null,
+      createdByName: user?.name ?? "Admin",
+      createdByEmail: user?.email ?? null,
+    });
+    ctx.response.body = { success: true, removedShiftCount:
+      result.removedParticipantShiftCount + result.removedDirectAssignmentCount };
+  } catch (error) {
+    const missing = error instanceof Error && error.message === "Volunteer not found";
+    ctx.response.status = missing ? 404 : 500;
+    ctx.response.body = { error: missing ? "Volunteer not found" : "Could not delete volunteer. Please try again." };
   }
 }
 
@@ -1597,8 +1617,8 @@ export async function unfilledShifts(ctx: RouterContext<string>) {
     };
     const result = await client.queryObject<ShiftRow>(
       `SELECT s.id, s.show_date_id, s.role, 
-              s.arrive_time AT TIME ZONE 'Australia/Adelaide' as arrive_time,
-              s.depart_time AT TIME ZONE 'Australia/Adelaide' as depart_time,
+              s.arrive_time as arrive_time,
+              s.depart_time as depart_time,
               DATE(sd.start_time) as date, sd.start_time as show_start, sd.end_time as show_end,
               sh.name as show_name, sh.id as show_id
        FROM shifts s
@@ -2575,7 +2595,7 @@ export async function emailLastMinuteShifts(ctx: RouterContext<string>) {
       return;
     }
 
-    const unfilledShifts = await getUnfilledShiftsForVolunteer(volunteerId, 10);
+    const unfilledShifts = await getUnfilledShiftsForVolunteer(volunteerId, null);
     const hasShifts = unfilledShifts.length > 0;
 
     if (!hasShifts) {
@@ -2592,7 +2612,7 @@ export async function emailLastMinuteShifts(ctx: RouterContext<string>) {
     );
     const pdfBuffer = await generateOutstandingShiftsPDFForVolunteer(
       volunteerId,
-      10,
+      null,
       emailOptions.contactInfo,
     );
     const filename = `last-minute-shifts-${
@@ -2603,23 +2623,7 @@ export async function emailLastMinuteShifts(ctx: RouterContext<string>) {
     }-${new Date().toISOString().split("T")[0]}.pdf`;
 
     // Format shifts for email preview (similar to existing email formats)
-    const shifts = unfilledShifts.map((shift) => {
-      const date = new Date(shift.show_start).toLocaleDateString("en-AU", {
-        weekday: "short",
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-      });
-      const arriveTime = new Date(shift.arrive_time).toLocaleTimeString(
-        "en-AU",
-        {
-          hour: "2-digit",
-          minute: "2-digit",
-          hour12: true,
-        },
-      );
-      return `${date} ${arriveTime}<br><span style="margin-left:1.5em;display:inline-block;">${shift.show_name} (${shift.role})</span>`;
-    });
+    const shifts = buildLastMinutePreview(unfilledShifts);
 
     const emailData = {
       volunteerName: volunteer.name,
@@ -2790,7 +2794,7 @@ async function _getNext10UnfilledShifts() {
 /**
  * Get unfilled shifts that don't overlap with a volunteer's existing shifts
  */
-async function getUnfilledShiftsForVolunteer(volunteerId: string, limit = 10) {
+export async function getUnfilledShiftsForVolunteer(volunteerId: string, limit: number | null = null) {
   const pool = getPool();
   const client = await pool.connect();
   try {
@@ -2809,8 +2813,8 @@ async function getUnfilledShiftsForVolunteer(volunteerId: string, limit = 10) {
               DATE(sd.start_time) as date, 
               sd.start_time as show_start,
               s.role, 
-              s.arrive_time AT TIME ZONE 'Australia/Adelaide' as arrive_time,
-              s.depart_time AT TIME ZONE 'Australia/Adelaide' as depart_time
+              s.arrive_time as arrive_time,
+              s.depart_time as depart_time
        FROM shifts s
        JOIN show_dates sd ON sd.id = s.show_date_id
        JOIN shows sh ON sh.id = sd.show_id
@@ -3646,7 +3650,7 @@ export async function sendBulkUnfilledShiftsEmails(ctx: RouterContext<string>) {
         // Get unfilled shifts that don't overlap with this volunteer's existing shifts
         const unfilledShifts = await getUnfilledShiftsForVolunteer(
           volunteerId,
-          10,
+          null,
         );
         if (unfilledShifts.length === 0) {
           results.push({
@@ -3661,28 +3665,12 @@ export async function sendBulkUnfilledShiftsEmails(ctx: RouterContext<string>) {
         }
 
         // Format shifts for email preview
-        const shifts = unfilledShifts.map((shift) => {
-          const date = new Date(shift.show_start).toLocaleDateString("en-AU", {
-            weekday: "short",
-            day: "2-digit",
-            month: "short",
-            year: "numeric",
-          });
-          const arriveTime = new Date(shift.arrive_time).toLocaleTimeString(
-            "en-AU",
-            {
-              hour: "2-digit",
-              minute: "2-digit",
-              hour12: true,
-            },
-          );
-          return `${date} ${arriveTime}<br><span style="margin-left:1.5em;display:inline-block;">${shift.show_name} (${shift.role})</span>`;
-        });
+        const shifts = buildLastMinutePreview(unfilledShifts);
 
         // Generate volunteer-specific PDF with non-overlapping shifts
         const pdfBuffer = await generateOutstandingShiftsPDFForVolunteer(
           volunteerId,
-          10,
+          null,
           unfilledOptions.contactInfo,
         );
         const filename = `last-minute-shifts-${

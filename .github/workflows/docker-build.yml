@@ -33,7 +33,12 @@ jobs:
           DENO_ENV=production
           EOF
 
+      - name: Build app and apply additive migration
+        run: |
+          docker compose -f docker-compose.yml.localserver build theatreapp
+          docker compose -f docker-compose.yml.localserver run --rm --no-deps theatreapp deno run -A scripts/add-participant-soft-delete.ts
+
       - name: Restart app with Docker Compose
         run: |
           docker compose down theatreapp
-          docker compose -f docker-compose.yml.localserver up -d --build
+          docker compose -f docker-compose.yml.localserver up -d --no-build

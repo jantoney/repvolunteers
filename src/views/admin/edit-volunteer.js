@@ -21,6 +21,7 @@ document.addEventListener("DOMContentLoaded", function () {
 });
 
 function setupEventListeners() {
+  document.getElementById("deleteVolunteerBtn")?.addEventListener("click", confirmDeleteVolunteer);
   // Handle form submission for volunteer update
   const form = document.getElementById("volunteerForm");
   if (form) {
@@ -825,3 +826,39 @@ async function toggleVolunteerStatusFromProfile(button) {
 globalThis.copyProfileSignupUrl = copyProfileSignupUrl;
 globalThis.openProfileSignupUrl = openProfileSignupUrl;
 globalThis.toggleVolunteerStatusFromProfile = toggleVolunteerStatusFromProfile;
+
+
+function confirmDeleteVolunteer() {
+  const button = document.getElementById("deleteVolunteerBtn");
+  if (button.disabled) return;
+  const remove = async () => {
+    if (button.disabled) return;
+    button.disabled = true;
+    button.textContent = "Deleting...";
+    try {
+      const response = await fetch(`/admin/api/volunteers/${profileVolunteerId}`, {
+        method: "DELETE", credentials: "include",
+      });
+      if (!response.ok) throw new Error("Delete failed");
+      globalThis.location.assign("/admin/volunteers");
+    } catch (_error) {
+      button.disabled = false;
+      button.textContent = "Delete volunteer";
+      if (typeof Modal !== "undefined") Modal.error("Delete failed", "Could not delete this volunteer. Please try again.");
+      else alert("Could not delete this volunteer. Please try again.");
+    }
+  };
+  const explanation = "This removes the record from volunteer lists, disables its portal link and releases upcoming shifts. Details and history will be kept.";
+  if (typeof Modal !== "undefined") {
+    Modal.showModal("delete-profile-volunteer", {
+      title: "Delete volunteer",
+      body: `<p>Delete <strong>${escapeHtml(profileVolunteerName)}</strong>?</p><p>${explanation}</p>`,
+      buttons: [
+        { text: "Cancel", className: "modal-btn-outline", action: "cancel" },
+        { text: "Delete volunteer", className: "modal-btn-danger", action: "delete", handler: remove },
+      ],
+    });
+  } else if (confirm(`Delete ${profileVolunteerName}? ${explanation}`)) {
+    remove();
+  }
+}

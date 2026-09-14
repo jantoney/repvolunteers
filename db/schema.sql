@@ -175,3 +175,6 @@ CREATE INDEX IF NOT EXISTS idx_sent_emails_type ON sent_emails(email_type, sent_
 CREATE INDEX IF NOT EXISTS idx_volunteer_unavailable_performances_show_date ON volunteer_unavailable_performances(show_date_id);
 CREATE INDEX IF NOT EXISTS idx_participants_status ON participants(status);
 CREATE INDEX IF NOT EXISTS idx_participant_notes_participant ON participant_notes(participant_id, created_at DESC);
+
+-- Soft-deleted volunteer records retain their history.
+ALTER TABLE participants ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;

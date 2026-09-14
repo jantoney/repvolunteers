@@ -537,6 +537,11 @@ Login URL: ${data.loginUrl}
           html: htmlContent,
         });
 
+        if (emailResult.error || !emailResult.data?.id) {
+          console.error("Login email was rejected by the email provider:", emailResult.error?.message);
+          return false;
+        }
+
         resendEmailId = emailResult.data?.id;
         const forceNote = forceProduction
           ? " (FORCED from development mode)"
@@ -908,7 +913,7 @@ export function renderLastMinuteShiftsEmail(
     shiftsSection = `
             <div style="background:#fff3cd;border-radius:6px;padding:20px;margin:25px 0;border-left:4px solid #ffc107;">
               <h3 style="color:#856404;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;font-size:16px;font-weight:bold;margin:0 0 10px 0;">
-                🚨 Next 10 Outstanding Shifts:
+                🚨 Next 10 Dates with Unfilled Shifts:
               </h3>
               <ul style="color:#856404;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;font-size:14px;line-height:20px;margin:0;padding-left:20px;">
                 ${shiftsList}
@@ -975,7 +980,7 @@ export function renderLastMinuteShiftsEmail(
                             </h1>
                             {{messageSection}}
                             <p style="font-size:14px;line-height:24px;color:#333;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;margin:24px 0;margin-bottom:14px;margin-top:24px;margin-right:0;margin-left:0">
-                              We've attached a PDF with the next 10 outstanding shifts that need volunteers. 
+                              We've attached a PDF with all available unfilled shifts that need volunteers.
                               Sign in below to view available shifts and update your shifts.
                             </p>
                             {{shiftsSection}}
@@ -997,7 +1002,7 @@ export function renderLastMinuteShiftsEmail(
                               📎 In this email:
                             </h3>
                             <ul style="color:#333;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;font-size:14px;line-height:24px;margin:0;padding-left:20px;">
-                              <li>Next 10 outstanding shifts needing volunteers [PDF attached]</li>
+                              <li>All available unfilled shifts [PDF attached]</li>
                               <li>Contact information for urgent coordination</li>
                               <li>Details about available volunteer opportunities</li>
                             </ul>

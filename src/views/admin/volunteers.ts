@@ -19,7 +19,7 @@ export async function showVolunteersPage(ctx: RouterContext<string>) {
         status: string;
       }
     >(
-      "SELECT id, name, email, phone, approved, status FROM participants ORDER BY name",
+      "SELECT id, name, email, phone, approved, status FROM participants WHERE deleted_at IS NULL ORDER BY name",
     );
 
     const data: VolunteersPageData = {

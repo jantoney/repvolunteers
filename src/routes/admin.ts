@@ -2,6 +2,8 @@ import { Router } from "oak";
 import * as adminController from "../controllers/admin.ts";
 import { requireAdminAuth, requireAuth } from "../middlewares/better-auth.ts";
 
+import { rejectDeletedVolunteer } from "../middlewares/deleted-volunteer.ts";
+
 const router = new Router();
 
 const knownAdminPaths = [
@@ -120,6 +122,12 @@ router.post(
 
 // Protected admin routes - apply middleware first
 router.use(requireAdminAuth);
+router.use(async (ctx, next) => {
+  const match = ctx.request.url.pathname.match(/\/admin\/(?:api\/)?volunteers\/([a-f0-9-]{36})(?:\/|$)/i);
+  if (match && await rejectDeletedVolunteer(ctx, match[1])) return;
+  await next();
+});
+router.delete("/api/volunteers/:id", adminController.deleteVolunteer);
 router.get("/dashboard", adminController.showDashboard);
 router.get("/settings", adminController.showSettingsPage);
 router.get("/help", adminController.showHelpPage);

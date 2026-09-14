@@ -1,7 +1,14 @@
 import { Router } from "oak";
 import * as volunteerController from "../controllers/volunteer.ts";
 
+import { rejectDeletedVolunteer } from "../middlewares/deleted-volunteer.ts";
+
 const router = new Router();
+router.use(async (ctx, next) => {
+  const match = ctx.request.url.pathname.match(/\/signup\/([^/]+)/);
+  if (match && await rejectDeletedVolunteer(ctx, match[1])) return;
+  await next();
+});
 
 router.get("/signup/:id", volunteerController.viewSignup);
 router.get("/signup/:id/pdf", volunteerController.downloadPDF);

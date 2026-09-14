@@ -4,6 +4,7 @@ export const VOLUNTEER_OPT_OUT_NOTE = "Opted out of volunteering in the future";
 
 interface MarkInactiveOptions {
   note?: string;
+  softDelete?: boolean;
   createdByUserId?: string | null;
   createdByName?: string | null;
   createdByEmail?: string | null;
@@ -56,7 +57,7 @@ export async function markParticipantActive(
     await client.queryObject("BEGIN");
 
     const participantResult = await client.queryObject<{ id: string }>(
-      "SELECT id FROM participants WHERE id = $1 FOR UPDATE",
+      "SELECT id FROM participants WHERE id = $1 AND deleted_at IS NULL FOR UPDATE",
       [participantId],
     );
 
@@ -108,7 +109,7 @@ export async function markParticipantInactive(
     await client.queryObject("BEGIN");
 
     const participantResult = await client.queryObject<{ id: string }>(
-      "SELECT id FROM participants WHERE id = $1 FOR UPDATE",
+      "SELECT id FROM participants WHERE id = $1 AND deleted_at IS NULL FOR UPDATE",
       [participantId],
     );
 
@@ -118,8 +119,9 @@ export async function markParticipantInactive(
     }
 
     await client.queryObject(
-      "UPDATE participants SET status = 'inactive', approved = false WHERE id = $1",
-      [participantId],
+      `UPDATE participants SET status = 'inactive', approved = false,
+         deleted_at = CASE WHEN $2 THEN NOW() ELSE deleted_at END WHERE id = $1`,
+      [participantId, options.softDelete ?? false],
     );
 
     const removedParticipantShifts = await client.queryObject<

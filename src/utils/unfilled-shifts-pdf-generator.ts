@@ -623,7 +623,7 @@ export async function generateOutstandingShiftsPDF(
  */
 export async function generateOutstandingShiftsPDFForVolunteer(
   volunteerId: string,
-  limit: number = 10,
+  limit: number | null = null,
   contactInfo?: ContactInfo,
 ): Promise<Uint8Array> {
   try {
@@ -652,7 +652,7 @@ export async function generateOutstandingShiftsPDFForVolunteer(
     // Subtitle
     doc.setFontSize(14);
     doc.setFont("helvetica", "normal");
-    doc.text(`Available Shifts for You`, margin, yPos);
+    doc.text(`All Available Unfilled Shifts for You`, margin, yPos);
     yPos += 10;
 
     // Summary stats
@@ -707,28 +707,28 @@ export async function generateOutstandingShiftsPDFForVolunteer(
 
       yPos += 33;
 
-      // Column headers
-      doc.setFontSize(10);
-      doc.setFont("helvetica", "bold");
-      doc.text("Date & Time", margin, yPos);
-      doc.text("Show", margin + 50, yPos);
-      doc.text("Role", margin + 110, yPos);
-      doc.text("Arrive - Depart", margin + 150, yPos);
-      yPos += 6;
-
-      // Line under headers
-      doc.setDrawColor(0, 0, 0);
-      doc.line(margin, yPos, margin + contentWidth, yPos);
-      yPos += 5;
-
-      // List shifts
-      doc.setFont("helvetica", "normal");
+      const drawColumns = () => {
+        doc.setFontSize(9);
+        doc.setFont("helvetica", "bold");
+        doc.text("Date (Adelaide)", margin, yPos);
+        doc.text("Production", margin + 43, yPos);
+        doc.text("Role", margin + 98, yPos);
+        doc.text("Arrive - Depart", margin + 132, yPos);
+        yPos += 4;
+        doc.line(margin, yPos, margin + contentWidth, yPos);
+        yPos += 5;
+        doc.setFont("helvetica", "normal");
+      };
+      drawColumns();
       for (const shift of data.shifts) {
-        // Check if we need a new page
-        if (yPos > pageHeight - 40) {
+        const productionLines = doc.splitTextToSize(shift.show_name, 52);
+        const roleLines = doc.splitTextToSize(shift.role, 31);
+        const rowHeight = Math.max(productionLines.length, roleLines.length) * 4 + 3;
+        if (yPos + rowHeight > pageHeight - 30) {
           addPageFooter(doc, pageWidth, pageHeight, margin, data.generatedAt);
           doc.addPage();
           yPos = margin + 5;
+          drawColumns();
         }
 
         const date = new Date(shift.date).toLocaleDateString("en-AU", {
@@ -736,6 +736,7 @@ export async function generateOutstandingShiftsPDFForVolunteer(
           day: "2-digit",
           month: "short",
           year: "numeric",
+          timeZone: "UTC",
         });
         const arriveTime = extractTime(shift.arrive_time);
         const departTime =
@@ -743,17 +744,17 @@ export async function generateOutstandingShiftsPDFForVolunteer(
           plusOneDayIfNeeded(shift.arrive_time, shift.depart_time);
 
         doc.text(date, margin, yPos);
-        doc.text(shift.show_name, margin + 50, yPos);
-        doc.text(
-          shift.role.length > 26 ? shift.role.slice(0, 20) + "..." : shift.role,
-          margin + 110,
-          yPos,
-        );
-        doc.text(`${arriveTime} - ${departTime}`, margin + 150, yPos);
-
-        yPos += 5;
+        doc.text(productionLines, margin + 43, yPos);
+        doc.text(roleLines, margin + 98, yPos);
+        doc.text(`${arriveTime} - ${departTime}`, margin + 132, yPos);
+        yPos += rowHeight;
       }
 
+      if (yPos > pageHeight - 65) {
+        addPageFooter(doc, pageWidth, pageHeight, margin, data.generatedAt);
+        doc.addPage();
+        yPos = margin + 5;
+      }
       yPos += 10;
 
       // Thank you message
@@ -842,14 +843,14 @@ async function getOutstandingShiftsData(
 // Helper function to get outstanding shifts for a specific volunteer (excluding overlapping shifts)
 async function getOutstandingShiftsDataForVolunteer(
   volunteerId: string,
-  limit: number = 10,
+  limit: number | null = null,
 ): Promise<UnfilledShiftsData> {
   const pool = getPool();
   const client = await pool.connect();
 
   try {
     const result = await client.queryObject<UnfilledShift>(
-      `SELECT s.id, s.show_date_id, sh.name as show_name, DATE(sd.start_time) as date,
+      `SELECT s.id, s.show_date_id, sh.name as show_name, TO_CHAR(sd.start_time AT TIME ZONE 'Australia/Adelaide', 'YYYY-MM-DD') as date,
               TO_CHAR(sd.start_time AT TIME ZONE 'Australia/Adelaide', 'HH24:MI') as show_start, 
               TO_CHAR(sd.end_time AT TIME ZONE 'Australia/Adelaide', 'HH24:MI') as show_end,
               s.role, 

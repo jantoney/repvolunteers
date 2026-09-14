@@ -352,7 +352,7 @@ export function renderBulkEmailTemplate(): string {
           <!-- Unfilled Shifts Email Content -->
           <div class="email-content" id="unfilled-shifts-content">
             <h3>Unfilled Shifts Email</h3>
-            <p>Send "Last Minute Shifts" emails to volunteers asking them to help fill outstanding shifts. This includes a PDF of the next 10 unfilled shifts.</p>
+            <p>Send "Last Minute Shifts" emails to volunteers asking them to help fill outstanding shifts. This includes a PDF of all available unfilled shifts and an email preview of the next 10 dates with vacancies.</p>
 
             <div class="email-editor">
               <div class="form-group">

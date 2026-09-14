@@ -679,8 +679,13 @@ router.get("/", (ctx) => {
             });
             
             if (response.ok) {
-              messageEl.innerHTML = '<div class="success-message">Registration submitted! You will be contacted once approved.</div>';
-              document.getElementById('registerForm').reset();            } else if (response.status === 409) {
+              const result = await response.json();
+              const notice = document.createElement('div');
+              notice.className = result.loginEmailSent ? 'success-message' : 'error-message';
+              notice.textContent = result.message;
+              messageEl.replaceChildren(notice);
+              document.getElementById('registerForm').reset();
+            } else if (response.status === 409) {
               messageEl.innerHTML = '<div class="error-message">Email already exists. Use "Login to your account" instead.</div>';
             } else {
               throw new Error('Registration failed');

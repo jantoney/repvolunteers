@@ -163,7 +163,7 @@ router.post("/send-link", async (ctx) => {
 
     try {
       const result = await client.queryObject(
-        "SELECT id, name, email FROM participants WHERE email = $1 AND approved = true AND status = 'active'",
+        "SELECT id, name, email FROM participants WHERE deleted_at IS NULL AND email = $1 AND approved = true AND status = 'active'",
         [email],
       );
 
@@ -248,7 +248,7 @@ router.post("/register", async (ctx) => {
     try {
       // Check if email already exists
       const existingResult = await client.queryObject(
-        "SELECT id FROM participants WHERE email = $1",
+        "SELECT id FROM participants WHERE lower(email) = lower($1) AND deleted_at IS NULL",
         [email],
       );
 
@@ -266,16 +266,34 @@ router.post("/register", async (ctx) => {
         [name, email, phone],
       );
 
-      const newVolunteer = result.rows[0] as { id: number };
+      const newVolunteer = result.rows[0] as { id: string };
       console.log(
         `New registration: ${name} (${email}) - ID: ${newVolunteer.id}`,
       );
 
-      // TODO: Send notification email to admin
+      // Registration remains saved if delivery fails, so the user does not
+      // accidentally create another record by retrying registration.
+      let loginEmailSent = false;
+      try {
+        const { sendVolunteerLoginEmail, createVolunteerLoginUrl } = await import("../utils/email.ts");
+        const { getEmailDefaults, resolveEmailOverrides } = await import("../utils/email-settings.ts");
+        const contact = resolveEmailOverrides(await getEmailDefaults(), {});
+        loginEmailSent = await sendVolunteerLoginEmail({
+          volunteerName: name,
+          volunteerEmail: email,
+          loginUrl: createVolunteerLoginUrl(Deno.env.get("BASE_URL") || ctx.request.url.origin, newVolunteer.id),
+          contactInfo: contact.contactInfo,
+        });
+      } catch (error) {
+        console.error("Could not send registration login email:", error);
+      }
 
       ctx.response.status = 200;
       ctx.response.body = {
-        message: "Registration submitted successfully",
+        message: loginEmailSent
+          ? "Registration complete. Check your email for your personal login link."
+          : "Registration complete, but we could not email your login link. Please contact the volunteer coordinator; you do not need to register again.",
+        loginEmailSent,
         id: newVolunteer.id,
       };
     } finally {

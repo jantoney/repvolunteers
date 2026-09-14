@@ -365,7 +365,7 @@ export function renderEditVolunteerTemplate(
         <section class="profile-panel" id="profile-tab-links">
           <div class="profile-section-heading">
             <h2>Links and delete</h2>
-            <p>Use the volunteer's personal signup link.</p>
+            <p>Use the volunteer's personal signup link or delete this record.</p>
           </div>
 
           <div class="profile-card signup-card">
@@ -381,6 +381,11 @@ export function renderEditVolunteerTemplate(
             </div>
           </div>
 
+          <div class="profile-card" style="margin-top:20px;border-color:#dc3545;">
+            <h3>Delete volunteer</h3>
+            <p>Remove this record from volunteer lists and disable its portal link. Upcoming shifts will be released. Details, past shifts, notes and email history will be kept.</p>
+            <button type="button" class="btn btn-danger" id="deleteVolunteerBtn">Delete volunteer</button>
+          </div>
         </section>
       </div>
 
