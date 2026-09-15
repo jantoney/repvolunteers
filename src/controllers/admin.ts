@@ -3913,3 +3913,38 @@ export async function sendBulkAvailabilityRequestEmails(
     client.release();
   }
 }
+
+
+export async function swapVolunteerAssignment(ctx: RouterContext<string>) {
+  const { shiftId, previousVolunteerId, volunteerId } = await ctx.request.body.json();
+  const uuid = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
+  if (!Number.isInteger(shiftId) || shiftId < 1 || !uuid.test(previousVolunteerId) || !uuid.test(volunteerId) || previousVolunteerId === volunteerId) {
+    ctx.response.status = 400;
+    ctx.response.body = { error: "Choose a different replacement volunteer." };
+    return;
+  }
+  const client = await getPool().connect();
+  try {
+    await client.queryArray("BEGIN");
+    const shift = await client.queryObject<{ assigned_participant_id: string | null }>(
+      "SELECT assigned_participant_id FROM shifts WHERE id=$1 FOR UPDATE", [shiftId]);
+    if (!shift.rows.length) throw new Error("Shift no longer exists.");
+    const replacement = await client.queryObject("SELECT id FROM participants WHERE id=$1 AND status='active' AND deleted_at IS NULL FOR UPDATE", [volunteerId]);
+    if (!replacement.rows.length) throw new Error("Replacement volunteer is no longer active.");
+    const existing = await client.queryObject("SELECT participant_id FROM participant_shifts WHERE shift_id=$1 AND participant_id=$2", [shiftId, volunteerId]);
+    if (existing.rows.length || shift.rows[0].assigned_participant_id === volunteerId) throw new Error("Replacement volunteer is already assigned to this shift.");
+    const removed = await client.queryObject("DELETE FROM participant_shifts WHERE shift_id=$1 AND participant_id=$2 RETURNING participant_id", [shiftId, previousVolunteerId]);
+    const direct = shift.rows[0].assigned_participant_id === previousVolunteerId;
+    if (!removed.rows.length && !direct) throw new Error("The assignment has changed. Refresh the page and try again.");
+    if (direct) await client.queryArray("UPDATE shifts SET assigned_participant_id=$1 WHERE id=$2", [volunteerId, shiftId]);
+    if (removed.rows.length) await client.queryArray("INSERT INTO participant_shifts (participant_id, shift_id) VALUES ($1,$2)", [volunteerId, shiftId]);
+    await client.queryArray("COMMIT");
+    ctx.response.body = { success: true };
+  } catch (error) {
+    await client.queryArray("ROLLBACK");
+    ctx.response.status = 409;
+    ctx.response.body = { error: error instanceof Error ? error.message : "Could not swap volunteers. Please try again." };
+  } finally {
+    client.release();
+  }
+}

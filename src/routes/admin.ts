@@ -82,6 +82,7 @@ const knownAdminPaths = [
   /^\/api\/bulk-email\/send-availability-request$/,
   /^\/api\/server-time$/,
   /^\/api\/volunteer-shifts$/,
+  /^\/api\/volunteer-shifts\/swap$/,
 ];
 
 function isKnownAdminPath(pathname: string): boolean {
@@ -339,6 +340,7 @@ router.get(
   "/api/volunteers/:volunteerId/available-shifts",
   adminController.getAvailableShiftsForVolunteer,
 );
+router.post("/api/volunteer-shifts/swap", adminController.swapVolunteerAssignment);
 router.post("/api/volunteer-shifts", adminController.assignVolunteerToShift);
 router.delete(
   "/api/volunteers/:volunteerId/shifts/:shiftId",

@@ -140,6 +140,7 @@ async function viewShiftDetails(shiftId) {
             (p) =>
               `<li>
             ${p.name}${p.email ? ` (${p.email})` : ""}
+            <button class="btn btn-sm btn-primary" onclick="showAssignParticipant(${shiftId}, '${p.id}')">Swap</button>
             <button class="btn btn-sm btn-danger" style="margin-left: 10px;" onclick="unassignParticipant(${shiftId}, '${p.id}', '${p.name}')">Remove</button>
           </li>`,
           )
@@ -166,7 +167,7 @@ async function viewShiftDetails(shiftId) {
   }
 }
 
-async function showAssignParticipant(shiftId) {
+async function showAssignParticipant(shiftId, replacingId = null) {
   try {
     const response = await fetch(
       `/admin/api/shifts/${shiftId}/available-volunteers`,
@@ -206,7 +207,7 @@ async function showAssignParticipant(shiftId) {
               <div class="volunteer-name">${v.name}</div>
               <div class="volunteer-details">${email}${phone}</div>
             </div>
-            <button class="btn btn-sm btn-primary" onclick="assignParticipant(${shiftId}, '${v.id}', '${safeName}')">Assign</button>
+            <button class="btn btn-sm btn-primary" onclick="${replacingId ? `swapParticipant(${shiftId}, '${replacingId}', '${v.id}', this)` : `assignParticipant(${shiftId}, '${v.id}', '${safeName}')`}">${replacingId ? "Swap" : "Assign"}</button>
           </div>
         `;
       });
@@ -222,7 +223,7 @@ async function showAssignParticipant(shiftId) {
       `;
 
       console.log("Modal content:", modalContent); // Debug log
-      Modal.html("Assign Participant to Shift", modalContent, null, "large");
+      Modal.html(replacingId ? "Choose Replacement Volunteer" : "Assign Participant to Shift", modalContent, null, "large");
 
       // Focus the search input after modal opens
       setTimeout(() => {
@@ -344,5 +345,26 @@ async function unassignParticipant(shiftId, volunteerId, volunteerName) {
   } catch (error) {
     console.error("Error:", error);
     Modal.error("Error", "Error removing participant from shift");
+  }
+}
+
+
+async function swapParticipant(shiftId, previousVolunteerId, volunteerId, button) {
+  const buttons = button.closest(".volunteer-list-container").querySelectorAll("button");
+  buttons.forEach(item => item.disabled = true);
+  button.textContent = "Swapping...";
+  try {
+    const response = await fetch("/admin/api/volunteer-shifts/swap", {
+      method: "POST", credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ shiftId, previousVolunteerId, volunteerId }),
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || "Could not swap volunteers.");
+    location.reload();
+  } catch (error) {
+    buttons.forEach(item => item.disabled = false);
+    button.textContent = "Swap";
+    Modal.error("Swap failed", String(error.message).replace(/[<>&]/g, ""));
   }
 }
