@@ -20,7 +20,18 @@ Deno.test("admin dashboard template includes shell and calendar hooks", () => {
 Deno.test(
   "admin settings template includes database maintenance controls",
   () => {
-    const html = renderSettingsTemplate();
+    const html = renderSettingsTemplate({
+      isLocalDev: true,
+      emailDefaults: {
+        contactName: "Test",
+        contactPhone: "0400000000",
+        messages: {
+          showWeek: "",
+          lastMinuteShifts: "",
+          availabilityRequest: "",
+        },
+      },
+    });
 
     assertStringIncludes(html, "Database Maintenance");
     assertStringIncludes(
@@ -45,6 +56,7 @@ Deno.test(
           email: "a@example.com",
           phone: "0400 000 000",
           approved: true,
+          status: "active",
         },
       ],
     });

@@ -111,7 +111,7 @@ function renderShowCheckboxes() {
             `${show.name} (${show.shift_count} shifts)`,
           ),
         ],
-      ),
+      )
     ),
   );
 }
@@ -142,8 +142,9 @@ async function applyShowFilter() {
 
 async function loadShiftData() {
   try {
-    const showsParam =
-      selectedShows.length > 0 ? `?shows=${selectedShows.join(",")}` : "";
+    const showsParam = selectedShows.length > 0
+      ? `?shows=${selectedShows.join(",")}`
+      : "";
     console.log("Loading shift data with params:", showsParam);
     const response = await fetch(
       `/admin/api/shifts/calendar-data${showsParam}`,
@@ -219,13 +220,17 @@ function renderCalendar() {
     const date = new Date(startDate);
     date.setDate(startDate.getDate() + i);
 
-    const dayElement = document.createElement("div");
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    const dateStr = `${year}-${month}-${day}`;
+    const shifts = shiftData.get(dateStr);
+    const dayElement = document.createElement(shifts?.total > 0 ? "a" : "div");
     dayElement.className = "calendar-day";
 
     const isCurrentMonth = date.getMonth() === currentDate.getMonth();
     const today = new Date();
-    const isToday =
-      date.getDate() === today.getDate() &&
+    const isToday = date.getDate() === today.getDate() &&
       date.getMonth() === today.getMonth() &&
       date.getFullYear() === today.getFullYear();
 
@@ -241,13 +246,6 @@ function renderCalendar() {
     dayNumber.className = "day-number";
     dayNumber.textContent = date.getDate();
     dayElement.appendChild(dayNumber);
-
-    // Add shift information if available
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const day = String(date.getDate()).padStart(2, "0");
-    const dateStr = `${year}-${month}-${day}`;
-    const shifts = shiftData.get(dateStr);
 
     if (shifts && shifts.total > 0) {
       dayElement.classList.add("has-shifts");
@@ -267,7 +265,7 @@ function renderCalendar() {
 
       const countDiv = document.createElement("div");
       countDiv.className = "shift-count";
-      countDiv.textContent = `(${shifts.filled}/${shifts.total})`;
+      countDiv.textContent = `${shifts.filled}/${shifts.total}`;
 
       const showsDiv = document.createElement("div");
       showsDiv.className = "shift-shows";
@@ -278,20 +276,20 @@ function renderCalendar() {
       indicator.appendChild(showsDiv);
       dayElement.appendChild(indicator);
 
-      // Add click handler to go to shifts page
-      dayElement.addEventListener("click", () => {
-        // Navigate to shifts page filtered by this date and selected shows
-        const url = new URL("/admin/shifts", window.location.origin);
-        url.searchParams.set("date", dateStr);
-        if (
-          selectedShows.length > 0 &&
-          selectedShows.length < availableShows.length
-        ) {
-          // Only add show filter if not all shows are selected
-          url.searchParams.set("shows", selectedShows.join(","));
-        }
-        window.location.href = url.toString();
-      });
+      const url = new URL("/admin/shifts", window.location.origin);
+      url.searchParams.set("date", dateStr);
+      if (
+        selectedShows.length > 0 && selectedShows.length < availableShows.length
+      ) {
+        url.searchParams.set("shows", selectedShows.join(","));
+      }
+      dayElement.href = url.toString();
+      dayElement.setAttribute(
+        "aria-label",
+        `${dateStr}: ${shifts.shows}. ${shifts.filled} of ${shifts.total} shifts filled. View shifts.`,
+      );
+      dayElement.title =
+        `${shifts.shows}: ${shifts.filled} of ${shifts.total} shifts filled`;
       dayElement.style.cursor = "pointer";
     }
 
@@ -300,6 +298,7 @@ function renderCalendar() {
 }
 
 function changeMonth(delta) {
+  currentDate.setDate(1);
   currentDate.setMonth(currentDate.getMonth() + delta);
   renderCalendar();
 }

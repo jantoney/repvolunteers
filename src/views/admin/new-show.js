@@ -194,12 +194,12 @@ function renderCalendar() {
     const currentDay = new Date(startDate);
     currentDay.setDate(startDate.getDate() + i);
 
-    const dayElement = document.createElement("div");
+    const dayElement = document.createElement("button");
+    dayElement.type = "button";
     dayElement.className = "calendar-day";
     dayElement.textContent = currentDay.getDate();
 
-    const dateString =
-      currentDay.getFullYear() +
+    const dateString = currentDay.getFullYear() +
       "-" +
       String(currentDay.getMonth() + 1).padStart(2, "0") +
       "-" +
@@ -217,8 +217,14 @@ function renderCalendar() {
       dayElement.classList.add("selected");
     }
 
-    dayElement.addEventListener("click", () =>
-      selectDate(dateString, dayElement),
+    dayElement.setAttribute("aria-label", dateString);
+    dayElement.setAttribute(
+      "aria-pressed",
+      String(selectedDates.includes(dateString)),
+    );
+    dayElement.addEventListener(
+      "click",
+      () => selectDate(dateString, dayElement),
     );
     calendarGrid.appendChild(dayElement);
   }
@@ -233,6 +239,10 @@ function selectDate(dateString, element) {
     selectedDates.push(dateString);
     element.classList.add("selected");
   }
+  element.setAttribute(
+    "aria-pressed",
+    String(selectedDates.includes(dateString)),
+  );
   updateSelectedDatesDisplay();
 }
 
@@ -285,13 +295,15 @@ function renderIntervals() {
     showIntervals.map((interval, index) => {
       const startHours = Math.floor(interval.start_minutes / 60);
       const startMins = interval.start_minutes % 60;
-      const startTime =
-        startHours > 0 ? `${startHours}h ${startMins}m` : `${startMins}m`;
+      const startTime = startHours > 0
+        ? `${startHours}h ${startMins}m`
+        : `${startMins}m`;
       const endMinutes = interval.start_minutes + interval.duration_minutes;
       const endHours = Math.floor(endMinutes / 60);
       const endMinsDisplay = endMinutes % 60;
-      const endTime =
-        endHours > 0 ? `${endHours}h ${endMinsDisplay}m` : `${endMinsDisplay}m`;
+      const endTime = endHours > 0
+        ? `${endHours}h ${endMinsDisplay}m`
+        : `${endMinsDisplay}m`;
 
       return AdminDOM.el("div", { className: "interval-item" }, [
         AdminDOM.el(
@@ -440,11 +452,13 @@ function showError(message) {
 function initializeEventListeners() {
   // Calendar navigation
   document.getElementById("prevMonth").addEventListener("click", () => {
+    currentDate.setDate(1);
     currentDate.setMonth(currentDate.getMonth() - 1);
     renderCalendar();
   });
 
   document.getElementById("nextMonth").addEventListener("click", () => {
+    currentDate.setDate(1);
     currentDate.setMonth(currentDate.getMonth() + 1);
     renderCalendar();
   });
@@ -517,8 +531,7 @@ function initializeEventListeners() {
         const successful = result.results.filter((r) => r.success);
         const failed = result.results.filter((r) => !r.success);
 
-        let message =
-          "Added " +
+        let message = "Added " +
           successful.length +
           " performance(s) to '" +
           showName +
@@ -534,8 +547,8 @@ function initializeEventListeners() {
         // manage their production-level intervals on the edit production page.
         if (showType === "new" && showIntervals.length > 0) {
           await addIntervalsToShow(lastCreatedShowId);
-          message +=
-            " " + showIntervals.length + " production interval(s) added.";
+          message += " " + showIntervals.length +
+            " production interval(s) added.";
         }
 
         showSuccess(message);

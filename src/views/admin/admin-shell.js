@@ -200,12 +200,16 @@
   function toggleMobileMenu() {
     const navMenu = document.getElementById("navMenu");
     if (navMenu) {
-      navMenu.classList.toggle("active");
+      const expanded = navMenu.classList.toggle("active");
+      document.querySelector(".mobile-menu-toggle")?.setAttribute(
+        "aria-expanded",
+        String(expanded),
+      );
     }
   }
 
   function toggleMobileDropdown(event) {
-    if (globalThis.innerWidth > 768) {
+    if (globalThis.innerWidth > 1100) {
       return;
     }
     event.preventDefault();
@@ -226,6 +230,7 @@
       !toggle.contains(event.target)
     ) {
       navMenu.classList.remove("active");
+      toggle.setAttribute("aria-expanded", "false");
     }
   }
 
@@ -336,6 +341,23 @@
   globalThis.toggleMobileMenu = toggleMobileMenu;
   globalThis.toggleMobileDropdown = toggleMobileDropdown;
 
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      const menu = document.getElementById("navMenu");
+      const toggle = document.querySelector(".mobile-menu-toggle");
+      if (menu?.classList.contains("active")) {
+        menu.classList.remove("active");
+        toggle?.setAttribute("aria-expanded", "false");
+        toggle?.focus();
+      }
+    }
+  });
+  // Make dense table panels reachable for keyboard scrolling.
+  document.querySelectorAll(".table-container").forEach((panel) => {
+    panel.tabIndex = 0;
+    panel.setAttribute("role", "region");
+    panel.setAttribute("aria-label", "Scrollable table");
+  });
   initializeForceEmailMode();
   document.addEventListener("click", closeMobileNavigation);
   checkAuth();
