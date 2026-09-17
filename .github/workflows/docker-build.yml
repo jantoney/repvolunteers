@@ -37,6 +37,7 @@ jobs:
         run: |
           docker compose -f docker-compose.yml.localserver build theatreapp
           docker compose -f docker-compose.yml.localserver run --rm --no-deps theatreapp deno run -A scripts/add-participant-soft-delete.ts
+          docker compose -f docker-compose.yml.localserver run --rm --no-deps theatreapp deno run -A scripts/add-shift-no-shows.ts
 
       - name: Restart app with Docker Compose
         run: |

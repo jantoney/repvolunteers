@@ -266,7 +266,7 @@ export function renderShiftsTemplate(data: ShiftsPageData): string {
       ${getAdminNavigation("shifts")}
 
       <!-- Main Content -->
-      <div class="main-content">
+      <div class="main-content shift-management-page">
         <div class="page-header">
           <h1 class="page-title">Manage Shifts</h1>
           <div class="page-actions">

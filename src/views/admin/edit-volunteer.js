@@ -862,3 +862,21 @@ function confirmDeleteVolunteer() {
     remove();
   }
 }
+
+async function undoProfileNoShow(button) {
+  button.disabled = true;
+  try {
+    const response = await fetch(`/admin/api/shifts/${button.dataset.shiftId}/volunteers/${profileVolunteerId}/no-show`, {
+      method: "PUT", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ noShow: false }),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "Could not undo the no-show.");
+    const count = document.getElementById("noShowCount");
+    count.textContent = String(Math.max(0, Number(count.textContent) - 1));
+    button.closest("td").textContent = "—";
+    Toast.success("No-show removed.");
+  } catch (error) {
+    Toast.error(error.message || "Could not undo the no-show.");
+    button.disabled = false;
+  }
+}

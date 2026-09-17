@@ -131,33 +131,98 @@ async function viewShiftDetails(shiftId) {
     if (response.ok) {
       const participants = await response.json();
 
-      let content = "";
-      if (participants.length === 0) {
-        content = "<p>No participants assigned to this shift.</p>";
-      } else {
-        const participantList = participants
-          .map(
-            (p) =>
-              `<li>
-            ${p.name}${p.email ? ` (${p.email})` : ""}
-            <button class="btn btn-sm btn-primary" onclick="showAssignParticipant(${shiftId}, '${p.id}')">Swap</button>
-            <button class="btn btn-sm btn-danger" style="margin-left: 10px;" onclick="unassignParticipant(${shiftId}, '${p.id}', '${p.name}')">Remove</button>
-          </li>`,
-          )
-          .join("");
-
-        content = `
-          <p><strong>Assigned Participants:</strong></p>
-          <ul style="list-style: none; padding: 0;">${participantList}</ul>
-        `;
-      }
-
-      content += `
-        <hr style="margin: 1rem 0;">
-        <button class="btn btn-primary" onclick="showAssignParticipant(${shiftId})">Assign Participant</button>
-      `;
-
-      Modal.info("Shift Details", content);
+      const escape = (value) =>
+        String(value ?? "").replace(
+          /[&<>"']/g,
+          (
+            char,
+          ) => ({
+            "&": "&amp;",
+            "<": "&lt;",
+            ">": "&gt;",
+            '"': "&quot;",
+            "'": "&#39;",
+          }[char]),
+        );
+      const content = participants.length
+        ? participants.map((p, index) => `
+        <div class="shift-detail-participant" data-index="${index}">
+          <strong>${escape(p.name)}</strong>
+          <div class="shift-detail-contact">${escape(p.email)}</div>
+          <span class="no-show-badge" ${
+          p.no_show ? "" : "hidden"
+        }>No-show</span>
+          <div class="shift-detail-actions">
+            <button type="button" class="btn btn-sm btn-primary" data-action="swap">Swap</button>
+            <button type="button" class="btn btn-sm btn-danger" data-action="remove">Remove</button>
+            <button type="button" class="btn btn-sm btn-secondary" data-action="no-show"
+              ${
+          p.no_show || p.can_mark_no_show
+            ? ""
+            : 'disabled title="Available after the shift starts"'
+        }>
+              ${p.no_show ? "Undo no-show" : "Mark no-show"}
+            </button>
+          </div>
+        </div>`).join("")
+        : "<p>No participants assigned to this shift.</p>";
+      Modal.destroyModal("shift-details");
+      const detailsModal = Modal.showModal("shift-details", {
+        title: "Shift Details",
+        body: content +
+          '<button type="button" class="btn btn-primary" id="assignDetailParticipant">Assign Participant</button>',
+        buttons: [{
+          text: "Close",
+          action: "close",
+          className: "modal-btn-secondary",
+        }],
+      });
+      detailsModal.querySelector("#assignDetailParticipant").onclick = () => {
+        Modal.closeModal("shift-details");
+        showAssignParticipant(shiftId);
+      };
+      detailsModal.querySelectorAll(".shift-detail-participant").forEach(
+        (row) => {
+          const p = participants[Number(row.dataset.index)];
+          row.querySelector('[data-action="swap"]').onclick = () => {
+            Modal.closeModal("shift-details");
+            showAssignParticipant(shiftId, p.id);
+          };
+          row.querySelector('[data-action="remove"]').onclick = () =>
+            unassignParticipant(shiftId, p.id, p.name);
+          row.querySelector('[data-action="no-show"]').onclick = async (
+            event,
+          ) => {
+            const button = event.currentTarget;
+            button.disabled = true;
+            try {
+              const response = await fetch(
+                `/admin/api/shifts/${shiftId}/volunteers/${p.id}/no-show`,
+                {
+                  method: "PUT",
+                  credentials: "include",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ noShow: !p.no_show }),
+                },
+              );
+              const data = await response.json();
+              if (!response.ok) {
+                throw new Error(data.error || "Could not update the no-show.");
+              }
+              p.no_show = data.noShow;
+              row.querySelector(".no-show-badge").hidden = !p.no_show;
+              button.textContent = p.no_show ? "Undo no-show" : "Mark no-show";
+              Toast.success(
+                p.no_show ? "No-show recorded." : "No-show removed.",
+              );
+            } catch (error) {
+              Toast.error(error.message || "Could not update the no-show.");
+            } finally {
+              button.disabled = false;
+            }
+          };
+        },
+      );
     } else {
       Modal.error("Error", "Failed to load shift details");
     }
@@ -200,14 +265,20 @@ async function showAssignParticipant(shiftId, replacingId = null) {
         const safeName = v.name.replace(/'/g, "\\'");
 
         volunteerListHtml += `
-          <div class="volunteer-item" data-name="${v.name.toLowerCase()}" data-email="${email.toLowerCase()}" data-phone="${(
+          <div class="volunteer-item" data-name="${v.name.toLowerCase()}" data-email="${email.toLowerCase()}" data-phone="${
+          (
             v.phone || ""
-          ).toLowerCase()}">
+          ).toLowerCase()
+        }">
             <div class="volunteer-info">
               <div class="volunteer-name">${v.name}</div>
               <div class="volunteer-details">${email}${phone}</div>
             </div>
-            <button class="btn btn-sm btn-primary" onclick="${replacingId ? `swapParticipant(${shiftId}, '${replacingId}', '${v.id}', this)` : `assignParticipant(${shiftId}, '${v.id}', '${safeName}')`}">${replacingId ? "Swap" : "Assign"}</button>
+            <button class="btn btn-sm btn-primary" onclick="${
+          replacingId
+            ? `swapParticipant(${shiftId}, '${replacingId}', '${v.id}', this)`
+            : `assignParticipant(${shiftId}, '${v.id}', '${safeName}')`
+        }">${replacingId ? "Swap" : "Assign"}</button>
           </div>
         `;
       });
@@ -223,7 +294,14 @@ async function showAssignParticipant(shiftId, replacingId = null) {
       `;
 
       console.log("Modal content:", modalContent); // Debug log
-      Modal.html(replacingId ? "Choose Replacement Volunteer" : "Assign Participant to Shift", modalContent, null, "large");
+      Modal.html(
+        replacingId
+          ? "Choose Replacement Volunteer"
+          : "Assign Participant to Shift",
+        modalContent,
+        null,
+        "large",
+      );
 
       // Focus the search input after modal opens
       setTimeout(() => {
@@ -259,8 +337,7 @@ function filterVolunteers() {
     const email = item.dataset.email || "";
     const phone = item.dataset.phone || "";
 
-    const matches =
-      name.includes(searchTerm) ||
+    const matches = name.includes(searchTerm) ||
       email.includes(searchTerm) ||
       phone.includes(searchTerm);
 
@@ -348,22 +425,31 @@ async function unassignParticipant(shiftId, volunteerId, volunteerName) {
   }
 }
 
-
-async function swapParticipant(shiftId, previousVolunteerId, volunteerId, button) {
-  const buttons = button.closest(".volunteer-list-container").querySelectorAll("button");
-  buttons.forEach(item => item.disabled = true);
+async function swapParticipant(
+  shiftId,
+  previousVolunteerId,
+  volunteerId,
+  button,
+) {
+  const buttons = button.closest(".volunteer-list-container").querySelectorAll(
+    "button",
+  );
+  buttons.forEach((item) => item.disabled = true);
   button.textContent = "Swapping...";
   try {
     const response = await fetch("/admin/api/volunteer-shifts/swap", {
-      method: "POST", credentials: "include",
+      method: "POST",
+      credentials: "include",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ shiftId, previousVolunteerId, volunteerId }),
     });
     const result = await response.json();
-    if (!response.ok) throw new Error(result.error || "Could not swap volunteers.");
+    if (!response.ok) {
+      throw new Error(result.error || "Could not swap volunteers.");
+    }
     location.reload();
   } catch (error) {
-    buttons.forEach(item => item.disabled = false);
+    buttons.forEach((item) => item.disabled = false);
     button.textContent = "Swap";
     Modal.error("Swap failed", String(error.message).replace(/[<>&]/g, ""));
   }

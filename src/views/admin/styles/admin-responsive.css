@@ -572,3 +572,136 @@ body .main-content .calendar-nav button {
     overflow-x: auto;
   }
 }
+/* Stable card sections keep titles, status, times and actions aligned. */
+body .shift-management-page .shifts-grid {
+  align-items: stretch;
+}
+body .shift-management-page .shift-card {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1.25rem;
+}
+body .shift-management-page .shift-header {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.625rem;
+  margin: 0;
+}
+body .shift-management-page .shift-title {
+  display: block;
+  width: 100%;
+  min-height: 3.4rem;
+}
+body .shift-management-page .shift-role {
+  font-size: 1rem;
+  line-height: 1.5;
+  font-weight: 600;
+}
+body .shift-management-page .shift-status {
+  flex-shrink: 0;
+  line-height: 1.5;
+}
+body .shift-management-page .shift-times {
+  margin: 0;
+}
+body .shift-management-page .shift-volunteers {
+  margin: 0;
+  flex: 1;
+}
+body .shift-management-page .table-actions {
+  margin-top: auto;
+  padding-top: 1rem;
+  border-top: 1px solid var(--admin-border);
+}
+.no-show-badge {
+  display: inline-block;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.375rem;
+  background: #fbe5e7;
+  color: #92242f;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+.no-show-badge[hidden] {
+  display: none;
+}
+.shift-detail-participant {
+  padding-bottom: 1rem;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid var(--admin-border);
+  overflow-wrap: anywhere;
+}
+.shift-detail-contact {
+  color: var(--admin-muted);
+  margin-bottom: 0.5rem;
+}
+.shift-detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+.shift-detail-actions .btn {
+  margin: 0;
+  min-height: 44px;
+}
+.profile-stat-row {
+  flex-wrap: wrap;
+}
+@supports (grid-template-rows: subgrid) {
+  body .shift-management-page .shift-card {
+    display: grid;
+    grid-template-rows: subgrid;
+    grid-row: span 4;
+  }
+  body .shift-management-page .shift-header .shift-status {
+    margin-top: auto;
+  }
+}
+@media (max-width: 700px) {
+  body .profile-table.past-shifts-table {
+    min-width: 0;
+  }
+  .past-shifts-table,
+  .past-shifts-table tbody,
+  .past-shifts-table tr,
+  .past-shifts-table td {
+    display: block;
+    width: 100%;
+  }
+  .past-shifts-table thead {
+    display: none;
+  }
+  .past-shifts-table tr {
+    padding: 0.75rem;
+    border-bottom: 1px solid var(--admin-border);
+  }
+  body .past-shifts-table td {
+    padding: 0.5rem;
+    border: 0;
+    overflow-wrap: anywhere;
+  }
+  .past-shifts-table td::before {
+    content: attr(data-label);
+    display: block;
+    color: var(--admin-muted);
+    font-size: 0.75rem;
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+  }
+  body .profile-stat-row {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    width: 100%;
+    gap: 0.5rem;
+  }
+  body .profile-stat {
+    min-width: 0;
+    padding: 0.75rem 0.375rem;
+  }
+  body .profile-stat span {
+    font-size: 0.75rem;
+  }
+}

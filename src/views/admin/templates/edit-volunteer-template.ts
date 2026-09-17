@@ -22,6 +22,7 @@ export interface VolunteerShift {
   arrive_time: string | null;
   depart_time: string | null;
   performance_id?: number;
+  no_show?: boolean;
 }
 
 export interface EditVolunteerPageData {
@@ -29,6 +30,7 @@ export interface EditVolunteerPageData {
   assignedShifts: VolunteerShift[];
   pastShifts: VolunteerShift[];
   notes: VolunteerNote[];
+  noShowCount?: number;
 }
 
 export interface VolunteerNote {
@@ -93,13 +95,14 @@ function renderPastShiftsTable(pastShifts: VolunteerShift[]): string {
 
   return `
     <div class="profile-table-wrap">
-      <table class="profile-table">
+      <table class="profile-table past-shifts-table">
         <thead>
           <tr>
             <th>Production</th>
             <th>Role</th>
             <th>Start</th>
             <th>End</th>
+            <th>Attendance</th>
           </tr>
         </thead>
         <tbody>
@@ -107,10 +110,16 @@ function renderPastShiftsTable(pastShifts: VolunteerShift[]): string {
     pastShifts
       .map((shift) => `
               <tr>
-                <td>${escapeHtml(shift.show_name)}</td>
-                <td>${escapeHtml(shift.role)}</td>
-                <td>${escapeHtml(shift.start_time)}</td>
-                <td>${escapeHtml(shift.end_time)}</td>
+                <td data-label="Production">${escapeHtml(shift.show_name)}</td>
+                <td data-label="Role">${escapeHtml(shift.role)}</td>
+                <td data-label="Start">${escapeHtml(shift.start_time)}</td>
+                <td data-label="End">${escapeHtml(shift.end_time)}</td>
+                <td data-label="Attendance">${
+        shift.no_show
+          ? `<span class="no-show-badge">No-show</span>
+                  <button type="button" class="btn btn-sm btn-secondary" data-shift-id="${shift.id}" onclick="undoProfileNoShow(this)">Undo no-show</button>`
+          : "—"
+      }</td>
               </tr>
             `)
       .join("")
@@ -251,7 +260,6 @@ export function renderEditVolunteerTemplate(
 
         <header class="profile-hero">
           <div>
-            <p class="profile-eyebrow">Volunteer profile</p>
             <h1 class="page-title">${volunteerName}</h1>
             <div class="profile-summary">
               <span>${volunteerEmail}</span>
@@ -263,6 +271,12 @@ export function renderEditVolunteerTemplate(
             </div>
           </div>
           <div class="profile-stat-row" aria-label="Shift summary">
+            <div class="profile-stat">
+              <strong id="noShowCount">${
+    data.noShowCount ?? pastShifts.filter((shift) => shift.no_show).length
+  }</strong>
+              <span>No-shows</span>
+            </div>
             <div class="profile-stat">
               <strong>${assignedShifts.length}</strong>
               <span>Upcoming shifts</span>

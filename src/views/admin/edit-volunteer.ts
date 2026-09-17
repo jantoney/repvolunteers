@@ -27,6 +27,7 @@ export async function showEditVolunteerForm(ctx: RouterContext<string>) {
       `
       SELECT
         s.id,
+        (ns.participant_id IS NOT NULL) AS no_show,
         sd.show_id,
         sh.name as show_name,
         s.role,
@@ -49,10 +50,11 @@ export async function showEditVolunteerForm(ctx: RouterContext<string>) {
         TO_CHAR(s.depart_time AT TIME ZONE 'Australia/Adelaide', 'YYYY-MM-DD"T"HH24:MI:SS') as depart_time,
         sd.id as performance_id
       FROM shifts s
-      JOIN participant_shifts ps ON ps.shift_id = s.id
+      LEFT JOIN participant_shifts ps ON ps.shift_id = s.id AND ps.participant_id = $1
+      LEFT JOIN participant_shift_no_shows ns ON ns.shift_id = s.id AND ns.participant_id = $1
       JOIN show_dates sd ON s.show_date_id = sd.id
       JOIN shows sh ON sd.show_id = sh.id
-      WHERE ps.participant_id = $1
+      WHERE (ps.participant_id = $1 OR s.assigned_participant_id = $1)
         AND s.depart_time >= NOW()
       ORDER BY sd.start_time, s.arrive_time
     `,
@@ -63,6 +65,7 @@ export async function showEditVolunteerForm(ctx: RouterContext<string>) {
       `
       SELECT
         s.id,
+        (ns.participant_id IS NOT NULL) AS no_show,
         sd.show_id,
         sh.name as show_name,
         s.role,
@@ -85,16 +88,21 @@ export async function showEditVolunteerForm(ctx: RouterContext<string>) {
         TO_CHAR(s.depart_time AT TIME ZONE 'Australia/Adelaide', 'YYYY-MM-DD"T"HH24:MI:SS') as depart_time,
         sd.id as performance_id
       FROM shifts s
-      JOIN participant_shifts ps ON ps.shift_id = s.id
+      LEFT JOIN participant_shifts ps ON ps.shift_id = s.id AND ps.participant_id = $1
+      LEFT JOIN participant_shift_no_shows ns ON ns.shift_id = s.id AND ns.participant_id = $1
       JOIN show_dates sd ON s.show_date_id = sd.id
       JOIN shows sh ON sd.show_id = sh.id
-      WHERE ps.participant_id = $1
+      WHERE (ps.participant_id = $1 OR s.assigned_participant_id = $1 OR ns.participant_id IS NOT NULL)
         AND COALESCE(s.depart_time, sd.end_time, sd.start_time) < NOW()
       ORDER BY sd.start_time DESC, s.arrive_time DESC
     `,
       [id],
     );
 
+    const noShowCount = await client.queryObject<{ count: number }>(
+      "SELECT COUNT(*)::int AS count FROM participant_shift_no_shows WHERE participant_id = $1",
+      [id],
+    );
     const notesResult = await client.queryObject<VolunteerNote>(
       `
       SELECT
@@ -113,6 +121,7 @@ export async function showEditVolunteerForm(ctx: RouterContext<string>) {
 
     const data: EditVolunteerPageData = {
       volunteer: result.rows[0],
+      noShowCount: noShowCount.rows[0].count,
       assignedShifts: assignedShiftsResult.rows,
       pastShifts: pastShiftsResult.rows,
       notes: notesResult.rows,

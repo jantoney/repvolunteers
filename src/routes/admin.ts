@@ -1,4 +1,5 @@
 import { Router } from "oak";
+import { setShiftNoShow } from "../controllers/shift-attendance.ts";
 import * as adminController from "../controllers/admin.ts";
 import { requireAdminAuth, requireAuth } from "../middlewares/better-auth.ts";
 
@@ -7,6 +8,7 @@ import { rejectDeletedVolunteer } from "../middlewares/deleted-volunteer.ts";
 const router = new Router();
 
 const knownAdminPaths = [
+  /^\/api\/shifts\/[^/]+\/volunteers\/[^/]+\/no-show$/,
   /^\/login$/,
   /^\/logout$/,
   /^\/reset-password$/,
@@ -123,6 +125,7 @@ router.post(
 
 // Protected admin routes - apply middleware first
 router.use(requireAdminAuth);
+router.put("/api/shifts/:shiftId/volunteers/:volunteerId/no-show", setShiftNoShow);
 router.use(async (ctx, next) => {
   const match = ctx.request.url.pathname.match(/\/admin\/(?:api\/)?volunteers\/([a-f0-9-]{36})(?:\/|$)/i);
   if (match && await rejectDeletedVolunteer(ctx, match[1])) return;

@@ -1686,10 +1686,16 @@ export async function getShiftVolunteers(ctx: RouterContext<string>) {
   const client = await pool.connect();
   try {
     const result = await client.queryObject(
-      `SELECT v.id, v.name, v.email, v.phone
-       FROM participants v
-       JOIN participant_shifts vs ON vs.participant_id = v.id
-       WHERE vs.shift_id = $1
+      `SELECT v.id, v.name, v.email, v.phone,
+              (ns.participant_id IS NOT NULL) AS no_show,
+              (COALESCE(s.arrive_time, sd.start_time) <= NOW()) AS can_mark_no_show
+       FROM shifts s
+       JOIN show_dates sd ON sd.id = s.show_date_id
+       JOIN participants v ON v.id = s.assigned_participant_id OR EXISTS (
+         SELECT 1 FROM participant_shifts ps WHERE ps.shift_id = s.id AND ps.participant_id = v.id
+       )
+       LEFT JOIN participant_shift_no_shows ns ON ns.shift_id = s.id AND ns.participant_id = v.id
+       WHERE s.id = $1
        ORDER BY v.name`,
       [shiftId],
     );

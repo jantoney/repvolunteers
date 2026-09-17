@@ -59,6 +59,15 @@ CREATE TABLE IF NOT EXISTS participant_shifts (
   PRIMARY KEY (participant_id, shift_id)
 );
 
+-- Admin-only attendance, kept independently of assignment changes.
+CREATE TABLE IF NOT EXISTS participant_shift_no_shows (
+  participant_id UUID NOT NULL REFERENCES participants(id) ON DELETE CASCADE,
+  shift_id INTEGER NOT NULL REFERENCES shifts(id) ON DELETE CASCADE,
+  recorded_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  recorded_by TEXT,
+  PRIMARY KEY (participant_id, shift_id)
+);
+
 CREATE TABLE IF NOT EXISTS volunteer_unavailable_performances (
   participant_id UUID REFERENCES participants(id) ON DELETE CASCADE,
   show_date_id INTEGER REFERENCES show_dates(id) ON DELETE CASCADE,
