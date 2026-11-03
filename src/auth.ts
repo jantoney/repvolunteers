@@ -1,4 +1,5 @@
-import { betterAuth } from "better-auth";
+import { betterAuth, type BetterAuthOptions } from "better-auth";
+import type { MicrosoftEntraIDProfile } from "better-auth/social-providers";
 import { getAuthPool } from "./models/db.ts";
 import { hasMicrosoftAdminGroup } from "./utils/microsoft-admin.ts";
 
@@ -51,10 +52,7 @@ function decodeJwtPayload(idToken: string): MicrosoftTokenProfile | null {
 
 function mapMicrosoftProfile(profile: MicrosoftTokenProfile) {
   const email = profile.email ?? profile.preferred_username ?? profile.upn;
-  const id = profile.oid ?? profile.sub ?? email ?? crypto.randomUUID();
-
   return {
-    id: String(id),
     name: profile.name ?? email,
     email,
     image: profile.picture,
@@ -65,7 +63,7 @@ function mapMicrosoftProfile(profile: MicrosoftTokenProfile) {
 
 function createAuth() {
   if (!_auth) {
-    _auth = betterAuth({
+    _auth = betterAuth<BetterAuthOptions>({
       database: getAuthPool(),
       emailAndPassword: {
         enabled: false,
@@ -146,12 +144,15 @@ function createAuth() {
             if (!profile) {
               throw new Error("Microsoft id_token could not be decoded");
             }
+            if (typeof profile.oid !== "string" || !profile.oid.trim()) {
+              throw new Error("Microsoft id_token did not include an account identifier");
+            }
 
             return {
               user: {
                 ...mapMicrosoftProfile({ ...profile, idToken: tokens.idToken }),
               },
-              data: profile,
+              data: profile as MicrosoftEntraIDProfile,
             };
           },
         },

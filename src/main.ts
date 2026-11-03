@@ -104,4 +104,4 @@ app.use(router.routes());
 app.use(router.allowedMethods());
 
 console.log(`Server running on http://localhost:${port}`);
-await app.listen({ port });
+await app.listen({ hostname: "0.0.0.0", port });
