@@ -40,6 +40,8 @@ logs
 *.log
 
 # Environment files (these should be mounted as volumes)
+.env
+.env.*
 .env.local
 .env.development
 .env.test

@@ -1,7 +1,7 @@
-FROM denoland/deno:alpine-2.3.4
+FROM denoland/deno:alpine-2.9.8
 
 # Install tzdata and set timezone
-RUN apk add --no-cache tzdata && \
+RUN apk upgrade --no-cache && apk add --no-cache tzdata && \
     cp /usr/share/zoneinfo/Australia/Adelaide /etc/localtime && \
     echo "Australia/Adelaide" > /etc/timezone
 
