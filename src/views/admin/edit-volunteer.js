@@ -402,9 +402,19 @@ async function saveUnavailablePerformances() {
   }
 
   try {
-    const performanceIds = Array.from(unavailablePerformanceIds);
-    const result = await persistUnavailablePerformances(performanceIds);
-    syncSavedUnavailablePerformanceIds(result.performanceIds || performanceIds);
+    const selectedId = document.getElementById("unavailablePerformanceSelect")
+      ?.value;
+    const performanceIds = new Set(unavailablePerformanceIds);
+    if (selectedId) performanceIds.add(selectedId);
+
+    const idsToSave = Array.from(performanceIds);
+    const result = await persistUnavailablePerformances(idsToSave);
+    syncSavedUnavailablePerformanceIds(result.performanceIds || idsToSave);
+
+    if (selectedId) {
+      unavailablePerformanceIds.add(selectedId);
+      renderUnavailablePerformances();
+    }
 
     setUnavailablePerformancesStatus(
       "Unavailable performances saved.",
